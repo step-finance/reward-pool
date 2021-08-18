@@ -1,0 +1,18 @@
+[package]
+name = "reward-pool"
+version = "0.1.0"
+description = "Created with Anchor"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "reward_pool"
+
+[features]
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-lang = "0.13.2"
+anchor-spl = "0.13.2"
+solana-program = "1.7.7"
