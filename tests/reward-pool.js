@@ -156,7 +156,7 @@ describe('Reward Pool', () => {
     userSigner = _userSigner;
 
     const _balances = await utils.createUserTokenAccounts(
-      userSigner,
+      provider.wallet.publicKey,
       poolMint,
       stakingMint
     );
