@@ -2,7 +2,7 @@ const anchor = require("@project-serum/anchor");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 
-async function createMintAndVault(provider, vaultOwner, decimals) {
+async function createMint(provider, decimals) {
     const mint = await Token.createMint(
         provider.connection,
         provider.wallet.payer,
@@ -11,37 +11,51 @@ async function createMintAndVault(provider, vaultOwner, decimals) {
         decimals,
         TOKEN_PROGRAM_ID
     );
+    return mint;
+}
+
+async function createMintAndVault(provider, vaultOwner, decimals) {
+    const mint = await createMint(provider);
 
     const vault = await mint.createAccount(vaultOwner ? vaultOwner : provider.wallet.publicKey);
     return [mint, vault];
-}
-
-async function createUserTokenAccounts(owner, poolMint, stakingMint) {
-  const spt = await poolMint.createAccount(owner);
-  const vault = await stakingMint.createAccount(owner);
-  return {spt, vault};
 }
 
 async function mintToAccount(
     provider,
     mint,
     destination,
-    amount,
-    mintAuthority
+    amount
 ) {
-    // mint authority is the provider
     const tx = new anchor.web3.Transaction();
     tx.add(
       Token.createMintToInstruction(
         TOKEN_PROGRAM_ID,
         mint,
         destination,
-        mintAuthority.publicKey,
+        provider.wallet.publicKey,
         [],
         amount
       )
     );
-    await provider.send(tx, [mintAuthority]);
+    await provider.send(tx);
+}
+
+async function sendLamports(
+    provider,
+    destination,
+    amount
+) {
+    const tx = new anchor.web3.Transaction();
+    tx.add(
+        anchor.web3.SystemProgram.transfer(
+            { 
+                fromPubkey: provider.wallet.publicKey, 
+                lamports: amount, 
+                toPubkey: destination}
+        )
+    );
+    await provider.send(tx);
 }
 
 async function createMintToAccountInstrs(
@@ -61,7 +75,8 @@ return [
 }
 
 module.exports = {
-    createUserTokenAccounts,
     mintToAccount,
-    createMintAndVault
+    createMintAndVault,
+    createMint,
+    sendLamports,
 };
