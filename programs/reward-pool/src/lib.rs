@@ -803,8 +803,10 @@ pub enum ErrorCode {
     InvalidUserSigner,
     #[msg("An unknown error has occured.")]
     Unknown,
-    #[msg("Invalid mint supplied")]
+    #[msg("Invalid mint supplied.")]
     InvalidMint,
     #[msg("Please specify the correct authority for this program.")]
     InvalidProgramAuthority,
+    #[msg("Insufficient funds to unstake.")]
+    InsufficientFundUnstake,
 }
