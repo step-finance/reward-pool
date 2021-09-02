@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::system_program;
 use anchor_lang::solana_program::program_option::COption;
 use anchor_spl::token::{self, Mint, TokenAccount};
 use std::convert::Into;
@@ -10,7 +11,7 @@ pub fn update_rewards(
     reward_b_mint: &CpiAccount<anchor_spl::token::Mint>,
     user: Option<&mut ProgramAccount<User>>,
     clock: &Clock,
-    user_lp_amount: u64,
+    user_reward_pool_token_amount: u64,
     total_staked: u64,
     total_shares: u64,
 ) -> Result<()> {
@@ -43,7 +44,7 @@ pub fn update_rewards(
 
     if let Some(u) = user {
         u.reward_a_earned = earned(
-            user_lp_amount,
+            user_reward_pool_token_amount,
             total_shares,
             total_staked,
             pool.reward_a_per_token_stored,
@@ -54,7 +55,7 @@ pub fn update_rewards(
         u.reward_per_token_a_paid = pool.reward_a_per_token_stored;
 
         u.reward_b_earned = earned(
-            user_lp_amount,
+            user_reward_pool_token_amount,
             total_shares,
             total_staked,
             pool.reward_b_per_token_stored,
@@ -99,7 +100,7 @@ pub fn reward_per_token(
 }
 
 pub fn earned(
-    user_lp_amount: u64,
+    user_reward_pool_token_amount: u64,
     total_shares: u64,
     total_staked: u64,
     reward_per_token_x: u64,
@@ -110,7 +111,7 @@ pub fn earned(
     // Convert from stake-token units to mint-token units.
     let mut staked_amount = 0;
     if total_shares > 0 {
-        staked_amount = user_lp_amount
+        staked_amount = user_reward_pool_token_amount
             .checked_mul(total_staked)
             .unwrap()
             .checked_div(total_shares)
@@ -158,7 +159,7 @@ pub mod reward_pool {
         pool.reward_a_vault = reward_a_vault;
         pool.reward_b_mint = reward_b_mint;
         pool.reward_b_vault = reward_b_vault;
-        pool.pool_mint = *ctx.accounts.pool_mint.to_account_info().key;
+        pool.reward_pool_mint = *ctx.accounts.reward_pool_mint.to_account_info().key;
         pool.reward_duration = reward_duration;
         pool.reward_duration_end = 0;
         pool.last_update_time = 0;
@@ -167,21 +168,23 @@ pub mod reward_pool {
         pool.reward_a_per_token_stored = 0;
         pool.reward_b_per_token_stored = 0;
 
+        msg!("created pool nonce {}", nonce);
+
         Ok(())
     }
 
-    #[access_control(CreateUser::accounts(&ctx, nonce))]
     pub fn create_user(ctx: Context<CreateUser>, nonce: u8) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
         user.owner = *ctx.accounts.owner.key;
-        user.lp = *ctx.accounts.lp.to_account_info().key;
-        user.stake_from_account = *ctx.accounts.stake_from_account.to_account_info().key;
+        user.reward_pool_token = *ctx.accounts.reward_pool_token.to_account_info().key;
         user.reward_per_token_a_paid = 0;
         user.reward_per_token_b_paid = 0;
         user.reward_a_earned = 0;
         user.reward_b_earned = 0;
         user.nonce = nonce;
+
+        msg!("created user nonce {}", nonce);
         Ok(())
     }
 
@@ -195,7 +198,7 @@ pub mod reward_pool {
             return Err(ErrorCode::PoolPaused.into());
         }
 
-        let total_shares = ctx.accounts.pool_mint.supply;
+        let total_shares = ctx.accounts.reward_pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -214,8 +217,8 @@ pub mod reward_pool {
         // Transfer tokens into the stake vault.
         {
             let seeds = &[
+                ctx.accounts.owner.to_account_info().key.as_ref(),
                 ctx.accounts.pool.to_account_info().key.as_ref(),
-                ctx.accounts.user.to_account_info().key.as_ref(),
                 &[ctx.accounts.user.nonce],
             ];
             let user_signer = &[&seeds[..]];
@@ -243,8 +246,8 @@ pub mod reward_pool {
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.clone(),
                 token::MintTo {
-                    mint: ctx.accounts.pool_mint.to_account_info(),
-                    to: ctx.accounts.lp.to_account_info(),
+                    mint: ctx.accounts.reward_pool_mint.to_account_info(),
+                    to: ctx.accounts.reward_pool_token.to_account_info(),
                     authority: ctx.accounts.pool_signer.to_account_info(),
                 },
                 pool_signer,
@@ -267,7 +270,7 @@ pub mod reward_pool {
     }
 
     pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
-        let total_shares = ctx.accounts.pool_mint.supply;
+        let total_shares = ctx.accounts.reward_pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -285,8 +288,8 @@ pub mod reward_pool {
 
         // Program signer.
         let seeds = &[
+            ctx.accounts.owner.to_account_info().key.as_ref(),
             ctx.accounts.pool.to_account_info().key.as_ref(),
-            ctx.accounts.user.to_account_info().key.as_ref(),
             &[ctx.accounts.user.nonce],
         ];
         let user_signer = &[&seeds[..]];
@@ -296,9 +299,9 @@ pub mod reward_pool {
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.clone(),
                 token::Burn {
-                    mint: ctx.accounts.pool_mint.to_account_info(),
-                    to: ctx.accounts.lp.to_account_info(),
-                    authority: ctx.accounts.owner.to_account_info(),
+                    mint: ctx.accounts.reward_pool_mint.to_account_info(),
+                    to: ctx.accounts.reward_pool_token.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
                 },
                 user_signer,
             );
@@ -341,7 +344,7 @@ pub mod reward_pool {
         }
 
         let pool = &mut ctx.accounts.pool;
-        let total_shares = ctx.accounts.pool_mint.supply;
+        let total_shares = ctx.accounts.reward_pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         update_rewards(
@@ -414,7 +417,7 @@ pub mod reward_pool {
     }
 
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
-        let total_shares = ctx.accounts.pool_mint.supply;
+        let total_shares = ctx.accounts.reward_pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -429,6 +432,8 @@ pub mod reward_pool {
             total_shares,
         )
         .unwrap();
+
+        //msg!("user {} ");
 
         let seeds = &[
             ctx.accounts.pool.to_account_info().key.as_ref(),
@@ -488,7 +493,7 @@ pub mod reward_pool {
 pub struct Initialize<'info> {
     #[account(init)]
     pool: ProgramAccount<'info, Pool>,
-    pool_mint: CpiAccount<'info, Mint>,
+    reward_pool_mint: CpiAccount<'info, Mint>,
     rent: Sysvar<'info, Rent>,
 }
 
@@ -499,55 +504,45 @@ impl<'info> Initialize<'info> {
             ctx.program_id,
         )
         .map_err(|_| ErrorCode::InvalidNonce)?;
-        if ctx.accounts.pool_mint.mint_authority != COption::Some(pool_signer) {
-            return Err(ErrorCode::InvalidPoolMintAuthority.into());
-        }
-        assert!(ctx.accounts.pool_mint.supply == 0);
+        require!(
+            ctx.accounts.reward_pool_mint.mint_authority == COption::Some(pool_signer),
+            ErrorCode::InvalidPoolMintAuthority
+        );
+
+        require!(ctx.accounts.reward_pool_mint.supply == 0, ErrorCode::InvalidPoolMintSupply);
         Ok(())
     }
 }
 
 #[derive(Accounts)]
+#[instruction(nonce: u8)]
 pub struct CreateUser<'info> {
     // Stake instance.
     pool: ProgramAccount<'info, Pool>,
     // Member.
-    #[account(init)]
+    #[account(
+        init,
+        seeds = [
+            owner.key.as_ref(), 
+            pool.to_account_info().key.as_ref(),
+            &[nonce],
+        ],
+        payer = owner,
+    )]
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(
-        constraint = lp.mint == pool.pool_mint,
-        has_one = owner
+        constraint = reward_pool_token.mint == pool.reward_pool_mint,
+        constraint = reward_pool_token.owner == *user.to_account_info().key,
     )]
-    lp: CpiAccount<'info, TokenAccount>,
-    #[account(
-        constraint = stake_from_account.mint == pool.staking_mint,
-        has_one = owner
-    )]
-    stake_from_account: CpiAccount<'info, TokenAccount>,
-    user_signer: AccountInfo<'info>,
+    reward_pool_token: CpiAccount<'info, TokenAccount>,
     // Misc.
-    #[account(constraint = token_program.key == &token::ID)]
+    #[account(address = token::ID)]
     token_program: AccountInfo<'info>,
+    #[account(address = system_program::ID)]
+    system_program: AccountInfo<'info>,
     rent: Sysvar<'info, Rent>,
-}
-
-impl<'info> CreateUser<'info> {
-    fn accounts(ctx: &Context<CreateUser>, nonce: u8) -> Result<()> {
-        let seeds = &[
-            ctx.accounts.pool.to_account_info().key.as_ref(),
-            ctx.accounts.user.to_account_info().key.as_ref(),
-            &[nonce],
-        ];
-        let user_signer = Pubkey::create_program_address(seeds, ctx.program_id)
-            .map_err(|_| ErrorCode::InvalidNonce)?;
-        if &user_signer != ctx.accounts.user_signer.to_account_info().key {
-            return Err(ErrorCode::InvalidUserSigner.into());
-        }
-
-        Ok(())
-    }
 }
 
 #[derive(Accounts)]
@@ -561,10 +556,15 @@ pub struct Pause<'info> {
 #[derive(Accounts)]
 pub struct Stake<'info> {
     // Global accounts for the staking instance.
-    #[account(mut, has_one = pool_mint)]
+    #[account(
+        mut, 
+        has_one = reward_pool_mint,
+        has_one = reward_a_mint,
+        has_one = reward_b_mint
+    )]
     pool: ProgramAccount<'info, Pool>,
     #[account(mut)]
-    pool_mint: CpiAccount<'info, Mint>,
+    reward_pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -573,15 +573,24 @@ pub struct Stake<'info> {
     staking_vault: CpiAccount<'info, TokenAccount>,
 
     // User.
-    #[account(mut, has_one = owner, has_one = pool)]
+    #[account(
+        mut, 
+        has_one = owner, 
+        has_one = pool,
+        seeds = [
+            owner.key.as_ref(), 
+            pool.to_account_info().key.as_ref(),
+            &[user.nonce],
+        ],
+    )]
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(mut,
-        constraint = lp.mint == pool.pool_mint,
-        has_one = owner
+        constraint = reward_pool_token.mint == pool.reward_pool_mint,
+        constraint = reward_pool_token.owner == *user.to_account_info().key,
     )]
-    lp: CpiAccount<'info, TokenAccount>,
+    reward_pool_token: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = stake_from_account.mint == pool.staking_mint,
         has_one = owner
@@ -592,27 +601,24 @@ pub struct Stake<'info> {
     #[account(
         seeds = [
             pool.to_account_info().key.as_ref(),
-            user.to_account_info().key.as_ref(),
-            &[user.nonce],
-        ]
+            &[pool.nonce],
+        ],
     )]
-    user_signer: AccountInfo<'info>,
-    #[account(seeds = [pool.to_account_info().key.as_ref(), &[pool.nonce]])]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
     clock: Sysvar<'info, Clock>,
-    #[account(constraint = token_program.key == &token::ID)]
+    #[account(address = token::ID)]
     token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
 pub struct Fund<'info> {
     // Global accounts for the staking instance.
-    #[account(mut, has_one = pool_mint)]
+    #[account(mut, has_one = reward_pool_mint)]
     pool: ProgramAccount<'info, Pool>,
     #[account(mut)]
-    pool_mint: CpiAccount<'info, Mint>,
+    reward_pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -636,7 +642,12 @@ pub struct Fund<'info> {
     from_b: CpiAccount<'info, TokenAccount>,
 
     // Program signers.
-    #[account(seeds = [pool.to_account_info().key.as_ref(), &[pool.nonce]])]
+    #[account(
+        seeds = [
+            pool.to_account_info().key.as_ref(),
+            &[pool.nonce],
+        ],
+    )]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
@@ -648,10 +659,17 @@ pub struct Fund<'info> {
 #[derive(Accounts)]
 pub struct ClaimReward<'info> {
     // Global accounts for the staking instance.
-    #[account(mut, has_one = pool_mint)]
+    #[account(
+        mut, 
+        has_one = reward_pool_mint,
+        has_one = reward_a_mint,
+        has_one = reward_b_mint
+    )]
     pool: ProgramAccount<'info, Pool>,
-    #[account(mut)]
-    pool_mint: CpiAccount<'info, Mint>,
+    #[account(mut,
+        constraint = reward_pool_mint.mint_authority == COption::Some(*pool_signer.key)
+    )]
+    reward_pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -668,15 +686,24 @@ pub struct ClaimReward<'info> {
     reward_b_vault: CpiAccount<'info, TokenAccount>,
 
     // User.
-    #[account(mut, has_one = owner, has_one = pool)]
+    #[account(
+        mut,
+        has_one = owner,
+        has_one = pool,
+        seeds = [
+            owner.to_account_info().key.as_ref(),
+            pool.to_account_info().key.as_ref(),
+            &[user.nonce],
+        ],
+    )]
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(
-        constraint = lp.mint == pool.pool_mint,
-        has_one = owner
+        constraint = reward_pool_token.mint == pool.reward_pool_mint,
+        constraint = reward_pool_token.owner == *user.to_account_info().key,
     )]
-    lp: CpiAccount<'info, TokenAccount>,
+    reward_pool_token: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
         constraint = reward_a_account.owner == *owner.key
@@ -692,17 +719,14 @@ pub struct ClaimReward<'info> {
     #[account(
         seeds = [
             pool.to_account_info().key.as_ref(),
-            user.to_account_info().key.as_ref(),
-            &[user.nonce],
-        ]
+            &[pool.nonce],
+        ],
     )]
-    user_signer: AccountInfo<'info>,
-    #[account(seeds = [pool.to_account_info().key.as_ref(), &[pool.nonce]])]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
     clock: Sysvar<'info, Clock>,
-    #[account(constraint = token_program.key == &token::ID)]
+    #[account(address = token::ID)]
     token_program: AccountInfo<'info>,
 }
 
@@ -727,7 +751,7 @@ pub struct Pool {
     /// Vault to store reward B tokens.
     pub reward_b_vault: Pubkey,
     /// Staking pool token mint that represents shares of the pool.
-    pub pool_mint: Pubkey,
+    pub reward_pool_mint: Pubkey,
     /// The period which rewards are linearly distributed.
     pub reward_duration: u64,
     /// The timestamp at which the current reward period ends.
@@ -745,15 +769,14 @@ pub struct Pool {
 }
 
 #[account]
+#[derive(Default)]
 pub struct User {
     /// Pool the this user belongs to.
     pub pool: Pubkey,
     /// The owner of this account.
     pub owner: Pubkey,
-    /// Pool token account (LP).
-    pub lp: Pubkey,
-    /// Token account for depositing/staking from.
-    pub stake_from_account: Pubkey,
+    /// Pool token account.
+    pub reward_pool_token: Pubkey,
     /// The amount of token A claimed.
     pub reward_per_token_a_paid: u64,
     /// The amount of token B claimed.
@@ -774,6 +797,8 @@ pub enum ErrorCode {
     InvalidNonce,
     #[msg("Invalid pool mint authority")]
     InvalidPoolMintAuthority,
+    #[msg("Invalid pool mint supply")]
+    InvalidPoolMintSupply,
     #[msg("User signer doesn't match the derived address.")]
     InvalidUserSigner,
     #[msg("An unknown error has occured.")]

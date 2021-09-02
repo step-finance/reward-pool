@@ -32,21 +32,48 @@ const rewardPerToken = (pool, rewardXPerTokenStored, rewardXRate, totalStaked, r
 }
 
 const earned = (stakedBalance, rewardPerToken, userRewardPerTokenXPaid, rewardXEarned, rewardDecimals) => {
+  
+  // console.log("stakedBalance", stakedBalance.toString());
+  // console.log("rewardPerToken", rewardPerToken.toString());
+  // console.log("userRewardPerTokenXPaid", userRewardPerTokenXPaid);
+  // console.log("rewardXEarned", rewardXEarned);
+  // console.log("rewardDecimals", rewardDecimals);
+
   return stakedBalance
     .mul(rewardPerToken.sub(userRewardPerTokenXPaid))
     .div(new anchor.BN(10).pow(rewardDecimals))
     .add(rewardXEarned);
 }
 
+program = anchor.workspace.RewardPool;
+
+//Read the provider from the configured environmnet.
+//represents an outside actor
+//owns mints out of any other actors control, provides initial $$ to others
+const envProvider = anchor.Provider.env();
+
+// represents our admin who is setting up a reward pool
+const adminKp = new anchor.web3.Keypair();
+const adminProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(adminKp), envProvider.opts);
+
+// represents our user who has come to reap rewards
+const userKp = new anchor.web3.Keypair();
+const userProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(userKp), envProvider.opts);
+
+//we allow this convenience var to change between default env and mock user(s)
+//initially we are the outside actor
+let provider = envProvider;
+//convenience method to set in anchor AND above convenience var
+//setting in anchor allows the rpc and accounts namespaces access
+//to a different wallet from env
+function setProvider(p) { 
+  provider = p; 
+  anchor.setProvider(p); 
+  program = new anchor.Program(program.idl, program.programId, p);
+};
+setProvider(provider);
+
 describe('Reward Pool', () => {
-  // Read the provider from the configured environmnet.
-  const provider = anchor.Provider.env();
-
-  // Configure the client to use the provider.
-  anchor.setProvider(provider);
-
-  const program = anchor.workspace.RewardPool;
-
   let stakingMint = null;
   let stakingMintVault = null;
   let mintA = null;
@@ -54,14 +81,38 @@ describe('Reward Pool', () => {
   let mintB = null;
   let mintBVault = null;
 
-  const pool = new anchor.web3.Account();
+  const pool = new anchor.web3.Account();;
   const rewardDuration = new anchor.BN(30);
-  let poolAccount = null;
   let poolSigner = null;
   let nonce = null;
-  let poolMint = null;
+  let rewardPoolMint = null;
 
+  let userStakeToken = null;
+
+  it("Initialize actors", async () => {
+    setProvider(envProvider);
+    await utils.sendLamports(provider, adminProvider.wallet.publicKey, 3_000_000_000);
+    await utils.sendLamports(provider, userProvider.wallet.publicKey, 3_000_000_000);
+
+    //these mints are ecosystem mints not owned
+    //by admin or user
+    mintA = await utils.createMint(provider, 9);
+    mintB = await utils.createMint(provider, 9);
+    stakingMint = await utils.createMint(provider, 9);
+
+    //give our user some of the token to stake
+    userStakeToken = await stakingMint.createAccount(userProvider.wallet.publicKey);
+    stakingMint.mintTo(
+      userStakeToken,
+      provider.wallet.publicKey,
+      [],
+      1_000_000_000
+    );
+    
+  });
   it("Create pool accounts", async () => {
+    setProvider(adminProvider);
+
     const [
       _poolSigner,
       _nonce,
@@ -71,7 +122,7 @@ describe('Reward Pool', () => {
     );
     poolSigner = _poolSigner;
     nonce = _nonce;
-    poolMint = await Token.createMint(
+    rewardPoolMint = await Token.createMint(
       provider.connection,
       provider.wallet.payer,
       poolSigner,
@@ -80,46 +131,28 @@ describe('Reward Pool', () => {
       TOKEN_PROGRAM_ID
     );
 
-    const [_stakingMint, _stakingMintVault] = await utils.createMintAndVault(
-      provider,
-      poolSigner,
-      9
-    );
-    stakingMint = _stakingMint;
-    stakingMintVault = _stakingMintVault;
-
-    const [_mintA, _mintAVault] = await utils.createMintAndVault(
-      provider,
-      poolSigner,
-      9
-    );
-    mintA = _mintA;
-    mintAVault = _mintAVault;
-
-    const [_mintB, _mintBVault] = await utils.createMintAndVault(
-      provider,
-      poolSigner,
-      9
-    );
-    mintB = _mintB;
-    mintBVault = _mintBVault;
+    stakingMintVault = await stakingMint.createAccount(poolSigner);
+    mintAVault = await mintA.createAccount(poolSigner);
+    mintBVault = await mintB.createAccount(poolSigner);
   });
 
   it("Initializes the pool", async () => {
-    await program.rpc.initialize(
+    setProvider(adminProvider);
+
+    let tx = await program.rpc.initialize(
       provider.wallet.publicKey,
       nonce,
       stakingMint.publicKey,
-      stakingMintVault.publicKey,
+      stakingMintVault,
       mintA.publicKey,
       mintAVault,
-      mintB.publicKey,
+      mintB.publicKey, 
       mintBVault,
       rewardDuration,
       {
         accounts: {
           pool: pool.publicKey,
-          poolMint: poolMint.publicKey,
+          rewardPoolMint: rewardPoolMint.publicKey,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         },
         signers: [pool],
@@ -136,86 +169,71 @@ describe('Reward Pool', () => {
     assert.ok(poolAccount.stakingMint.equals(stakingMint.publicKey));
     assert.ok(poolAccount.rewardAMint.equals(mintA.publicKey));
     assert.ok(poolAccount.rewardBMint.equals(mintB.publicKey));
-    assert.ok(poolAccount.poolMint.equals(poolMint.publicKey));
+    assert.ok(poolAccount.rewardPoolMint.equals(rewardPoolMint.publicKey));
     assert.ok(poolAccount.rewardDuration.eq(rewardDuration));
   });
 
-  const user = new anchor.web3.Account();
   let userAccount = null;
-  let userSigner = null;
-  let balances = null;
+  let userAccountMeta = null;
+  let userNonce = null;
+  let rewardPoolTokenAccount = null;
 
   it("Creates a user", async () => {
+    setProvider(userProvider);
+
     const [
-      _userSigner,
-      nonce,
+      _userAccount,
+      _userNonce,
     ] = await anchor.web3.PublicKey.findProgramAddress(
-      [pool.publicKey.toBuffer(), user.publicKey.toBuffer()],
+      [provider.wallet.publicKey.toBuffer(), pool.publicKey.toBuffer()],
       program.programId
     );
-    userSigner = _userSigner;
+    userAccount = _userAccount;
+    userNonce = _userNonce;
+    
+    rewardPoolTokenAccount = await rewardPoolMint.createAccount(userAccount);
 
-    const _balances = await utils.createUserTokenAccounts(
-      provider.wallet.publicKey,
-      poolMint,
-      stakingMint
-    );
-
-    balances = _balances;
-
-    const tx = program.transaction.createUser(nonce, {
+    const tx = program.transaction.createUser(userNonce, {
       accounts: {
         pool: pool.publicKey,
-        user: user.publicKey,
+        user: userAccount,
         owner: provider.wallet.publicKey,
-        userSigner,
-        lp: balances.spt,
-        stakeFromAccount: balances.vault,
+        rewardPoolToken: rewardPoolTokenAccount,
         tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      },
-      instructions: [await program.account.user.createInstruction(user)],
+      }
     });
 
-    // Give user some tokens to stake
-    await stakingMint.mintTo(balances.vault, provider.wallet.publicKey, [], 1000000000);
+    await provider.send(tx);
 
-    const signers = [user, provider.wallet.payer];
-    const allTxs = [{ tx, signers }];
-    let txSigs = await provider.sendAll(allTxs);
+    userAccountMeta = await program.account.user.fetch(userAccount);
 
-    userAccount = await program.account.user.fetch(user.publicKey);
-
-    const userVault = await serumCmn.getTokenAccount(
-      provider,
-      balances.vault
-    );
-
-    assert.ok(userAccount.pool.equals(pool.publicKey));
-    assert.ok(userAccount.owner.equals(provider.wallet.publicKey));
-    assert.ok(userAccount.lp.equals(balances.spt));
-    assert.ok(userAccount.stakeFromAccount.equals(balances.vault));
-    assert.ok(userVault.amount.eq(new anchor.BN(1000000000)));
+    assert.ok(userAccountMeta.pool.equals(pool.publicKey));
+    assert.ok(userAccountMeta.owner.equals(provider.wallet.publicKey));
+    assert.ok(userAccountMeta.rewardPoolToken.equals(rewardPoolTokenAccount));
   });
 
-
   it("Stake tokens in the pool", async () => {
-    const stakeAmount = new anchor.BN(1000000000);
-    await program.rpc.stake(stakeAmount, {
+    setProvider(userProvider);
+
+    const stakeAmount = new anchor.BN(1_000_000_000);
+    await program.rpc.stake(
+      stakeAmount, 
+      {
       accounts: {
         // Stake instance.
         pool: pool.publicKey,
-        poolMint: poolMint.publicKey,
+        rewardPoolMint: rewardPoolMint.publicKey,
         rewardAMint: mintA.publicKey,
         rewardBMint: mintB.publicKey,
         stakingVault: stakingMintVault,
         // User.
-        user: user.publicKey,
+        user: userAccount,
         owner: provider.wallet.publicKey,
-        lp: balances.spt,
-        stakeFromAccount: balances.vault,
+        rewardPoolToken: rewardPoolTokenAccount,
+        stakeFromAccount: userStakeToken,
         // Program signers.
-        userSigner,
         poolSigner,
         // Misc.
         clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
@@ -223,38 +241,45 @@ describe('Reward Pool', () => {
       },
     });
 
+    const userTokenMeta = await serumCmn.getTokenAccount(
+      provider,
+      userStakeToken
+    );
     const vault = await serumCmn.getTokenAccount(
       provider,
-      userAccount.stakeFromAccount
-    );
-    const spt = await serumCmn.getTokenAccount(
-      provider,
-      userAccount.lp
+      stakingMintVault
     );
 
-    assert.ok(vault.amount.eq(new anchor.BN(0)));
-    assert.ok(spt.amount.eq(new anchor.BN(1000000000)));
+    assert.ok(userTokenMeta.amount.eq(new anchor.BN(0)));
+    assert.ok(vault.amount.eq(new anchor.BN(1_000_000_000)));
   });
 
   let funderMintAAccount = null;
   let funderMintBAccount = null;
 
   it("Fund the pool", async () => {
+    //switch to admin context to create token accounts
+    setProvider(adminProvider);
+
     const amountA = new anchor.BN(1000000000);
     const amountB = new anchor.BN(1000000000);
 
     funderMintAAccount = await mintA.createAccount(provider.wallet.publicKey);
     funderMintBAccount = await mintB.createAccount(provider.wallet.publicKey);
 
+    //switch to env context to mint (admin doesn't own these)
+    setProvider(envProvider);
     // Create some rewards to fund contract with
     await mintA.mintTo(funderMintAAccount, provider.wallet.publicKey, [], amountA.toNumber());
     await mintB.mintTo(funderMintBAccount, provider.wallet.publicKey, [], amountB.toNumber());
 
+    //back to admin to properly test
+    setProvider(adminProvider);
     await program.rpc.fund(amountA, amountB, {
       accounts: {
         // Stake instance.
         pool: pool.publicKey,
-        poolMint: poolMint.publicKey,
+        rewardPoolMint: rewardPoolMint.publicKey,
         rewardAMint: mintA.publicKey,
         rewardBMint: mintB.publicKey,
         stakingVault: stakingMintVault,
@@ -299,30 +324,34 @@ describe('Reward Pool', () => {
   let claimerMintBAccount = null;
 
   it("User has accrued rewards", async () => {
-    poolAccount = await program.account.pool.fetch(pool.publicKey);
-    userAccount = await program.account.user.fetch(user.publicKey);
+    setProvider(envProvider);
 
-    claimerMintAAccount = await mintA.createAccount(provider.wallet.publicKey);
-    claimerMintBAccount = await mintB.createAccount(provider.wallet.publicKey);
+    poolAccountMeta = await program.account.pool.fetch(pool.publicKey);
+    userAccountMeta = await program.account.user.fetch(userAccount);
+
+    claimerMintAAccount = await mintA.createAccount(userProvider.wallet.publicKey);
+    claimerMintBAccount = await mintB.createAccount(userProvider.wallet.publicKey);
+
+    setProvider(userProvider);
 
     const stakingVaultAccount = await serumCmn.getTokenAccount(
       provider,
       stakingMintVault
     );
 
-    const spt = await serumCmn.getTokenAccount(
+    const rewardPoolTokenMeta = await serumCmn.getTokenAccount(
       provider,
-      userAccount.lp
+      userAccountMeta.rewardPoolToken
     );
 
-    const lp = await serumCmn.getMintInfo(
+    const rewardPoolMintMeta = await serumCmn.getMintInfo(
       provider,
-      poolMint.publicKey
+      rewardPoolMint.publicKey
     );
 
-    const stakedBalance = spt.amount
+    const stakedBalance = rewardPoolTokenMeta.amount
       .mul(stakingVaultAccount.amount)
-      .div(lp.supply)
+      .div(rewardPoolMintMeta.supply)
 
     const mintAInfo = await serumCmn.getMintInfo(
       provider,
@@ -341,11 +370,13 @@ describe('Reward Pool', () => {
       stakingVaultAccount.amount,
       new anchor.BN(mintAInfo.decimals)
     );
+
+
     const earnedAmt = earned(
       stakedBalance,
       _rewardPerToken,
-      userAccount.rewardPerTokenAPaid,
-      userAccount.rewardAEarned,
+      userAccountMeta.rewardPerTokenAPaid,
+      userAccountMeta.rewardAEarned,
       new anchor.BN(mintAInfo.decimals)
     );
 
@@ -358,21 +389,19 @@ describe('Reward Pool', () => {
       accounts: {
         // Stake instance.
         pool: pool.publicKey,
-        poolMint: poolMint.publicKey,
+        rewardPoolMint: rewardPoolMint.publicKey,
         rewardAMint: mintA.publicKey,
         rewardBMint: mintB.publicKey,
         stakingVault: stakingMintVault,
         rewardAVault: mintAVault,
         rewardBVault: mintBVault,
         // User.
-        user: user.publicKey,
+        user: userAccount,
         owner: provider.wallet.publicKey,
-        lp: balances.spt,
-        stakeFromAccount: balances.vault,
+        rewardPoolToken: rewardPoolTokenAccount,
         rewardAAccount: claimerMintAAccount,
         rewardBAccount: claimerMintBAccount,
         // Program signers.
-        userSigner,
         poolSigner,
         // Misc.
         clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
@@ -395,26 +424,29 @@ describe('Reward Pool', () => {
   });
 
   it("Unstake tokens from pool", async () => {
-    let spt = await serumCmn.getTokenAccount(
+    setProvider(userProvider);
+
+    userAccountMeta = await program.account.user.fetch(userAccount);
+
+    let rewardPoolTokenMeta = await serumCmn.getTokenAccount(
       provider,
-      userAccount.lp
+      userAccountMeta.rewardPoolToken
     );
 
-    await program.rpc.unstake(spt.amount, {
+    await program.rpc.unstake(rewardPoolTokenMeta.amount, {
       accounts: {
         // Stake instance.
         pool: pool.publicKey,
-        poolMint: poolMint.publicKey,
+        rewardPoolMint: rewardPoolMint.publicKey,
         rewardAMint: mintA.publicKey,
         rewardBMint: mintB.publicKey,
         stakingVault: stakingMintVault,
         // User.
-        user: user.publicKey,
+        user: userAccount,
         owner: provider.wallet.publicKey,
-        lp: balances.spt,
-        stakeFromAccount: balances.vault,
+        rewardPoolToken: userAccountMeta.rewardPoolToken,
+        stakeFromAccount: userStakeToken,
         // Program signers.
-        userSigner,
         poolSigner,
         // Misc.
         clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
@@ -422,21 +454,20 @@ describe('Reward Pool', () => {
       },
     });
 
+    const userTokenMeta = await serumCmn.getTokenAccount(
+      provider,
+      userStakeToken
+    );
     const vault = await serumCmn.getTokenAccount(
       provider,
-      userAccount.stakeFromAccount
-    );
-    spt = await serumCmn.getTokenAccount(
-      provider,
-      userAccount.lp
+      stakingMintVault
     );
 
-    assert.ok(vault.amount.eq(new anchor.BN(1000000000)));
-    assert.ok(spt.amount.eq(new anchor.BN(0)));
+    assert.ok(userTokenMeta.amount.eq(new anchor.BN(1000000000)));
+    assert.ok(vault.amount.eq(new anchor.BN(0)));
   });
 
   it("Can pause/unpause", async () => {
     // TODO
   });
-
 });

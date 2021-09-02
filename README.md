@@ -1,6 +1,12 @@
 # Reward Pool
 
-Program for staking and receiving rewards. For a technical introduction, see the [docs](./docs).
+Program for staking and receiving rewards. 
+
+## Design Overview
+
+![reward pool account overview](https://github.com/step-finance/reward-pool/blob/initial/account-design.png)
+
+*draw.io editable*
 
 ## Note
 
