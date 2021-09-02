@@ -4,6 +4,7 @@ const serumCmn = require("@project-serum/common");
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const utils = require("./utils");
+const { User } = require("./user");
 
 const lastTimeRewardApplicable = (pool) => {
   return new anchor.BN(Math.min(Date.now() / 1000, pool.rewardDurationEnd));
@@ -14,51 +15,28 @@ const rewardPerToken = (pool, rewardXPerTokenStored, rewardXRate, totalStaked, r
     return rewardPerTokenAStored;
   }
 
-  /*console.log("rewardXPerTokenStored", rewardXPerTokenStored.toNumber())
-  console.log("rewardXRate", rewardXRate.toNumber())
-  console.log("totalStaked", totalStaked.toNumber())
-  console.log("lastUpdateTime", pool.lastUpdateTime.toNumber())
-  console.log("lastTimeRewardApplicable", lastTimeRewardApplicable(pool).toNumber())
-  console.log("decimals", new anchor.BN(10).pow(rewardDecimals).toNumber())
-  console.log("time since updated", (Date.now() / 1000) - pool.lastUpdateTime.toNumber())*/
-
   return rewardXPerTokenStored.add(
     (lastTimeRewardApplicable(pool)
-        .sub(pool.lastUpdateTime))
-        .mul(rewardXRate)
-        .mul(new anchor.BN(10).pow(rewardDecimals))
-        .div(totalStaked)
+      .sub(pool.lastUpdateTime))
+      .mul(rewardXRate)
+      .mul(new anchor.BN(10).pow(rewardDecimals))
+      .div(totalStaked)
   );
 }
 
 const earned = (stakedBalance, rewardPerToken, userRewardPerTokenXPaid, rewardXEarned, rewardDecimals) => {
-  
-  // console.log("stakedBalance", stakedBalance.toString());
-  // console.log("rewardPerToken", rewardPerToken.toString());
-  // console.log("userRewardPerTokenXPaid", userRewardPerTokenXPaid);
-  // console.log("rewardXEarned", rewardXEarned);
-  // console.log("rewardDecimals", rewardDecimals);
-
   return stakedBalance
     .mul(rewardPerToken.sub(userRewardPerTokenXPaid))
     .div(new anchor.BN(10).pow(rewardDecimals))
     .add(rewardXEarned);
 }
 
-program = anchor.workspace.RewardPool;
+let program = anchor.workspace.RewardPool;
 
 //Read the provider from the configured environmnet.
 //represents an outside actor
 //owns mints out of any other actors control, provides initial $$ to others
 const envProvider = anchor.Provider.env();
-
-// represents our admin who is setting up a reward pool
-const adminKp = new anchor.web3.Keypair();
-const adminProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(adminKp), envProvider.opts);
-
-// represents our user who has come to reap rewards
-const userKp = new anchor.web3.Keypair();
-const userProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(userKp), envProvider.opts);
 
 //we allow this convenience var to change between default env and mock user(s)
 //initially we are the outside actor
@@ -66,14 +44,175 @@ let provider = envProvider;
 //convenience method to set in anchor AND above convenience var
 //setting in anchor allows the rpc and accounts namespaces access
 //to a different wallet from env
-function setProvider(p) { 
-  provider = p; 
-  anchor.setProvider(p); 
+function setProvider(p) {
+  provider = p;
+  anchor.setProvider(p);
   program = new anchor.Program(program.idl, program.programId, p);
 };
 setProvider(provider);
 
-describe('Reward Pool', () => {
+describe('Multiuser Reward Pool', () => {
+
+  const rewardDuration = new anchor.BN(30);
+
+  let users;
+  let funders;
+  let mintA;
+  let mintB;
+  let stakingMint;
+  let poolKeypair = anchor.web3.Keypair.generate();
+
+  it("Initialize mints", async () => {
+    setProvider(envProvider);
+    //these mints are ecosystem mints not owned
+    //by funder or user
+    mintA = await utils.createMint(provider, 9);
+    mintB = await utils.createMint(provider, 9);
+    stakingMint = await utils.createMint(provider, 9);
+  });
+
+  it("Initialize users", async () => {
+    users = [1, 2, 3, 4, 5].map(a => new User());
+    await Promise.all(
+      users.map(a => a.init(1_000_000_000, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+    );
+  })
+
+  it("Initialize funders", async () => {
+    funders = [1, 2].map(a => new User());
+    await Promise.all(
+      funders.map(a => a.init(1_000_000_000, stakingMint.publicKey, 0, mintA.publicKey, 10_000_000_000, mintB.publicKey, 20_000_000_000))
+    );
+  });
+
+  it("Creates a pool", async () => {
+    await funders[0].initializePool(poolKeypair, rewardDuration);
+
+    //second funder tries to create with same pubkey
+    try {
+      await funders[1].initializePool(poolKeypair, rewardDuration);
+      assert.fail("did not fail to create dupe pool");
+    } catch (e) { }
+  });
+
+  it('Users create staking accounts', async () => {
+    let pool = funders[0].poolPubkey;
+    await Promise.all(
+      users.map(a => a.createUserStakingAccount(pool))
+    );
+
+    //user tries to create a dupe account
+    try {
+      await users[0].createUserStakingAccount(pool);
+      assert.fail("did not fail to create dupe user");
+    } catch (e) { }
+  });
+
+  it('Some users stake some tokens', async () => {
+    await Promise.all([
+      users[0].stakeTokens(2_000_000_000),
+      users[1].stakeTokens(1_000_000_000),
+      users[2].stakeTokens(500_000_000)
+    ]);
+  });
+
+  it('User tries to stake more tokens than they have', async () => {
+    try {
+      await users[3].stakeTokens(5_000_000_001)
+      assert.fail("did not fail on user stake too much");
+    } catch (e) { }
+  });
+
+  it('User tries to pause the pool using own pubkey', async () => {
+    try {
+      await users[0].pausePool(true, null);
+      assert.fail("did not fail on user pause pool");
+    } catch (e) { }
+  });
+
+  it('User tries to pause the pool using funder pubkey but unsigned', async () => {
+    try {
+      await users[0].pausePool(true, funders[0].provider.wallet.publicKey);
+      assert.fail("did not fail on user pause pool");
+    } catch (e) { }
+  });
+
+  it('Funder pauses the pool', async () => {
+      await funders[0].pausePool(true, null);
+  });
+
+  it('Funder pauses the paused pool', async () => {
+      await funders[0].pausePool(true, null);
+  });
+
+  it('User tried to stake some tokens in paused pool', async () => {
+    try {
+      await users[3].stakeTokens(1_000_000_000);
+      assert.fail("did not fail on user staking in paused pool");
+    } catch (e) { }
+  });
+
+  it('User tries to unpause the pool using own pubkey', async () => {
+    try {
+      await users[0].pausePool(false, null);
+      assert.fail("did not fail on user pause pool");
+    } catch (e) { }
+  });
+
+  it('User tries to unpause the pool using funder pubkey but unsigned', async () => {
+    try {
+      await users[0].pausePool(false, funders[0].provider.wallet.publicKey);
+      assert.fail("did not fail on user pause pool");
+    } catch (e) { }
+  });
+
+  it('User unstakes some tokens in paused pool', async () => {
+      await users[2].unstakeTokens(250_000_000);
+  });
+
+  it('Funder unpauses the pool', async () => {
+      await funders[0].pausePool(false, null);
+  });
+
+  it('Funder unpauses the unpaused pool', async () => {
+      await funders[0].pausePool(false, null);
+  });
+
+  it('User stakes some tokens in unpaused pool', async () => {
+      await users[2].stakeTokens(250_000_000);
+  });
+
+  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 0, 0
+
+  it('Users try to unstake when they have none', async () => {
+    try {
+      await users[3].unstakeTokens(1);
+      assert.fail("did not fail on user unstaking when no balance");
+    } catch (e) { }
+  });
+
+  it('Users try to unstake more than they have', async () => {
+    try {
+      await users[2].unstakeTokens(500_000_001);
+      assert.fail("did not fail on user unstaking when more than they have");
+    } catch (e) { }
+  });
+
+
+
+});
+
+
+describe('Simple Reward Pool', () => {
+
+  // represents our funder who is setting up a reward pool
+  const funderKp = new anchor.web3.Keypair();
+  const funderProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(funderKp), envProvider.opts);
+
+  // represents our user who has come to reap rewards
+  const userKp = new anchor.web3.Keypair();
+  const userProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(userKp), envProvider.opts);
+
   let stakingMint = null;
   let stakingMintVault = null;
   let mintA = null;
@@ -91,11 +230,11 @@ describe('Reward Pool', () => {
 
   it("Initialize actors", async () => {
     setProvider(envProvider);
-    await utils.sendLamports(provider, adminProvider.wallet.publicKey, 3_000_000_000);
+    await utils.sendLamports(provider, funderProvider.wallet.publicKey, 3_000_000_000);
     await utils.sendLamports(provider, userProvider.wallet.publicKey, 3_000_000_000);
 
     //these mints are ecosystem mints not owned
-    //by admin or user
+    //by funder or user
     mintA = await utils.createMint(provider, 9);
     mintB = await utils.createMint(provider, 9);
     stakingMint = await utils.createMint(provider, 9);
@@ -108,10 +247,10 @@ describe('Reward Pool', () => {
       [],
       1_000_000_000
     );
-    
+
   });
   it("Create pool accounts", async () => {
-    setProvider(adminProvider);
+    setProvider(funderProvider);
 
     const [
       _poolSigner,
@@ -137,7 +276,7 @@ describe('Reward Pool', () => {
   });
 
   it("Initializes the pool", async () => {
-    setProvider(adminProvider);
+    setProvider(funderProvider);
 
     let tx = await program.rpc.initialize(
       provider.wallet.publicKey,
@@ -146,7 +285,7 @@ describe('Reward Pool', () => {
       stakingMintVault,
       mintA.publicKey,
       mintAVault,
-      mintB.publicKey, 
+      mintB.publicKey,
       mintBVault,
       rewardDuration,
       {
@@ -190,7 +329,7 @@ describe('Reward Pool', () => {
     );
     userAccount = _userAccount;
     userNonce = _userNonce;
-    
+
     rewardPoolTokenAccount = await rewardPoolMint.createAccount(userAccount);
 
     const tx = program.transaction.createUser(userNonce, {
@@ -219,7 +358,7 @@ describe('Reward Pool', () => {
 
     const stakeAmount = new anchor.BN(1_000_000_000);
     await program.rpc.stake(
-      stakeAmount, 
+      stakeAmount,
       {
       accounts: {
         // Stake instance.
@@ -258,8 +397,8 @@ describe('Reward Pool', () => {
   let funderMintBAccount = null;
 
   it("Fund the pool", async () => {
-    //switch to admin context to create token accounts
-    setProvider(adminProvider);
+    //switch to funder context to create token accounts
+    setProvider(funderProvider);
 
     const amountA = new anchor.BN(1000000000);
     const amountB = new anchor.BN(1000000000);
@@ -267,14 +406,14 @@ describe('Reward Pool', () => {
     funderMintAAccount = await mintA.createAccount(provider.wallet.publicKey);
     funderMintBAccount = await mintB.createAccount(provider.wallet.publicKey);
 
-    //switch to env context to mint (admin doesn't own these)
+    //switch to env context to mint (funder doesn't own these)
     setProvider(envProvider);
     // Create some rewards to fund contract with
     await mintA.mintTo(funderMintAAccount, provider.wallet.publicKey, [], amountA.toNumber());
     await mintB.mintTo(funderMintBAccount, provider.wallet.publicKey, [], amountB.toNumber());
 
-    //back to admin to properly test
-    setProvider(adminProvider);
+    //back to funder to properly test
+    setProvider(funderProvider);
     await program.rpc.fund(amountA, amountB, {
       accounts: {
         // Stake instance.
@@ -467,7 +606,4 @@ describe('Reward Pool', () => {
     assert.ok(vault.amount.eq(new anchor.BN(0)));
   });
 
-  it("Can pause/unpause", async () => {
-    // TODO
-  });
 });
