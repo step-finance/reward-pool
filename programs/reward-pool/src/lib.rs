@@ -215,20 +215,13 @@ pub mod reward_pool {
 
         // Transfer tokens into the stake vault.
         {
-            let seeds = &[
-                ctx.accounts.owner.to_account_info().key.as_ref(),
-                ctx.accounts.pool.to_account_info().key.as_ref(),
-                &[ctx.accounts.user.nonce],
-            ];
-            let user_signer = &[&seeds[..]];
-            let cpi_ctx = CpiContext::new_with_signer(
+            let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.clone(),
                 token::Transfer {
                     from: ctx.accounts.stake_from_account.to_account_info(),
                     to: ctx.accounts.staking_vault.to_account_info(),
                     authority: ctx.accounts.owner.to_account_info(),
                 },
-                user_signer,
             );
 
             token::transfer(cpi_ctx, amount)?;
@@ -285,24 +278,15 @@ pub mod reward_pool {
         )
         .unwrap();
 
-        // Program signer.
-        let seeds = &[
-            ctx.accounts.owner.to_account_info().key.as_ref(),
-            ctx.accounts.pool.to_account_info().key.as_ref(),
-            &[ctx.accounts.user.nonce],
-        ];
-        let user_signer = &[&seeds[..]];
-
         // Burn pool tokens.
         {
-            let cpi_ctx = CpiContext::new_with_signer(
+            let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.clone(),
                 token::Burn {
                     mint: ctx.accounts.pool_mint.to_account_info(),
                     to: ctx.accounts.lp.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(),
                 },
-                user_signer,
             );
             token::burn(cpi_ctx, spt_amount)?;
         }

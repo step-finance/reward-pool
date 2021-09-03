@@ -78,7 +78,7 @@ class User {
                 mintBVault
             };
 
-        let tx = await this.program.rpc.initialize(
+        await this.program.rpc.initialize(
             this.provider.wallet.publicKey,
             nonce,
             this.stakingMintObject.publicKey,
@@ -125,7 +125,7 @@ class User {
         this.poolMintObject = new Token(this.provider.connection, poolMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
 
         let lpKeypair = anchor.web3.Keypair.generate();
-        this.lpPubkey = lpKeypair.publicKey;
+        let newlpPubkey = lpKeypair.publicKey;
 
         const balanceNeeded = await Token.getMinBalanceRentForExemptAccount(this.provider.connection);
 
@@ -141,7 +141,7 @@ class User {
             instructions: [
                 anchor.web3.SystemProgram.createAccount({
                     fromPubkey: this.provider.wallet.publicKey,
-                    newAccountPubkey: this.lpPubkey,
+                    newAccountPubkey: newlpPubkey,
                     lamports: balanceNeeded,
                     space: AccountLayout.span,
                     programId: TOKEN_PROGRAM_ID,
@@ -149,17 +149,19 @@ class User {
                 Token.createInitAccountInstruction(
                     TOKEN_PROGRAM_ID,
                     poolMint,
-                    this.lpPubkey,
+                    newlpPubkey,
                     this.provider.wallet.publicKey,
                 ),
             ],
             signers: [lpKeypair]
         });
+
+        //do AFTER the tx succeeds
+        this.lpPubkey = newlpPubkey;
     }
 
     async stakeTokens(amount) {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        let userObject = await this.program.account.user.fetch(this.userPubkey);
 
         const [
             _poolSigner,
@@ -191,7 +193,8 @@ class User {
                     clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
                     tokenProgram: TOKEN_PROGRAM_ID,
                 },
-            });
+            }
+        );
     }
 
     async pausePool(isPaused, authority) {
@@ -207,7 +210,6 @@ class User {
 
     async unstakeTokens(amount) {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        let userObject = await this.program.account.user.fetch(this.userPubkey);
 
         const [
             _poolSigner,

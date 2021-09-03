@@ -97,6 +97,7 @@ describe('Multiuser Reward Pool', () => {
 
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
+
     await Promise.all(
       users.map(a => a.createUserStakingAccount(pool))
     );
@@ -109,13 +110,13 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('Some users stake some tokens', async () => {
+
     await Promise.all([
       users[0].stakeTokens(2_000_000_000),
       users[1].stakeTokens(1_000_000_000),
       users[2].stakeTokens(500_000_000)
     ]);
   });
-
   it('User tries to stake more tokens than they have', async () => {
     try {
       await users[3].stakeTokens(5_000_000_001)
@@ -203,7 +204,6 @@ describe('Multiuser Reward Pool', () => {
   });
 
 });
-
 /*
 describe('Simple Reward Pool', () => {
 
@@ -607,6 +607,5 @@ describe('Simple Reward Pool', () => {
     assert.ok(userTokenMeta.amount.eq(new anchor.BN(1000000000)));
     assert.ok(vault.amount.eq(new anchor.BN(0)));
   });
-
 });
 */
