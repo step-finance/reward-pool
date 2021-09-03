@@ -4,7 +4,7 @@ const utils = require("./utils");
 
 ///user can be an admin or a staker. either way, call init - then can call other methods
 class User {
-    constructor() { }
+    constructor(a) { this.id = a; }
 
     async init(initialLamports, stakingMint, initialStaking, mintA, initialA, mintB, initialB) {
         this.keypair = new anchor.web3.Keypair();
@@ -35,12 +35,12 @@ class User {
             this.stakingPubkey = await this.stakingMintObject.createAssociatedTokenAccount(this.pubkey);
             await this.stakingMintObject.mintTo(this.stakingPubkey, envProvider.wallet.payer, [], initialStaking);
         }
+        this.mintAPubkey = await this.mintAObject.createAssociatedTokenAccount(this.pubkey);
         if (initialA > 0) {
-            this.mintAPubkey = await this.mintAObject.createAssociatedTokenAccount(this.pubkey);
             await this.mintAObject.mintTo(this.mintAPubkey, envProvider.wallet.payer, [], initialA);
         }
+        this.mintBPubkey = await this.mintBObject.createAssociatedTokenAccount(this.pubkey);
         if (initialB > 0) {
-            this.mintBPubkey = await this.mintBObject.createAssociatedTokenAccount(this.pubkey);
             await this.mintBObject.mintTo(this.mintBPubkey, envProvider.wallet.payer, [], initialB);
         }
     }
@@ -279,6 +279,48 @@ class User {
                     tokenProgram: TOKEN_PROGRAM_ID,
                 },
             });
+    }
+
+    async claim() {
+        let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
+
+        const [
+            _poolSigner,
+            _nonce,
+        ] = await anchor.web3.PublicKey.findProgramAddress(
+            [this.poolPubkey.toBuffer()],
+            this.program.programId
+        );
+        let poolSigner = _poolSigner;
+
+        await this.program.rpc.claim({
+            accounts: {
+                // Stake instance.
+                pool: this.poolPubkey,
+                poolMint: poolObject.poolMint,
+                rewardAMint: poolObject.rewardAMint,
+                rewardBMint: poolObject.rewardBMint,
+                stakingVault: poolObject.stakingVault,
+                rewardAVault: poolObject.rewardAVault,
+                rewardBVault: poolObject.rewardBVault,
+                // User.
+                user: this.userPubkey,
+                owner: this.provider.wallet.publicKey,
+                lp: this.lpPubkey,
+                rewardAAccount: this.mintAPubkey,
+                rewardBAccount: this.mintBPubkey,
+                // Program signers.
+                poolSigner,
+                // Misc.
+                clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
+                tokenProgram: TOKEN_PROGRAM_ID,
+            },
+        });
+
+        let amtA = await this.provider.connection.getTokenAccountBalance(this.mintAPubkey);
+        let amtB = await this.provider.connection.getTokenAccountBalance(this.mintBPubkey);
+        console.log(this.id, "amtA", amtA.value.uiAmount);
+        console.log(this.id, "amtB", amtB.value.uiAmount);
     }
 }
 
