@@ -145,7 +145,7 @@ describe('Multiuser Reward Pool', () => {
       await funders[0].pausePool(true, null);
   });
 
-  it('User tried to stake some tokens in paused pool', async () => {
+  it('User tries to stake some tokens in paused pool', async () => {
     try {
       await users[3].stakeTokens(1_000_000_000);
       assert.fail("did not fail on user staking in paused pool");
