@@ -587,8 +587,8 @@ pub struct Stake<'info> {
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(mut,
+        has_one = owner,
         constraint = lp.mint == pool.pool_mint,
-        constraint = lp.owner == *user.to_account_info().key,
     )]
     lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
@@ -700,8 +700,8 @@ pub struct ClaimReward<'info> {
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(
+        has_one = owner,
         constraint = lp.mint == pool.pool_mint,
-        constraint = lp.owner == *user.to_account_info().key,
     )]
     lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
