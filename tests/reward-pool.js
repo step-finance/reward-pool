@@ -72,16 +72,16 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it("Initialize users", async () => {
-    users = [1, 2, 3, 4, 5].map(a => new User());
+    users = [1, 2, 3, 4, 5].map(a => new User(a));
     await Promise.all(
-      users.map(a => a.init(1_000_000_000, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+      users.map(a => a.init(10_000_000_000, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
     );
   })
 
   it("Initialize funders", async () => {
     funders = [1, 2].map(a => new User());
     await Promise.all(
-      funders.map(a => a.init(1_000_000_000, stakingMint.publicKey, 0, mintA.publicKey, 10_000_000_000, mintB.publicKey, 20_000_000_000))
+      funders.map(a => a.init(10_000_000_000, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000))
     );
   });
 
@@ -201,7 +201,30 @@ describe('Multiuser Reward Pool', () => {
 
   it('Funder funds the pool', async () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
+      await funders[1].fund(10_000_000_000, 20_000_000_000);
   });
+
+  it('Users claim', async () => {
+    await Promise.all(
+      users.map(a => a.claim())
+    );
+  });
+
+  it('waits', async () => {
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("2")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("4")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("6")
+  });
+
+  it('Users claim', async () => {
+    await Promise.all(
+      users.map(a => a.claim())
+    );
+  });
+
 
 });
 /*
