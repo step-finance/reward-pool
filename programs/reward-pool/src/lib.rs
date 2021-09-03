@@ -177,7 +177,6 @@ pub mod reward_pool {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
         user.owner = *ctx.accounts.owner.key;
-        user.lp = *ctx.accounts.lp.to_account_info().key;
         user.reward_per_token_a_paid = 0;
         user.reward_per_token_b_paid = 0;
         user.reward_a_earned = 0;
@@ -532,11 +531,6 @@ pub struct CreateUser<'info> {
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
-    #[account(
-        constraint = lp.mint == pool.pool_mint,
-        constraint = lp.owner == *user.to_account_info().key,
-    )]
-    lp: CpiAccount<'info, TokenAccount>,
     // Misc.
     #[account(address = token::ID)]
     token_program: AccountInfo<'info>,
@@ -699,11 +693,6 @@ pub struct ClaimReward<'info> {
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
-    #[account(
-        has_one = owner,
-        constraint = lp.mint == pool.pool_mint,
-    )]
-    lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
         constraint = reward_a_account.owner == *owner.key
@@ -775,8 +764,6 @@ pub struct User {
     pub pool: Pubkey,
     /// The owner of this account.
     pub owner: Pubkey,
-    /// Pool token account.
-    pub lp: Pubkey,
     /// The amount of token A claimed.
     pub reward_per_token_a_paid: u64,
     /// The amount of token B claimed.
