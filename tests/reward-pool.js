@@ -198,11 +198,13 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
   });
 
-
+  it('Funder funds the pool', async () => {
+      await funders[0].fund(1_000_000_000, 2_000_000_000);
+  });
 
 });
 
-
+/*
 describe('Simple Reward Pool', () => {
 
   // represents our funder who is setting up a reward pool
@@ -607,3 +609,4 @@ describe('Simple Reward Pool', () => {
   });
 
 });
+*/

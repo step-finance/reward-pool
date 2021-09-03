@@ -242,6 +242,43 @@ class User {
                 },
             });
     }
+
+    async fund(amountA, amountB) {
+        let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
+
+        const [
+            _poolSigner,
+            _nonce,
+        ] = await anchor.web3.PublicKey.findProgramAddress(
+            [this.poolPubkey.toBuffer()],
+            this.program.programId
+        );
+        let poolSigner = _poolSigner;
+
+        await this.program.rpc.fund(
+            new anchor.BN(amountA),
+            new anchor.BN(amountB),
+            {
+                accounts: {
+                    // Stake instance.
+                    pool: this.poolPubkey,
+                    rewardPoolMint: poolObject.rewardPoolMint,
+                    rewardAMint: poolObject.rewardAMint,
+                    rewardBMint: poolObject.rewardBMint,
+                    stakingVault: poolObject.stakingVault,
+                    rewardAVault: poolObject.rewardAVault,
+                    rewardBVault: poolObject.rewardBVault,
+                    funder: this.provider.wallet.publicKey,
+                    fromA: this.mintAPubkey,
+                    fromB: this.mintBPubkey,
+                    // Program signers.
+                    poolSigner,
+                    // Misc.
+                    clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                },
+            });
+    }
 }
 
 module.exports = {
