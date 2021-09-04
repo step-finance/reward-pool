@@ -114,12 +114,19 @@ describe('Multiuser Reward Pool', () => {
     await Promise.all([
       users[0].stakeTokens(2_000_000_000),
       users[1].stakeTokens(1_000_000_000),
-      users[2].stakeTokens(500_000_000)
+      users[2].stakeTokens(500_000_000),
+
+
+      //adding this one will blow it up
+      //users[3].stakeTokens(2_000_000_000),
+
+
+
     ]);
   });
   it('User tries to stake more tokens than they have', async () => {
     try {
-      await users[3].stakeTokens(5_000_000_001)
+      await users[4].stakeTokens(5_000_000_001)
       assert.fail("did not fail on user stake too much");
     } catch (e) { }
   });
@@ -148,7 +155,7 @@ describe('Multiuser Reward Pool', () => {
 
   it('User tries to stake some tokens in paused pool', async () => {
     try {
-      await users[3].stakeTokens(1_000_000_000);
+      await users[3].stakeTokens(100_000);
       assert.fail("did not fail on user staking in paused pool");
     } catch (e) { }
   });
@@ -183,7 +190,7 @@ describe('Multiuser Reward Pool', () => {
       await users[2].stakeTokens(250_000_000);
   });
 
-  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 0, 0
+  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 2_000_000_000, 0
 
   it('Users try to unstake when they have none', async () => {
     try {
@@ -205,10 +212,10 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('Users claim', async () => {
-    await Promise.all(
-      users.map(a => a.claim())
+    let r = await Promise.all(
+      users.map(a => a.claim().then(b=>[a,b]))
     );
-    
+
     r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
   });
 
@@ -223,12 +230,55 @@ describe('Multiuser Reward Pool', () => {
 
   it('Users claim', async () => {
     let r = await Promise.all(
-      users.map(a => a.claim().then(b=>[a,b]))
+      users.slice(0,3).map(a => a.claim().then(b=>[a,b]))
     );
 
     r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
   });
 
+  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 0, 0
+
+  it('things change', async () => {
+    await users[1].unstakeTokens(980_000_000);
+
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("2")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("4")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("6")
+
+    let r = await Promise.all(
+      users.slice(0,3).map(a => a.claim().then(b=>[a,b]))
+    );
+
+    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
+  });
+
+  it('things change', async () => {
+    await users[4].stakeTokens(5_000_000_000);
+    let b = await users[0].claim();
+    console.log(users[0].id, "amtA", b[0].value.uiAmount, "amtB", b[1].value.uiAmount)
+
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("2")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("4")
+    await new Promise(a=>setTimeout(a, 2000));
+    console.log("6")
+
+
+
+    //when user4 claims below, it blows out the u64 in the program earnedf method
+
+
+
+    let r = await Promise.all(
+      users.map(a => a.claim().then(b=>[a,b]))
+    );
+
+    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
+  });
 
 });
 /*
