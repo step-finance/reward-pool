@@ -208,6 +208,8 @@ describe('Multiuser Reward Pool', () => {
     await Promise.all(
       users.map(a => a.claim())
     );
+    
+    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
   });
 
   it('waits', async () => {
@@ -220,9 +222,11 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('Users claim', async () => {
-    await Promise.all(
-      users.map(a => a.claim())
+    let r = await Promise.all(
+      users.map(a => a.claim().then(b=>[a,b]))
     );
+
+    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
   });
 
 
