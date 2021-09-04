@@ -319,8 +319,8 @@ class User {
 
         let amtA = await this.provider.connection.getTokenAccountBalance(this.mintAPubkey);
         let amtB = await this.provider.connection.getTokenAccountBalance(this.mintBPubkey);
-        console.log(this.id, "amtA", amtA.value.uiAmount);
-        console.log(this.id, "amtB", amtB.value.uiAmount);
+        
+        return [amtA, amtB];
     }
 }
 

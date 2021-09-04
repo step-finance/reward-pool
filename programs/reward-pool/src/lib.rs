@@ -410,7 +410,7 @@ pub mod reward_pool {
             &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
-            ctx.accounts.staking_vault.amount,
+            ctx.accounts.lp.amount,
             total_staked,
             total_shares,
         )
@@ -677,6 +677,10 @@ pub struct ClaimReward<'info> {
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
+    #[account(
+        has_one = owner,
+    )]
+    lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
         constraint = reward_a_account.owner == *owner.key
