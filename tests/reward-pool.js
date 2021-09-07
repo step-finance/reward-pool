@@ -4,7 +4,7 @@ const serumCmn = require("@project-serum/common");
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const utils = require("./utils");
-const { User } = require("./user");
+const { User, claimForUsers } = require("./user");
 
 const lastTimeRewardApplicable = (pool) => {
   return new anchor.BN(Math.min(Date.now() / 1000, pool.rewardDurationEnd));
@@ -29,6 +29,14 @@ const earned = (stakedBalance, rewardPerToken, userRewardPerTokenXPaid, rewardXE
     .mul(rewardPerToken.sub(userRewardPerTokenXPaid))
     .div(new anchor.BN(10).pow(rewardDecimals))
     .add(rewardXEarned);
+}
+
+async function wait(seconds) {
+  while(seconds > 0) {
+    console.log("countdown " + seconds--);
+    await new Promise(a=>setTimeout(a, 1000));
+  }
+  console.log("wait over");
 }
 
 let program = anchor.workspace.RewardPool;
@@ -113,17 +121,15 @@ describe('Multiuser Reward Pool', () => {
 
     await Promise.all([
       users[0].stakeTokens(2_000_000_000),
-      users[1].stakeTokens(1_000_000_000),
+      users[1].stakeTokens(2_000_000_000),
       users[2].stakeTokens(500_000_000),
-
-
-      //adding this one will blow it up
-      //users[3].stakeTokens(2_000_000_000),
-
-
-
     ]);
   });
+
+
+  //these are all good, commenting just to get to the bottom faster
+
+  /*
   it('User tries to stake more tokens than they have', async () => {
     try {
       await users[4].stakeTokens(5_000_000_001)
@@ -185,12 +191,9 @@ describe('Multiuser Reward Pool', () => {
   it('Funder unpauses the unpaused pool', async () => {
       await funders[0].pausePool(false, null);
   });
-
   it('User stakes some tokens in unpaused pool', async () => {
       await users[2].stakeTokens(250_000_000);
   });
-
-  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 2_000_000_000, 0
 
   it('Users try to unstake when they have none', async () => {
     try {
@@ -205,79 +208,67 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail on user unstaking when more than they have");
     } catch (e) { }
   });
+  */
 
-  it('Funder funds the pool', async () => {
+
+  //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
+
+  it('Funder funds the pools', async () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
-      await funders[1].fund(10_000_000_000, 20_000_000_000);
-  });
-
-  it('Users claim', async () => {
-    let r = await Promise.all(
-      users.map(a => a.claim().then(b=>[a,b]))
-    );
-
-    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
   });
 
   it('waits', async () => {
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("2")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("4")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("6")
+    await wait(6);
   });
 
-  it('Users claim', async () => {
-    let r = await Promise.all(
-      users.slice(0,3).map(a => a.claim().then(b=>[a,b]))
-    );
-
-    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
+  it('User 5 snipes', async () => {
+    //user 5 is a bitch and immediately hops in, claims, and leaves
+    await users[4].stakeTokens(2_000_000_000);
+    await claimForUsers([users[4]]);
+    await users[4].unstakeTokens(2_000_000_000);
   });
 
-  //now is users stakes: 2_000_000_000, 1_000_000_000, 500_000_000, 0, 0
-
-  it('things change', async () => {
-    await users[1].unstakeTokens(980_000_000);
-
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("2")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("4")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("6")
-
-    let r = await Promise.all(
-      users.slice(0,3).map(a => a.claim().then(b=>[a,b]))
-    );
-
-    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
+  it('waits', async () => {
+    await wait(6);
   });
 
-  it('things change', async () => {
-    await users[4].stakeTokens(5_000_000_000);
-    let b = await users[0].claim();
-    console.log(users[0].id, "amtA", b[0].value.uiAmount, "amtB", b[1].value.uiAmount)
+  it('User 5 snipes', async () => {
+    //user 5 is a bitch and immediately hops in, claims, and leaves
+    await users[4].stakeTokens(2_000_000_000);
+    await claimForUsers([users[4]]);
+    await users[4].unstakeTokens(2_000_000_000);
+  });
 
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("2")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("4")
-    await new Promise(a=>setTimeout(a, 2000));
-    console.log("6")
+  it('waits', async () => {
+    await wait(6);
+  });
 
+  it('User 5 snipes', async () => {
+    //user 5 is a bitch and immediately hops in, claims, and leaves
+    await users[4].stakeTokens(2_000_000_000);
+    await claimForUsers([users[4]]);
+    await users[4].unstakeTokens(2_000_000_000);
+  });
 
+  it('Users 1-4 claim', async () => {
+    await claimForUsers(users.slice(0,4));
+  });
 
-    //when user4 claims below, it blows out the u64 in the program earnedf method
+  //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
 
+  it('user 2 unstakes, waits, and restakes', async () => {
+    await users[1].unstakeTokens(2_000_000_000);
 
+    await wait(6);
 
-    let r = await Promise.all(
-      users.map(a => a.claim().then(b=>[a,b]))
-    );
+    await users[1].stakeTokens(2_000_000_000);
+    await claimForUsers(users);
+  });
 
-    r.forEach(a=>console.log(a[0].id, "amtA", a[1][0].value.uiAmount, "amtB", a[1][1].value.uiAmount))
+  it('user 5 stakes', async () => {
+    await wait(6);
+
+    await claimForUsers(users);
   });
 
 });
