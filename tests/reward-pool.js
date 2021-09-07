@@ -252,6 +252,19 @@ describe('Multiuser Reward Pool', () => {
 
   it('Users 1-4 claim', async () => {
     await claimForUsers(users.slice(0,4));
+
+    /*
+
+    at this point, the pool is exhausted:
+    
+1 amtA 0.297435894 amtB 0.594871788
+2 amtA 0.035897448 amtB 0.071794894
+3 amtA 0 amtB 0
+4 amtA 0 amtB 0
+
+(not here, but below)
+5 amtA 0.666666658 amtB 1.333333318
+    */
   });
 
   //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
