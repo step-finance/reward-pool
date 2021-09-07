@@ -2,6 +2,22 @@ const anchor = require("@project-serum/anchor");
 const { TOKEN_PROGRAM_ID, Token, AccountLayout } = require("@solana/spl-token");
 const utils = require("./utils");
 
+
+async function claimForUsers(users) {
+    //some eye piercing way to claim for all users async, then print out all users balances
+    //if you're reading this, all we're effectively doing here is calling "claim()"" on a user.
+    let r = await Promise.all(
+      users.map(a => a.claim().then(b=>[a,b]))
+    );
+    console.log("--- users claimed ---")
+    r.sort((a,b)=>a[0].id < b[0].id)
+        .forEach(a=>{
+            a[0].currentA = a[1][0];
+            a[0].currentB = a[1][1];
+            console.log(a[0].id, "amtA", a[0].currentA, "amtB", a[0].currentB);
+        });
+}
+
 ///user can be an admin or a staker. either way, call init - then can call other methods
 class User {
     constructor(a) { this.id = a; }
@@ -319,11 +335,12 @@ class User {
 
         let amtA = await this.provider.connection.getTokenAccountBalance(this.mintAPubkey);
         let amtB = await this.provider.connection.getTokenAccountBalance(this.mintBPubkey);
-        
-        return [amtA, amtB];
+
+        return [amtA.value.uiAmount, amtB.value.uiAmount];
     }
 }
 
 module.exports = {
+    claimForUsers,
     User
 };

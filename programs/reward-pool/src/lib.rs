@@ -86,14 +86,16 @@ pub fn reward_per_token(
     }
     return reward_per_token_stored
         .checked_add(
-            last_time_reward_applicable
-                .checked_sub(last_update_time)
+            (last_time_reward_applicable as u128)
+                .checked_sub(last_update_time as u128)
                 .unwrap()
-                .checked_mul(reward_rate)
+                .checked_mul(reward_rate as u128)
                 .unwrap()
-                .checked_mul(reward_decimals)
+                .checked_mul(reward_decimals as u128)
                 .unwrap()
-                .checked_div(total_staked)
+                .checked_div(total_staked as u128)
+                .unwrap()
+                .try_into()
                 .unwrap(),
         )
         .unwrap();
@@ -109,26 +111,28 @@ pub fn earned(
     reward_decimals: u64,
 ) -> u64 {
     // Convert from stake-token units to mint-token units.
-    let mut staked_amount = 0;
+    let mut staked_amount: u128 = 0;
     if total_shares > 0 {
-        staked_amount = user_lp_amount
-            .checked_mul(total_staked)
+        staked_amount = (user_lp_amount as u128)
+            .checked_mul(total_staked as u128)
             .unwrap()
-            .checked_div(total_shares)
-            .unwrap();
+            .checked_div(total_shares as u128)
+            .unwrap()
     }
 
     return staked_amount
         .checked_mul(
-            reward_per_token_x
-                .checked_sub(user_reward_per_token_x_paid)
+            (reward_per_token_x as u128)
+                .checked_sub(user_reward_per_token_x_paid as u128)
                 .unwrap(),
         )
         .unwrap()
-        .checked_div(reward_decimals)
+        .checked_div(reward_decimals as u128)
         .unwrap()
-        .checked_add(user_reward_x_earned)
-        .unwrap();
+        .checked_add(user_reward_x_earned as u128)
+        .unwrap()
+        .try_into()
+        .unwrap()
 }
 
 #[program]
@@ -249,12 +253,12 @@ pub mod reward_pool {
                 token::mint_to(cpi_ctx, amount)?;
             } else {
                 // Convert from mint-token units to stake-token units.
-                let spt_amount = amount
-                    .checked_mul(total_shares)
+                let spt_amount: u128 = (amount as u128)
+                    .checked_mul(total_shares as u128)
                     .unwrap()
-                    .checked_div(total_staked)
+                    .checked_div(total_staked as u128)
                     .unwrap();
-                token::mint_to(cpi_ctx, spt_amount)?;
+                token::mint_to(cpi_ctx, spt_amount.try_into().unwrap())?;
             }
         }
 
@@ -292,10 +296,10 @@ pub mod reward_pool {
         }
 
         // Convert from stake-token units to mint-token units.
-        let token_amount = spt_amount
-            .checked_mul(total_staked)
+        let token_amount: u128 = (spt_amount as u128)
+            .checked_mul(total_staked as u128)
             .unwrap()
-            .checked_div(total_shares)
+            .checked_div(total_shares as u128)
             .unwrap();
 
         // Transfer tokens from the pool vault to user vault.
@@ -315,7 +319,7 @@ pub mod reward_pool {
                 },
                 pool_signer,
             );
-            token::transfer(cpi_ctx, token_amount)?;
+            token::transfer(cpi_ctx, token_amount.try_into().unwrap())?;
         }
 
         Ok(())
