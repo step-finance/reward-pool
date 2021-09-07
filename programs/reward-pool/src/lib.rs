@@ -22,6 +22,8 @@ pub fn update_rewards(
     let last_time_reward_applicable =
         last_time_reward_applicable(pool.reward_duration_end, clock.unix_timestamp);
 
+    msg!("last_time_reward_applicable: {}", last_time_reward_applicable);
+
     pool.reward_a_per_token_stored = reward_per_token(
         total_staked,
         pool.reward_a_per_token_stored,
@@ -30,6 +32,8 @@ pub fn update_rewards(
         pool.reward_a_rate,
         reward_a_decimals,
     );
+
+    msg!("pool.reward_a_per_token_stored: {}", pool.reward_a_per_token_stored);
 
     pool.reward_b_per_token_stored = reward_per_token(
         total_staked,
@@ -42,6 +46,8 @@ pub fn update_rewards(
 
     pool.last_update_time = last_time_reward_applicable;
 
+    msg!("pool.last_update_time: {}", pool.last_update_time);
+
     if let Some(u) = user {
         u.reward_a_earned = earned(
             user_lp_amount,
@@ -53,6 +59,9 @@ pub fn update_rewards(
             reward_a_decimals,
         );
         u.reward_per_token_a_paid = pool.reward_a_per_token_stored;
+
+        msg!("u.reward_a_earned: {}", u.reward_a_earned);
+        msg!("u.reward_per_token_a_paid: {}", u.reward_per_token_a_paid);
 
         u.reward_b_earned = earned(
             user_lp_amount,
@@ -420,8 +429,6 @@ pub mod reward_pool {
         )
         .unwrap();
 
-        //msg!("user {} ");
-
         let seeds = &[
             ctx.accounts.pool.to_account_info().key.as_ref(),
             &[ctx.accounts.pool.nonce],
@@ -431,6 +438,10 @@ pub mod reward_pool {
         if ctx.accounts.user.reward_a_earned > 0 {
             let mut reward_amount = ctx.accounts.user.reward_a_earned;
             let vault_balance = ctx.accounts.reward_a_vault.amount;
+
+            msg!("reward_amount {}", reward_amount);
+            msg!("vault_balance {}", vault_balance);
+
             ctx.accounts.user.reward_a_earned = 0;
             if vault_balance < reward_amount {
                 reward_amount = vault_balance;
