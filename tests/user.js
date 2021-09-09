@@ -5,7 +5,7 @@ const utils = require("./utils");
 
 async function claimForUsers(users) {
     //some eye piercing way to claim for all users async, then print out all users balances
-    //if you're reading this, all we're effectively doing here is calling "claim()"" on a user.
+    //if you're reading this, all we're effectively doing here is calling "claim()" on a user.
     let r = await Promise.all(
       users.map(a => a.claim().then(b=>[a,b]))
     );
@@ -45,7 +45,6 @@ class User {
         this.userPubkey = null;
         this.userNonce = null;
         this.lpPubkey = null;
-        this.poolMintObject = null;
 
         if (initialStaking > 0) {
             this.stakingPubkey = await this.stakingMintObject.createAssociatedTokenAccount(this.pubkey);
@@ -71,14 +70,6 @@ class User {
         );
         let poolSigner = _poolSigner;
         let nonce = _nonce;
-        this.poolMintObject = await Token.createMint(
-            this.provider.connection,
-            this.provider.wallet.payer,
-            poolSigner,
-            null,
-            9,
-            TOKEN_PROGRAM_ID
-        );
 
         let stakingMintVault = await this.stakingMintObject.createAccount(poolSigner);
         let mintAVault = await this.mintAObject.createAccount(poolSigner);
@@ -107,7 +98,6 @@ class User {
             {
                 accounts: {
                     pool: this.poolPubkey,
-                    poolMint: this.poolMintObject.publicKey,
                     rent: anchor.web3.SYSVAR_RENT_PUBKEY,
                 },
                 signers: [poolKeypair],
@@ -134,15 +124,6 @@ class User {
         this.userPubkey = _userPubkey;
         this.userNonce = _userNonce;
 
-        //lookup the reward account this way, like a user would
-        let poolObject = await this.program.account.pool.fetch(poolPubkey);
-        let poolMint = poolObject.poolMint;
-
-        this.poolMintObject = new Token(this.provider.connection, poolMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
-
-        let lpKeypair = anchor.web3.Keypair.generate();
-        let newlpPubkey = lpKeypair.publicKey;
-
         const balanceNeeded = await Token.getMinBalanceRentForExemptAccount(this.provider.connection);
 
         await this.program.rpc.createUser(this.userNonce, {
@@ -154,26 +135,7 @@ class User {
                 systemProgram: anchor.web3.SystemProgram.programId,
                 rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             },
-            instructions: [
-                anchor.web3.SystemProgram.createAccount({
-                    fromPubkey: this.provider.wallet.publicKey,
-                    newAccountPubkey: newlpPubkey,
-                    lamports: balanceNeeded,
-                    space: AccountLayout.span,
-                    programId: TOKEN_PROGRAM_ID,
-                }),
-                Token.createInitAccountInstruction(
-                    TOKEN_PROGRAM_ID,
-                    poolMint,
-                    newlpPubkey,
-                    this.provider.wallet.publicKey,
-                ),
-            ],
-            signers: [lpKeypair]
         });
-
-        //do AFTER the tx succeeds
-        this.lpPubkey = newlpPubkey;
     }
 
     async stakeTokens(amount) {
@@ -194,14 +156,12 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    poolMint: poolObject.poolMint,
                     rewardAMint: poolObject.rewardAMint,
                     rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
                     owner: this.provider.wallet.publicKey,
-                    lp: this.lpPubkey,
                     stakeFromAccount: this.stakingPubkey,
                     // Program signers.
                     poolSigner,
@@ -242,14 +202,12 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    poolMint: poolObject.poolMint,
                     rewardAMint: poolObject.rewardAMint,
                     rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
                     owner: this.provider.wallet.publicKey,
-                    lp: this.lpPubkey,
                     stakeFromAccount: this.stakingPubkey,
                     // Program signers.
                     poolSigner,
@@ -279,7 +237,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    poolMint: poolObject.poolMint,
                     rewardAMint: poolObject.rewardAMint,
                     rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
@@ -313,7 +270,6 @@ class User {
             accounts: {
                 // Stake instance.
                 pool: this.poolPubkey,
-                poolMint: poolObject.poolMint,
                 rewardAMint: poolObject.rewardAMint,
                 rewardBMint: poolObject.rewardBMint,
                 stakingVault: poolObject.stakingVault,
@@ -322,7 +278,6 @@ class User {
                 // User.
                 user: this.userPubkey,
                 owner: this.provider.wallet.publicKey,
-                lp: this.lpPubkey,
                 rewardAAccount: this.mintAPubkey,
                 rewardBAccount: this.mintBPubkey,
                 // Program signers.
