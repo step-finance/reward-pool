@@ -11,11 +11,6 @@
           "isSigner": false
         },
         {
-          "name": "poolMint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "rent",
           "isMut": false,
           "isSigner": false
@@ -131,11 +126,6 @@
           "isSigner": false
         },
         {
-          "name": "poolMint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "rewardAMint",
           "isMut": false,
           "isSigner": false
@@ -159,11 +149,6 @@
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "lp",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "stakeFromAccount",
@@ -202,11 +187,6 @@
           "isSigner": false
         },
         {
-          "name": "poolMint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "rewardAMint",
           "isMut": false,
           "isSigner": false
@@ -230,11 +210,6 @@
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "lp",
-          "isMut": true,
-          "isSigner": false
         },
         {
           "name": "stakeFromAccount",
@@ -269,11 +244,6 @@
       "accounts": [
         {
           "name": "pool",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "poolMint",
           "isMut": true,
           "isSigner": false
         },
@@ -353,11 +323,6 @@
           "isSigner": false
         },
         {
-          "name": "poolMint",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "rewardAMint",
           "isMut": false,
           "isSigner": false
@@ -391,11 +356,6 @@
           "name": "owner",
           "isMut": false,
           "isSigner": true
-        },
-        {
-          "name": "lp",
-          "isMut": false,
-          "isSigner": false
         },
         {
           "name": "rewardAAccount",
@@ -469,10 +429,6 @@
             "type": "publicKey"
           },
           {
-            "name": "poolMint",
-            "type": "publicKey"
-          },
-          {
             "name": "rewardDuration",
             "type": "u64"
           },
@@ -517,19 +473,23 @@
             "type": "publicKey"
           },
           {
-            "name": "rewardPerTokenAPaid",
+            "name": "rewardAPerTokenComplete",
             "type": "u64"
           },
           {
-            "name": "rewardPerTokenBPaid",
+            "name": "rewardBPerTokenComplete",
             "type": "u64"
           },
           {
-            "name": "rewardAEarned",
+            "name": "rewardAPerTokenPending",
             "type": "u64"
           },
           {
-            "name": "rewardBEarned",
+            "name": "rewardBPerTokenPending",
+            "type": "u64"
+          },
+          {
+            "name": "balanceStaked",
             "type": "u64"
           },
           {
@@ -553,41 +513,36 @@
     },
     {
       "code": 302,
-      "name": "InvalidPoolMintAuthority",
-      "msg": "Invalid pool mint authority"
-    },
-    {
-      "code": 303,
-      "name": "InvalidPoolMintSupply",
-      "msg": "Invalid pool mint supply"
-    },
-    {
-      "code": 304,
       "name": "InvalidUserSigner",
       "msg": "User signer doesn't match the derived address."
     },
     {
-      "code": 305,
+      "code": 303,
       "name": "Unknown",
       "msg": "An unknown error has occured."
     },
     {
-      "code": 306,
+      "code": 304,
       "name": "InvalidMint",
       "msg": "Invalid mint supplied."
     },
     {
-      "code": 307,
+      "code": 305,
       "name": "InvalidProgramAuthority",
       "msg": "Please specify the correct authority for this program."
     },
     {
-      "code": 308,
+      "code": 306,
       "name": "InsufficientFundUnstake",
       "msg": "Insufficient funds to unstake."
+    },
+    {
+      "code": 307,
+      "name": "AmountMustBeGreaterThanZero",
+      "msg": "Amount must be greater than zero."
     }
   ],
   "metadata": {
-    "address": "srWd9DS9gfjtvXHyN9Vn1GcakUGjBXhwQYiFpRXsAvN"
+    "address": "SRWdZmG93LMynvb4xZLsodmzEcivtwDRLB6G7adMXms"
   }
 }

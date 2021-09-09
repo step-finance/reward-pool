@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
-use anchor_lang::solana_program::program_option::COption;
 use anchor_spl::token::{self, Mint, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
@@ -11,9 +10,7 @@ pub fn update_rewards(
     reward_b_mint: &CpiAccount<anchor_spl::token::Mint>,
     user: Option<&mut ProgramAccount<User>>,
     clock: &Clock,
-    user_lp_amount: u64,
     total_staked: u64,
-    total_shares: u64,
 ) -> Result<()> {
     let base_ten: u64 = 10;
     let reward_a_decimals: u64 = base_ten.pow(reward_a_mint.decimals.into());
@@ -49,30 +46,26 @@ pub fn update_rewards(
     msg!("pool.last_update_time: {}", pool.last_update_time);
 
     if let Some(u) = user {
-        u.reward_a_earned = earned(
-            user_lp_amount,
-            total_shares,
-            total_staked,
+        u.reward_a_per_token_pending = earned(
+            u.balance_staked,
             pool.reward_a_per_token_stored,
-            u.reward_per_token_a_paid,
-            u.reward_a_earned,
+            u.reward_a_per_token_complete,
+            u.reward_a_per_token_pending,
             reward_a_decimals,
         );
-        u.reward_per_token_a_paid = pool.reward_a_per_token_stored;
+        u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
 
-        msg!("u.reward_a_earned: {}", u.reward_a_earned);
-        msg!("u.reward_per_token_a_paid: {}", u.reward_per_token_a_paid);
+        msg!("u.reward_a_per_token_pending: {}", u.reward_a_per_token_pending);
+        msg!("u.reward_a_per_token_complete: {}", u.reward_a_per_token_complete);
 
-        u.reward_b_earned = earned(
-            user_lp_amount,
-            total_shares,
-            total_staked,
+        u.reward_b_per_token_pending = earned(
+            u.balance_staked,
             pool.reward_b_per_token_stored,
-            u.reward_per_token_b_paid,
-            u.reward_b_earned,
+            u.reward_b_per_token_complete,
+            u.reward_b_per_token_pending,
             reward_b_decimals,
         );
-        u.reward_per_token_b_paid = pool.reward_b_per_token_stored;
+        u.reward_b_per_token_complete = pool.reward_b_per_token_stored;
     }
 
     Ok(())
@@ -94,42 +87,30 @@ pub fn reward_per_token(
         return reward_per_token_stored;
     }
     return reward_per_token_stored
-        .checked_add(
-            (last_time_reward_applicable as u128)
-                .checked_sub(last_update_time as u128)
-                .unwrap()
-                .checked_mul(reward_rate as u128)
-                .unwrap()
-                .checked_mul(reward_decimals as u128)
-                .unwrap()
-                .checked_div(total_staked as u128)
-                .unwrap()
-                .try_into()
-                .unwrap(),
-        )
-        .unwrap();
+                .checked_add(
+                    (last_time_reward_applicable as u128)
+                    .checked_sub(last_update_time as u128)
+                    .unwrap()
+                    .checked_mul(reward_rate as u128)
+                    .unwrap()
+                    .checked_mul(reward_decimals as u128)
+                    .unwrap()
+                    .checked_div(total_staked as u128)
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+                )
+                .unwrap();
 }
 
 pub fn earned(
-    user_lp_amount: u64,
-    total_shares: u64,
-    total_staked: u64,
+    balance_staked: u64,
     reward_per_token_x: u64,
     user_reward_per_token_x_paid: u64,
-    user_reward_x_earned: u64,
+    user_reward_x_pending: u64,
     reward_decimals: u64,
 ) -> u64 {
-    // Convert from stake-token units to mint-token units.
-    let mut staked_amount: u128 = 0;
-    if total_shares > 0 {
-        staked_amount = (user_lp_amount as u128)
-            .checked_mul(total_staked as u128)
-            .unwrap()
-            .checked_div(total_shares as u128)
-            .unwrap()
-    }
-
-    return staked_amount
+    return (balance_staked as u128)
         .checked_mul(
             (reward_per_token_x as u128)
                 .checked_sub(user_reward_per_token_x_paid as u128)
@@ -138,9 +119,9 @@ pub fn earned(
         .unwrap()
         .checked_div(reward_decimals as u128)
         .unwrap()
-        .checked_add(user_reward_x_earned as u128)
+        .checked_add(user_reward_x_pending as u128)
         .unwrap()
-        .try_into()
+        .try_into() //the divide by decimals will shrink to u64 again
         .unwrap()
 }
 
@@ -148,7 +129,6 @@ pub fn earned(
 pub mod reward_pool {
     use super::*;
 
-    #[access_control(Initialize::accounts(&ctx, nonce))]
     pub fn initialize(
         ctx: Context<Initialize>,
         authority: Pubkey,
@@ -172,7 +152,6 @@ pub mod reward_pool {
         pool.reward_a_vault = reward_a_vault;
         pool.reward_b_mint = reward_b_mint;
         pool.reward_b_vault = reward_b_vault;
-        pool.pool_mint = *ctx.accounts.pool_mint.to_account_info().key;
         pool.reward_duration = reward_duration;
         pool.reward_duration_end = 0;
         pool.last_update_time = 0;
@@ -190,10 +169,11 @@ pub mod reward_pool {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
         user.owner = *ctx.accounts.owner.key;
-        user.reward_per_token_a_paid = 0;
-        user.reward_per_token_b_paid = 0;
-        user.reward_a_earned = 0;
-        user.reward_b_earned = 0;
+        user.reward_a_per_token_complete = 0;
+        user.reward_b_per_token_complete = 0;
+        user.reward_a_per_token_pending = 0;
+        user.reward_b_per_token_pending = 0;
+        user.balance_staked = 0;
         user.nonce = nonce;
 
         msg!("created user nonce {}", nonce);
@@ -209,8 +189,10 @@ pub mod reward_pool {
         if ctx.accounts.pool.paused {
             return Err(ErrorCode::PoolPaused.into());
         }
+        if amount == 0 {
+            return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
+        }
 
-        let total_shares = ctx.accounts.pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -220,11 +202,11 @@ pub mod reward_pool {
             &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
-            ctx.accounts.staking_vault.amount,
             total_staked,
-            total_shares,
         )
         .unwrap();
+        
+        ctx.accounts.user.balance_staked = ctx.accounts.user.balance_staked.checked_add(amount).unwrap();
 
         // Transfer tokens into the stake vault.
         {
@@ -233,49 +215,20 @@ pub mod reward_pool {
                 token::Transfer {
                     from: ctx.accounts.stake_from_account.to_account_info(),
                     to: ctx.accounts.staking_vault.to_account_info(),
-                    authority: ctx.accounts.owner.to_account_info(),
+                    authority: ctx.accounts.owner.to_account_info(), //todo use user account as signer
                 },
             );
-
             token::transfer(cpi_ctx, amount)?;
-        }
-
-        // Mint pool tokens to the staker.
-        {
-            let seeds = &[
-                ctx.accounts.pool.to_account_info().key.as_ref(),
-                &[ctx.accounts.pool.nonce],
-            ];
-            let pool_signer = &[&seeds[..]];
-
-            let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
-                token::MintTo {
-                    mint: ctx.accounts.pool_mint.to_account_info(),
-                    to: ctx.accounts.lp.to_account_info(),
-                    authority: ctx.accounts.pool_signer.to_account_info(),
-                },
-                pool_signer,
-            );
-
-            if total_shares == 0 || total_staked == 0 {
-                token::mint_to(cpi_ctx, amount)?;
-            } else {
-                // Convert from mint-token units to stake-token units.
-                let spt_amount: u128 = (amount as u128)
-                    .checked_mul(total_shares as u128)
-                    .unwrap()
-                    .checked_div(total_staked as u128)
-                    .unwrap();
-                token::mint_to(cpi_ctx, spt_amount.try_into().unwrap())?;
-            }
         }
 
         Ok(())
     }
 
     pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
-        let total_shares = ctx.accounts.pool_mint.supply;
+        if spt_amount == 0 {
+            return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
+        }
+
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -285,31 +238,11 @@ pub mod reward_pool {
             &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
-            ctx.accounts.staking_vault.amount,
             total_staked,
-            total_shares,
         )
         .unwrap();
-
-        // Burn pool tokens.
-        {
-            let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.clone(),
-                token::Burn {
-                    mint: ctx.accounts.pool_mint.to_account_info(),
-                    to: ctx.accounts.lp.to_account_info(),
-                    authority: ctx.accounts.owner.to_account_info(),
-                },
-            );
-            token::burn(cpi_ctx, spt_amount)?;
-        }
-
-        // Convert from stake-token units to mint-token units.
-        let token_amount: u128 = (spt_amount as u128)
-            .checked_mul(total_staked as u128)
-            .unwrap()
-            .checked_div(total_shares as u128)
-            .unwrap();
+        
+        ctx.accounts.user.balance_staked = ctx.accounts.user.balance_staked.checked_sub(spt_amount).unwrap();
 
         // Transfer tokens from the pool vault to user vault.
         {
@@ -328,7 +261,7 @@ pub mod reward_pool {
                 },
                 pool_signer,
             );
-            token::transfer(cpi_ctx, token_amount.try_into().unwrap())?;
+            token::transfer(cpi_ctx, spt_amount.try_into().unwrap())?;
         }
 
         Ok(())
@@ -340,7 +273,6 @@ pub mod reward_pool {
         }
 
         let pool = &mut ctx.accounts.pool;
-        let total_shares = ctx.accounts.pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         update_rewards(
@@ -349,11 +281,32 @@ pub mod reward_pool {
             &ctx.accounts.reward_b_mint,
             None,
             &ctx.accounts.clock,
-            ctx.accounts.staking_vault.amount,
             total_staked,
-            total_shares,
         )
         .unwrap();
+
+        let current_time = ctx.accounts.clock.unix_timestamp.try_into().unwrap();
+        let reward_period_end = pool.reward_duration_end;
+
+        if current_time >= reward_period_end {
+            pool.reward_a_rate = amount_a.checked_div(pool.reward_duration).unwrap();
+            pool.reward_b_rate = amount_b.checked_div(pool.reward_duration).unwrap();
+        } else {
+            let remaining = pool.reward_duration_end.checked_sub(current_time).unwrap();
+            let leftover_a = remaining.checked_mul(pool.reward_a_rate).unwrap();
+            let leftover_b = remaining.checked_mul(pool.reward_b_rate).unwrap();
+
+            pool.reward_a_rate = amount_a
+                .checked_add(leftover_a)
+                .unwrap()
+                .checked_div(pool.reward_duration)
+                .unwrap();
+            pool.reward_b_rate = amount_b
+                .checked_add(leftover_b)
+                .unwrap()
+                .checked_div(pool.reward_duration)
+                .unwrap();
+        }
 
         // Transfer reward A tokens into the A vault.
         if amount_a > 0 {
@@ -383,29 +336,6 @@ pub mod reward_pool {
             token::transfer(cpi_ctx, amount_b)?;
         }
 
-        let current_time = ctx.accounts.clock.unix_timestamp.try_into().unwrap();
-        let reward_period_end = pool.reward_duration_end;
-
-        if current_time > reward_period_end {
-            pool.reward_a_rate = amount_a.checked_div(pool.reward_duration).unwrap();
-            pool.reward_b_rate = amount_b.checked_div(pool.reward_duration).unwrap();
-        } else {
-            let remaining = pool.reward_duration_end.checked_sub(current_time).unwrap();
-            let leftover_a = remaining.checked_mul(pool.reward_a_rate).unwrap();
-            let leftover_b = remaining.checked_mul(pool.reward_b_rate).unwrap();
-
-            pool.reward_a_rate = amount_a
-                .checked_add(leftover_a)
-                .unwrap()
-                .checked_div(pool.reward_duration)
-                .unwrap();
-            pool.reward_b_rate = amount_b
-                .checked_add(leftover_b)
-                .unwrap()
-                .checked_div(pool.reward_duration)
-                .unwrap();
-        }
-
         pool.last_update_time = current_time;
         pool.reward_duration_end = current_time.checked_add(pool.reward_duration).unwrap();
 
@@ -413,7 +343,6 @@ pub mod reward_pool {
     }
 
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
-        let total_shares = ctx.accounts.pool_mint.supply;
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -423,9 +352,7 @@ pub mod reward_pool {
             &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
-            ctx.accounts.lp.amount,
             total_staked,
-            total_shares,
         )
         .unwrap();
 
@@ -435,14 +362,14 @@ pub mod reward_pool {
         ];
         let pool_signer = &[&seeds[..]];
 
-        if ctx.accounts.user.reward_a_earned > 0 {
-            let mut reward_amount = ctx.accounts.user.reward_a_earned;
+        if ctx.accounts.user.reward_a_per_token_pending > 0 {
+            let mut reward_amount = ctx.accounts.user.reward_a_per_token_pending;
             let vault_balance = ctx.accounts.reward_a_vault.amount;
 
             msg!("reward_amount {}", reward_amount);
             msg!("vault_balance {}", vault_balance);
 
-            ctx.accounts.user.reward_a_earned = 0;
+            ctx.accounts.user.reward_a_per_token_pending = 0;
             if vault_balance < reward_amount {
                 reward_amount = vault_balance;
             }
@@ -461,10 +388,10 @@ pub mod reward_pool {
             }
         }
 
-        if ctx.accounts.user.reward_b_earned > 0 {
-            let mut reward_amount = ctx.accounts.user.reward_b_earned;
+        if ctx.accounts.user.reward_b_per_token_pending > 0 {
+            let mut reward_amount = ctx.accounts.user.reward_b_per_token_pending;
             let vault_balance = ctx.accounts.reward_b_vault.amount;
-            ctx.accounts.user.reward_b_earned = 0;
+            ctx.accounts.user.reward_b_per_token_pending = 0;
             if vault_balance < reward_amount {
                 reward_amount = vault_balance;
             }
@@ -491,25 +418,7 @@ pub mod reward_pool {
 pub struct Initialize<'info> {
     #[account(init)]
     pool: ProgramAccount<'info, Pool>,
-    pool_mint: CpiAccount<'info, Mint>,
     rent: Sysvar<'info, Rent>,
-}
-
-impl<'info> Initialize<'info> {
-    fn accounts(ctx: &Context<Initialize<'info>>, nonce: u8) -> Result<()> {
-        let pool_signer = Pubkey::create_program_address(
-            &[ctx.accounts.pool.to_account_info().key.as_ref(), &[nonce]],
-            ctx.program_id,
-        )
-        .map_err(|_| ErrorCode::InvalidNonce)?;
-        require!(
-            ctx.accounts.pool_mint.mint_authority == COption::Some(pool_signer),
-            ErrorCode::InvalidPoolMintAuthority
-        );
-
-        require!(ctx.accounts.pool_mint.supply == 0, ErrorCode::InvalidPoolMintSupply);
-        Ok(())
-    }
 }
 
 #[derive(Accounts)]
@@ -551,13 +460,10 @@ pub struct Stake<'info> {
     // Global accounts for the staking instance.
     #[account(
         mut, 
-        has_one = pool_mint,
         has_one = reward_a_mint,
         has_one = reward_b_mint
     )]
     pool: ProgramAccount<'info, Pool>,
-    #[account(mut)]
-    pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -577,13 +483,8 @@ pub struct Stake<'info> {
         ],
     )]
     user: ProgramAccount<'info, User>,
-    #[account(signer)]
+    #[account(signer)] //todo not signer; require stake_from_account auth to user program account instead?
     owner: AccountInfo<'info>,
-    #[account(mut,
-        has_one = owner,
-        constraint = lp.mint == pool.pool_mint,
-    )]
-    lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = stake_from_account.mint == pool.staking_mint,
         has_one = owner
@@ -608,10 +509,12 @@ pub struct Stake<'info> {
 #[derive(Accounts)]
 pub struct Fund<'info> {
     // Global accounts for the staking instance.
-    #[account(mut, has_one = pool_mint)]
+    #[account(
+        mut, 
+        has_one = reward_a_mint,
+        has_one = reward_b_mint
+    )]
     pool: ProgramAccount<'info, Pool>,
-    #[account(mut)]
-    pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -627,7 +530,7 @@ pub struct Fund<'info> {
     )]
     reward_b_vault: CpiAccount<'info, TokenAccount>,
 
-    #[account(signer)]
+    #[account(signer)] //todo remove signer and add approval to pool authority on tokens
     funder: AccountInfo<'info>,
     #[account(mut)]
     from_a: CpiAccount<'info, TokenAccount>,
@@ -654,15 +557,10 @@ pub struct ClaimReward<'info> {
     // Global accounts for the staking instance.
     #[account(
         mut, 
-        has_one = pool_mint,
         has_one = reward_a_mint,
         has_one = reward_b_mint
     )]
     pool: ProgramAccount<'info, Pool>,
-    #[account(mut,
-        constraint = pool_mint.mint_authority == COption::Some(*pool_signer.key)
-    )]
-    pool_mint: CpiAccount<'info, Mint>,
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
@@ -692,10 +590,6 @@ pub struct ClaimReward<'info> {
     user: ProgramAccount<'info, User>,
     #[account(signer)]
     owner: AccountInfo<'info>,
-    #[account(
-        has_one = owner,
-    )]
-    lp: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
         constraint = reward_a_account.owner == *owner.key
@@ -742,8 +636,6 @@ pub struct Pool {
     pub reward_b_mint: Pubkey,
     /// Vault to store reward B tokens.
     pub reward_b_vault: Pubkey,
-    /// Staking pool token mint that represents shares of the pool.
-    pub pool_mint: Pubkey,
     /// The period which rewards are linearly distributed.
     pub reward_duration: u64,
     /// The timestamp at which the current reward period ends.
@@ -768,13 +660,15 @@ pub struct User {
     /// The owner of this account.
     pub owner: Pubkey,
     /// The amount of token A claimed.
-    pub reward_per_token_a_paid: u64,
+    pub reward_a_per_token_complete: u64,
     /// The amount of token B claimed.
-    pub reward_per_token_b_paid: u64,
-    /// The last calculated earned amount of reward A.
-    pub reward_a_earned: u64,
-    /// The last calculated earned amount of reward B.
-    pub reward_b_earned: u64,
+    pub reward_b_per_token_complete: u64,
+    /// The amount of token A pending claim.
+    pub reward_a_per_token_pending: u64,
+    /// The amount of token B pending claim.
+    pub reward_b_per_token_pending: u64,
+    /// The amount staked.
+    pub balance_staked: u64,
     /// Signer nonce.
     pub nonce: u8,
 }
@@ -785,10 +679,6 @@ pub enum ErrorCode {
     PoolPaused,
     #[msg("The nonce given doesn't derive a valid program address.")]
     InvalidNonce,
-    #[msg("Invalid pool mint authority")]
-    InvalidPoolMintAuthority,
-    #[msg("Invalid pool mint supply")]
-    InvalidPoolMintSupply,
     #[msg("User signer doesn't match the derived address.")]
     InvalidUserSigner,
     #[msg("An unknown error has occured.")]
@@ -799,4 +689,6 @@ pub enum ErrorCode {
     InvalidProgramAuthority,
     #[msg("Insufficient funds to unstake.")]
     InsufficientFundUnstake,
+    #[msg("Amount must be greater than zero.")]
+    AmountMustBeGreaterThanZero,
 }

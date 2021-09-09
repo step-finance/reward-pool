@@ -217,6 +217,13 @@ describe('Multiuser Reward Pool', () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
   });
 
+  it('User 5 snipes', async () => {
+    //user 5 is a bitch and immediately hops in, claims, and leaves
+    await users[4].stakeTokens(2_000_000_000);
+    await claimForUsers([users[4]]);
+    await users[4].unstakeTokens(2_000_000_000);
+  });
+
   it('waits', async () => {
     await wait(6);
   });
