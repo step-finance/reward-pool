@@ -131,12 +131,24 @@ pub mod reward_pool {
 
     pub fn initialize_program(
         ctx: Context<InitializeProgram>,
+        nonce: u8, 
+        authority_mint: Pubkey,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
         if config.authority_mint != Pubkey::default() {
             return Err(ErrorCode::ProgramAlreadyInitialized.into());
         }
-        config.authority_mint = ctx.accounts.authority_mint.to_account_info().key.clone();
+        
+        let (proper_address, proper_nonce) = Pubkey::find_program_address(
+            &[ &b"config"[..] ], 
+            ctx.program_id
+        );
+        if proper_address != *config.to_account_info().key || proper_nonce != nonce {
+            return Err(ErrorCode::InvalidConfig.into());
+        }
+
+        config.authority_mint = authority_mint;
+
         Ok(())
     }
 
@@ -430,16 +442,12 @@ pub mod reward_pool {
 pub struct InitializeProgram<'info> {
     #[account(
         init,
-        seeds = [
-            &b"config"[..],
-            &[nonce],
-        ],
+        seeds = [&b"config"[..], &[nonce]],
         payer = payer,
     )]
     config: ProgramAccount<'info, ProgramConfig>,
     #[account(signer)]
     payer: AccountInfo<'info>,
-    authority_mint: CpiAccount<'info, Mint>,
     #[account(address = system_program::ID)]
     system_program: AccountInfo<'info>,
 }
@@ -450,7 +458,14 @@ pub struct InitializePool<'info> {
     config: ProgramAccount<'info, ProgramConfig>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
-        constraint = authority_token_account.owner == *authority_token_owner.to_account_info().key,
+        constraint = (
+            authority_token_account.owner == *authority_token_owner.to_account_info().key
+            ||
+            (authority_token_account.delegate.is_some()
+                && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
+                && authority_token_account.delegated_amount > 0)
+        ),
+        constraint = !authority_token_account.is_frozen(),
         constraint = authority_token_account.amount > 0,
     )]
     authority_token_account: CpiAccount<'info, TokenAccount>,
@@ -732,6 +747,8 @@ pub enum ErrorCode {
     Unknown,
     #[msg("Invalid mint supplied.")]
     InvalidMint,
+    #[msg("Invalid config supplied.")]
+    InvalidConfig,
     #[msg("Please specify the correct authority for this program.")]
     InvalidProgramAuthority,
     #[msg("Insufficient funds to unstake.")]

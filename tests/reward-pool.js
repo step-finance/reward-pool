@@ -229,8 +229,8 @@ describe('Multiuser Reward Pool', () => {
     await wait(5);
   });
 
-  it('Users claim', async () => {
-    //user 2 claims 
+  it('User 2 claims halfway through', async () => {
+    //user 2 claims
     await claimForUsers(users.slice(1, 2));
   });
 

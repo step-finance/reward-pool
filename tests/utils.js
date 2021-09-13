@@ -2,6 +2,22 @@ const anchor = require("@project-serum/anchor");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 
+async function initializeProgram(program, provider, authMintPubkey) {
+    const [ _configPubkey, _nonce] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config")], program.programId);
+    configPubkey = _configPubkey;
+    await program.rpc.initializeProgram(
+        _nonce,
+        authMintPubkey,
+        {
+            accounts: {
+                config: configPubkey,
+                payer: provider.wallet.publicKey,
+                systemProgram: anchor.web3.SystemProgram.programId,
+            },
+        }
+    )
+}
+
 async function createMint(provider, decimals) {
     const mint = await Token.createMint(
         provider.connection,
@@ -52,7 +68,8 @@ async function sendLamports(
             { 
                 fromPubkey: provider.wallet.publicKey, 
                 lamports: amount, 
-                toPubkey: destination}
+                toPubkey: destination
+            }
         )
     );
     await provider.send(tx);
@@ -79,4 +96,5 @@ module.exports = {
     createMintAndVault,
     createMint,
     sendLamports,
+    initializeProgram,
 };
