@@ -61,13 +61,14 @@ setProvider(provider);
 
 describe('Multiuser Reward Pool', () => {
 
-  const rewardDuration = new anchor.BN(30);
+  const rewardDuration = new anchor.BN(10);
 
   let users;
   let funders;
   let mintA;
   let mintB;
   let stakingMint;
+  let poolCreationAuthorityMint;
   let poolKeypair = anchor.web3.Keypair.generate();
 
   it("Initialize mints", async () => {
@@ -77,19 +78,26 @@ describe('Multiuser Reward Pool', () => {
     mintA = await utils.createMint(provider, 9);
     mintB = await utils.createMint(provider, 9);
     stakingMint = await utils.createMint(provider, 9);
+    poolCreationAuthorityMint = await utils.createMint(provider, 0);
+  });
+
+  it("Initialize program", async () => {
+    setProvider(envProvider);
+    //by funder or user
+    await utils.initializeProgram(program, provider, poolCreationAuthorityMint.publicKey);
   });
 
   it("Initialize users", async () => {
     users = [1, 2, 3, 4, 5].map(a => new User(a));
     await Promise.all(
-      users.map(a => a.init(10_000_000_000, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+      users.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, false, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
     );
   })
 
   it("Initialize funders", async () => {
-    funders = [1, 2].map(a => new User());
+    funders = [1, 2].map(a => new User(a));
     await Promise.all(
-      funders.map(a => a.init(10_000_000_000, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000))
+      funders.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000))
     );
   });
 
@@ -126,10 +134,8 @@ describe('Multiuser Reward Pool', () => {
     ]);
   });
 
-
   //these are all good, commenting just to get to the bottom faster
 
-  /*
   it('User tries to stake more tokens than they have', async () => {
     try {
       await users[4].stakeTokens(5_000_000_001)
@@ -208,59 +214,45 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail on user unstaking when more than they have");
     } catch (e) { }
   });
-  */
-
 
   //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
-
   it('Funder funds the pools', async () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
   });
 
   it('User 5 snipes', async () => {
     //user 5 is a bitch and immediately hops in, claims, and leaves
-    await users[4].stakeTokens(2_000_000_000);
-    await claimForUsers([users[4]]);
-    await users[4].unstakeTokens(2_000_000_000);
+    await users[4].snipe(2_000_000_000);
   });
 
   it('waits', async () => {
-    await wait(6);
+    await wait(5);
   });
 
-  it('User 5 snipes', async () => {
-    //user 5 is a bitch and immediately hops in, claims, and leaves
-    await users[4].stakeTokens(2_000_000_000);
-    await claimForUsers([users[4]]);
-    await users[4].unstakeTokens(2_000_000_000);
-  });
-
-  it('waits', async () => {
-    await wait(6);
-  });
-
-  it('User 5 snipes', async () => {
-    //user 5 is a bitch and immediately hops in, claims, and leaves
-    await users[4].stakeTokens(2_000_000_000);
-    await claimForUsers([users[4]]);
-    await users[4].unstakeTokens(2_000_000_000);
+  it('Users claim', async () => {
+    //user 2 claims 
+    await claimForUsers(users.slice(1, 2));
   });
 
   it('waits', async () => {
-    await wait(6);
+    await wait(5);
   });
 
-  it('User 5 snipes', async () => {
-    //user 5 is a bitch and immediately hops in, claims, and leaves
-    await users[4].stakeTokens(2_000_000_000);
-    await claimForUsers([users[4]]);
-    await users[4].unstakeTokens(2_000_000_000);
+  it('Users claim', async () => {
+    await claimForUsers(users);
   });
 
-  it('Users 1-4 claim', async () => {
-    await claimForUsers(users.slice(0,4));
+  it('waits', async () => {
+    await wait(10);
+  });
 
-    /*
+  it('Users claim', async () => {
+    await claimForUsers(users);
+  });
+
+});
+
+/*
 
     at this point, the pool is exhausted:
     
@@ -272,10 +264,12 @@ describe('Multiuser Reward Pool', () => {
 (not here, but below)
 5 amtA 0.666666658 amtB 1.333333318
     */
-  });
+
+
+  
 
   //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
-
+/*
   it('user 2 unstakes, waits, and restakes', async () => {
     await users[1].unstakeTokens(2_000_000_000);
 
@@ -292,6 +286,7 @@ describe('Multiuser Reward Pool', () => {
   });
 
 });
+*/
 /*
 describe('Simple Reward Pool', () => {
 
