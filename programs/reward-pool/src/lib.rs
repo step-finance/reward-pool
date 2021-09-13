@@ -565,7 +565,8 @@ pub struct Fund<'info> {
     #[account(
         mut, 
         has_one = reward_a_mint,
-        has_one = reward_b_mint
+        has_one = reward_b_mint,
+        constraint = pool.authority == *funder.to_account_info().key,
     )]
     pool: ProgramAccount<'info, Pool>,
     reward_a_mint: CpiAccount<'info, Mint>,
