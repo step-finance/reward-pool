@@ -473,7 +473,6 @@ pub struct InitializePool<'info> {
     authority_token_owner: AccountInfo<'info>,
     #[account(init)]
     pool: ProgramAccount<'info, Pool>,
-    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
@@ -499,7 +498,6 @@ pub struct CreateUser<'info> {
     token_program: AccountInfo<'info>,
     #[account(address = system_program::ID)]
     system_program: AccountInfo<'info>,
-    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]

@@ -197,6 +197,7 @@ describe('Multiuser Reward Pool', () => {
   it('Funder unpauses the unpaused pool', async () => {
       await funders[0].pausePool(false, null);
   });
+  
   it('User stakes some tokens in unpaused pool', async () => {
       await users[2].stakeTokens(250_000_000);
   });
@@ -220,13 +221,13 @@ describe('Multiuser Reward Pool', () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
   });
 
-  it('User 5 snipes', async () => {
-    //user 5 is a bitch and immediately hops in, claims, and leaves
-    await users[4].snipe(2_000_000_000);
-  });
-
   it('waits', async () => {
     await wait(5);
+  });
+
+  it('User 5 snipes', async () => {
+    //user 5 is a bitch and immediately hops in, claims, and leaves in one tx
+    await users[4].snipe(2_000_000_000);
   });
 
   it('User 2 claims halfway through', async () => {
@@ -237,6 +238,9 @@ describe('Multiuser Reward Pool', () => {
   it('waits', async () => {
     await wait(5);
   });
+
+  let user1currentA;
+  let user1currentB;
 
   it('Users claim', async () => {
     await claimForUsers(users);

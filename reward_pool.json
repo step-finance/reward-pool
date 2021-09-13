@@ -3,16 +3,56 @@
   "name": "reward_pool",
   "instructions": [
     {
-      "name": "initialize",
+      "name": "initializeProgram",
       "accounts": [
         {
-          "name": "pool",
+          "name": "config",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "rent",
+          "name": "payer",
           "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "authorityMint",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "initializePool",
+      "accounts": [
+        {
+          "name": "config",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authorityTokenAccount",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "authorityTokenOwner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
           "isSigner": false
         }
       ],
@@ -388,6 +428,18 @@
   ],
   "accounts": [
     {
+      "name": "ProgramConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authorityMint",
+            "type": "publicKey"
+          }
+        ]
+      }
+    },
+    {
       "name": "Pool",
       "type": {
         "kind": "struct",
@@ -528,21 +580,31 @@
     },
     {
       "code": 305,
+      "name": "InvalidConfig",
+      "msg": "Invalid config supplied."
+    },
+    {
+      "code": 306,
       "name": "InvalidProgramAuthority",
       "msg": "Please specify the correct authority for this program."
     },
     {
-      "code": 306,
+      "code": 307,
       "name": "InsufficientFundUnstake",
       "msg": "Insufficient funds to unstake."
     },
     {
-      "code": 307,
+      "code": 308,
       "name": "AmountMustBeGreaterThanZero",
       "msg": "Amount must be greater than zero."
+    },
+    {
+      "code": 309,
+      "name": "ProgramAlreadyInitialized",
+      "msg": "Program already initialized."
     }
   ],
   "metadata": {
-    "address": "SRWdZmG93LMynvb4xZLsodmzEcivtwDRLB6G7adMXms"
+    "address": "DJBxyVeok1cMwB5eY5SBWjYNxRM1V7DdFSdjPbeyZe1N"
   }
 }
