@@ -465,8 +465,8 @@ pub struct InitializePool<'info> {
                 && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
                 && authority_token_account.delegated_amount > 0)
         ),
-        constraint = !authority_token_account.is_frozen(),
         constraint = authority_token_account.amount > 0,
+        constraint = !authority_token_account.is_frozen(),
     )]
     authority_token_account: CpiAccount<'info, TokenAccount>,
     #[account(signer)]
