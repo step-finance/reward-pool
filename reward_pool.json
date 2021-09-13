@@ -122,11 +122,6 @@
           "name": "systemProgram",
           "isMut": false,
           "isSigner": false
-        },
-        {
-          "name": "rent",
-          "isMut": false,
-          "isSigner": false
         }
       ],
       "args": [
@@ -605,6 +600,6 @@
     }
   ],
   "metadata": {
-    "address": "DJBxyVeok1cMwB5eY5SBWjYNxRM1V7DdFSdjPbeyZe1N"
+    "address": "SRWdZmG93LMynvb4xZLsodmzEcivtwDRLB6G7adMXms"
   }
 }
