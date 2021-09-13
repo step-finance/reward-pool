@@ -129,8 +129,19 @@ pub fn earned(
 pub mod reward_pool {
     use super::*;
 
-    pub fn initialize(
-        ctx: Context<Initialize>,
+    pub fn initialize_program(
+        ctx: Context<InitializeProgram>,
+    ) -> Result<()> {
+        let config = &mut ctx.accounts.config;
+        if config.authority_mint != Pubkey::default() {
+            return Err(ErrorCode::ProgramAlreadyInitialized.into());
+        }
+        config.authority_mint = ctx.accounts.authority_mint.to_account_info().key.clone();
+        Ok(())
+    }
+
+    pub fn initialize_pool(
+        ctx: Context<InitializePool>,
         authority: Pubkey,
         nonce: u8,
         staking_mint: Pubkey,
@@ -415,7 +426,36 @@ pub mod reward_pool {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+#[instruction(nonce: u8)]
+pub struct InitializeProgram<'info> {
+    #[account(
+        init,
+        seeds = [
+            &b"config"[..],
+            &[nonce],
+        ],
+        payer = payer,
+    )]
+    config: ProgramAccount<'info, ProgramConfig>,
+    #[account(signer)]
+    payer: AccountInfo<'info>,
+    authority_mint: CpiAccount<'info, Mint>,
+    #[account(address = system_program::ID)]
+    system_program: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct InitializePool<'info> {
+    //no assertions needed here; anchor's owner and discriminator checks assert trust
+    config: ProgramAccount<'info, ProgramConfig>,
+    #[account(
+        constraint = authority_token_account.mint == config.authority_mint,
+        constraint = authority_token_account.owner == *authority_token_owner.to_account_info().key,
+        constraint = authority_token_account.amount > 0,
+    )]
+    authority_token_account: CpiAccount<'info, TokenAccount>,
+    #[account(signer)]
+    authority_token_owner: AccountInfo<'info>,
     #[account(init)]
     pool: ProgramAccount<'info, Pool>,
     rent: Sysvar<'info, Rent>,
@@ -617,6 +657,13 @@ pub struct ClaimReward<'info> {
 }
 
 #[account]
+#[derive(Default)]
+pub struct ProgramConfig {
+    pub authority_mint: Pubkey,
+}
+
+#[account]
+#[derive(Default)]
 pub struct Pool {
     /// Priviledged account.
     pub authority: Pubkey,
@@ -691,4 +738,6 @@ pub enum ErrorCode {
     InsufficientFundUnstake,
     #[msg("Amount must be greater than zero.")]
     AmountMustBeGreaterThanZero,
+    #[msg("Program already initialized.")]
+    ProgramAlreadyInitialized,
 }
