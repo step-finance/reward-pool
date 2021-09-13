@@ -5,3 +5,5 @@ target
 test-ledger
 **/*.rs.bk
 keys/
+.rustc_info.json
+debug/
