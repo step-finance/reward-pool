@@ -199,6 +199,9 @@ pub mod reward_pool {
         user.balance_staked = 0;
         user.nonce = nonce;
 
+        let pool = &mut ctx.accounts.pool;
+        pool.user_stake_count = pool.user_stake_count.checked_add(1).unwrap();
+
         msg!("created user nonce {}", nonce);
         Ok(())
     }
@@ -435,6 +438,77 @@ pub mod reward_pool {
 
         Ok(())
     }
+
+    pub fn close_user(ctx: Context<CloseUser>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        pool.user_stake_count = pool.user_stake_count.checked_sub(1).unwrap();
+        Ok(())
+    }
+
+    pub fn close_pool<'info>(ctx: Context<ClosePool>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        
+        let signer_seeds = &[pool.to_account_info().key.as_ref(), &[ctx.accounts.pool.nonce]];
+        
+        //close staking vault
+        let ix = spl_token::instruction::close_account(
+            &spl_token::ID,
+            ctx.accounts.staking_vault.to_account_info().key,
+            ctx.accounts.refundee.key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.staking_vault.to_account_info(),
+                ctx.accounts.refundee.clone(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
+        
+        //close token a vault
+        let ix = spl_token::instruction::close_account(
+            &spl_token::ID,
+            ctx.accounts.reward_a_vault.to_account_info().key,
+            ctx.accounts.refundee.key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.reward_a_vault.to_account_info(),
+                ctx.accounts.refundee.clone(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
+        
+        //close token b vault
+        let ix = spl_token::instruction::close_account(
+            &spl_token::ID,
+            ctx.accounts.reward_b_vault.to_account_info().key,
+            ctx.accounts.refundee.key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.reward_b_vault.to_account_info(),
+                ctx.accounts.refundee.clone(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -479,6 +553,7 @@ pub struct InitializePool<'info> {
 #[instruction(nonce: u8)]
 pub struct CreateUser<'info> {
     // Stake instance.
+    #[account(mut)]
     pool: ProgramAccount<'info, Pool>,
     // Member.
     #[account(
@@ -521,7 +596,7 @@ pub struct Stake<'info> {
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key,
-        constraint = staking_vault.mint = pool.staking_mint,
+        constraint = staking_vault.mint == pool.staking_mint,
     )]
     staking_vault: CpiAccount<'info, TokenAccount>,
 
@@ -677,6 +752,86 @@ pub struct ClaimReward<'info> {
     token_program: AccountInfo<'info>,
 }
 
+#[derive(Accounts)]
+pub struct CloseUser<'info> {
+    #[account(
+        mut, 
+    )]
+    pool: ProgramAccount<'info, Pool>,
+    #[account(
+        mut,
+        close = owner,
+        has_one = owner,
+        has_one = pool,
+        seeds = [
+            owner.to_account_info().key.as_ref(),
+            pool.to_account_info().key.as_ref(),
+            &[user.nonce],
+        ],
+        constraint = user.balance_staked == 0,
+        constraint = user.reward_a_per_token_pending == 0,
+        constraint = user.reward_b_per_token_pending == 0,
+    )]
+    user: ProgramAccount<'info, User>,
+    #[account(signer)]
+    owner: AccountInfo<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClosePool<'info> {
+    config: ProgramAccount<'info, ProgramConfig>,
+    #[account(
+        constraint = authority_token_account.mint == config.authority_mint,
+        constraint = (
+            authority_token_account.owner == *authority_token_owner.to_account_info().key
+            ||
+            (authority_token_account.delegate.is_some()
+                && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
+                && authority_token_account.delegated_amount > 0)
+        ),
+        constraint = authority_token_account.amount > 0,
+        constraint = !authority_token_account.is_frozen(),
+    )]
+    authority_token_account: CpiAccount<'info, TokenAccount>,
+    #[account(signer)]
+    authority_token_owner: AccountInfo<'info>,
+    #[account(mut)]
+    refundee: AccountInfo<'info>,
+    #[account(
+        mut,
+        close = refundee,
+        has_one = staking_vault,
+        has_one = reward_a_vault,
+        has_one = reward_b_vault,
+        constraint = pool.user_stake_count == 0,
+    )]
+    pool: ProgramAccount<'info, Pool>,
+    #[account(mut,
+        constraint = staking_vault.owner == *pool_signer.key,
+        constraint = staking_vault.amount == 0,
+    )]
+    staking_vault: CpiAccount<'info, TokenAccount>,
+    #[account(mut,
+        constraint = reward_a_vault.owner == *pool_signer.key,
+        constraint = reward_a_vault.amount == 0,
+    )]
+    reward_a_vault: CpiAccount<'info, TokenAccount>,
+    #[account(mut,
+        constraint = reward_b_vault.owner == *pool_signer.key,
+        constraint = reward_b_vault.amount == 0,
+    )]
+    reward_b_vault: CpiAccount<'info, TokenAccount>,
+    #[account(
+        seeds = [
+            pool.to_account_info().key.as_ref(),
+            &[pool.nonce],
+        ],
+    )]
+    pool_signer: AccountInfo<'info>,
+    #[account(address = token::ID)]
+    token_program: AccountInfo<'info>,
+}
+
 #[account]
 #[derive(Default)]
 pub struct ProgramConfig {
@@ -718,6 +873,8 @@ pub struct Pool {
     pub reward_a_per_token_stored: u64,
     /// Last calculated reward B per pool token.
     pub reward_b_per_token_stored: u64,
+    /// Users staked
+    pub user_stake_count: u32,
 }
 
 #[account]
