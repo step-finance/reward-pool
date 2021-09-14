@@ -92,6 +92,15 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
   });
 
+  it('Users closes staking account', async () => {
+    await users[0].closeUser();
+  });
+
+  it('Users reopens staking account', async () => {
+    let pool = funders[0].poolPubkey;
+    await users[0].createUserStakingAccount(pool);
+  });
+
   it('Some users stake some tokens', async () => {
 
     await Promise.all([
@@ -99,6 +108,13 @@ describe('Multiuser Reward Pool', () => {
       users[1].stakeTokens(2_000_000_000),
       users[2].stakeTokens(500_000_000),
     ]);
+  });
+
+  it('Users tries to close staking account', async () => {
+    try {
+      await users[0].closeUser();
+      assert.fail("did not fail closing active staking account");
+    } catch (e) { }
   });
 
   //these are all good, commenting just to get to the bottom faster
@@ -231,6 +247,13 @@ describe('Multiuser Reward Pool', () => {
     await wait(2);
   });
 
+  it('Users tries to close staking account', async () => {
+    try {
+      await users[0].closeUser();
+      assert.fail("did not fail closing active staking account");
+    } catch (e) { }
+  });
+
   it('Users claim after end of fund', async () => {
     await claimForUsers(users);
     assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6)));
@@ -315,6 +338,27 @@ describe('Multiuser Reward Pool', () => {
     assert(0.11 > user4Amount);
   });
 
+  it('Users tries to close staking account', async () => {
+    try {
+      await users[0].closeUser();
+      assert.fail("did not fail closing active staking account");
+    } catch (e) { }
+  });
+
+  it('User unstakes all tokens in pool', async () => {
+    await users[0].unstakeTokens(2_000_000_000);
+  });
+
+  it('Users closes staking account', async () => {
+    await users[0].closeUser();
+  });
+
+  it('Users tries to close staking account', async () => {
+    try {
+      await users[1].closeUser();
+      assert.fail("did not fail closing active staking account");
+    } catch (e) { }
+  });
 
 });  
 
