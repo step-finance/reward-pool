@@ -395,6 +395,18 @@ class User {
 
         return [amtA.value.uiAmount, amtB.value.uiAmount];
     }
+
+    async closeUser() {
+        await this.program.rpc.closeUser(
+            {
+                accounts: {
+                    // Stake instance.
+                    pool: this.poolPubkey,
+                    user: this.userPubkey,
+                    owner: this.provider.wallet.publicKey,
+                },
+            });
+    }
 }
 
 module.exports = {
