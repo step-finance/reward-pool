@@ -6,39 +6,6 @@ const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const utils = require("./utils");
 const { User, claimForUsers } = require("./user");
 
-const lastTimeRewardApplicable = (pool) => {
-  return new anchor.BN(Math.min(Date.now() / 1000, pool.rewardDurationEnd));
-}
-
-const rewardPerToken = (pool, rewardXPerTokenStored, rewardXRate, totalStaked, rewardDecimals) => {
-  if (totalStaked === 0) {
-    return rewardPerTokenAStored;
-  }
-
-  return rewardXPerTokenStored.add(
-    (lastTimeRewardApplicable(pool)
-      .sub(pool.lastUpdateTime))
-      .mul(rewardXRate)
-      .mul(new anchor.BN(10).pow(rewardDecimals))
-      .div(totalStaked)
-  );
-}
-
-const earned = (stakedBalance, rewardPerToken, userRewardPerTokenXPaid, rewardXEarned, rewardDecimals) => {
-  return stakedBalance
-    .mul(rewardPerToken.sub(userRewardPerTokenXPaid))
-    .div(new anchor.BN(10).pow(rewardDecimals))
-    .add(rewardXEarned);
-}
-
-async function wait(seconds) {
-  while(seconds > 0) {
-    console.log("countdown " + seconds--);
-    await new Promise(a=>setTimeout(a, 1000));
-  }
-  console.log("wait over");
-}
-
 let program = anchor.workspace.RewardPool;
 
 //Read the provider from the configured environmnet.
@@ -197,7 +164,7 @@ describe('Multiuser Reward Pool', () => {
   it('Funder unpauses the unpaused pool', async () => {
       await funders[0].pausePool(false, null);
   });
-  
+
   it('User stakes some tokens in unpaused pool', async () => {
       await users[2].stakeTokens(250_000_000);
   });
@@ -217,7 +184,7 @@ describe('Multiuser Reward Pool', () => {
   });
 
   //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
-  it('Funder funds the pools', async () => {
+  it('Funder funds the pool', async () => {
       await funders[0].fund(1_000_000_000, 2_000_000_000);
   });
 
@@ -226,473 +193,135 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('User 5 snipes', async () => {
+    setProvider(envProvider);
     //user 5 is a bitch and immediately hops in, claims, and leaves in one tx
+    //should get 0
     await users[4].snipe(2_000_000_000);
+
+    assert.strictEqual(0, (await provider.connection.getTokenAccountBalance(users[4].mintAPubkey)).value.uiAmount);
+    assert.strictEqual(0, (await provider.connection.getTokenAccountBalance(users[4].mintBPubkey)).value.uiAmount);
   });
 
   it('User 2 claims halfway through', async () => {
     //user 2 claims
-    await claimForUsers(users.slice(1, 2));
+    await users[1].claim();
+    assert(0 < (await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount);
+    assert(0 < (await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount);
+  });
+
+  it('waits', async () => {
+    await wait(6);
+  });
+
+  it('Users claim at end of fund', async () => {
+    await claimForUsers(users);
+
+    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+
+    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.111111, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.222222, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintBPubkey)).value.uiAmount.toFixed(6)));
+  });
+
+  it('waits', async () => {
+    await wait(2);
+  });
+
+  it('Users claim after end of fund', async () => {
+    await claimForUsers(users);
+    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.111111, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintAPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.222222, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintBPubkey)).value.uiAmount.toFixed(6)));
+  });
+
+  it('Funder funds the pool again', async () => {
+      await funders[0].fund(1_000_000_000, 1_000_000_000);
   });
 
   it('waits', async () => {
     await wait(5);
   });
 
-  let user1currentA;
-  let user1currentB;
-
-  it('Users claim', async () => {
-    await claimForUsers(users);
+  it('Funder funds the pool during emissions', async () => {
+      await funders[0].fund(30_000_000_000, 50_000_000_000);
   });
 
   it('waits', async () => {
-    await wait(10);
-  });
-
-  it('Users claim', async () => {
-    await claimForUsers(users);
-  });
-
-});
-
-/*
-
-    at this point, the pool is exhausted:
-    
-1 amtA 0.297435894 amtB 0.594871788
-2 amtA 0.035897448 amtB 0.071794894
-3 amtA 0 amtB 0
-4 amtA 0 amtB 0
-
-(not here, but below)
-5 amtA 0.666666658 amtB 1.333333318
-    */
-
-
-  
-
-  //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
-/*
-  it('user 2 unstakes, waits, and restakes', async () => {
-    await users[1].unstakeTokens(2_000_000_000);
-
     await wait(6);
+  });
 
-    await users[1].stakeTokens(2_000_000_000);
+  let oldValA;
+  let oldValB;
+
+  it('Users claim at original end of fund', async () => {
     await claimForUsers(users);
+    //rewards remain
+    assert(0 < parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
+    assert(0 < parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+
+    oldValA = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6));
+    oldValB = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6));
   });
 
-  it('user 5 stakes', async () => {
-    await wait(6);
+  it('waits', async () => {
+    await wait(5);
+  });
 
+  let newValA;
+  let newValB;
+
+  it('Users claim at proper new end of fund', async () => {
     await claimForUsers(users);
+    //no rewards remain
+    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+
+    newValA = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6));
+    newValB = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6));
+    assert(oldValA < newValA);
+    assert(oldValB < newValB);
   });
 
-});
-*/
-/*
-describe('Simple Reward Pool', () => {
-
-  // represents our funder who is setting up a reward pool
-  const funderKp = new anchor.web3.Keypair();
-  const funderProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(funderKp), envProvider.opts);
-
-  // represents our user who has come to reap rewards
-  const userKp = new anchor.web3.Keypair();
-  const userProvider = new anchor.Provider(envProvider.connection, new anchor.Wallet(userKp), envProvider.opts);
-
-  let stakingMint = null;
-  let stakingMintVault = null;
-  let mintA = null;
-  let mintAVault = null;
-  let mintB = null;
-  let mintBVault = null;
-
-  const pool = new anchor.web3.Account();;
-  const rewardDuration = new anchor.BN(30);
-  let poolSigner = null;
-  let nonce = null;
-  let rewardPoolMint = null;
-
-  let userStakeToken = null;
-
-  it("Initialize actors", async () => {
-    setProvider(envProvider);
-    await utils.sendLamports(provider, funderProvider.wallet.publicKey, 3_000_000_000);
-    await utils.sendLamports(provider, userProvider.wallet.publicKey, 3_000_000_000);
-
-    //these mints are ecosystem mints not owned
-    //by funder or user
-    mintA = await utils.createMint(provider, 9);
-    mintB = await utils.createMint(provider, 9);
-    stakingMint = await utils.createMint(provider, 9);
-
-    //give our user some of the token to stake
-    userStakeToken = await stakingMint.createAccount(userProvider.wallet.publicKey);
-    stakingMint.mintTo(
-      userStakeToken,
-      provider.wallet.publicKey,
-      [],
-      1_000_000_000
-    );
-
-  });
-  it("Create pool accounts", async () => {
-    setProvider(funderProvider);
-
-    const [
-      _poolSigner,
-      _nonce,
-    ] = await anchor.web3.PublicKey.findProgramAddress(
-      [pool.publicKey.toBuffer()],
-      program.programId
-    );
-    poolSigner = _poolSigner;
-    nonce = _nonce;
-    rewardPoolMint = await Token.createMint(
-      provider.connection,
-      provider.wallet.payer,
-      poolSigner,
-      null,
-      9,
-      TOKEN_PROGRAM_ID
-    );
-
-    stakingMintVault = await stakingMint.createAccount(poolSigner);
-    mintAVault = await mintA.createAccount(poolSigner);
-    mintBVault = await mintB.createAccount(poolSigner);
+  it('Funder funds the pool again', async () => {
+      await funders[0].fund(1_000_000_000, 1_000_000_000);
   });
 
-  it("Initializes the pool", async () => {
-    setProvider(funderProvider);
-
-    let tx = await program.rpc.initialize(
-      provider.wallet.publicKey,
-      nonce,
-      stakingMint.publicKey,
-      stakingMintVault,
-      mintA.publicKey,
-      mintAVault,
-      mintB.publicKey,
-      mintBVault,
-      rewardDuration,
-      {
-        accounts: {
-          pool: pool.publicKey,
-          rewardPoolMint: rewardPoolMint.publicKey,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-        },
-        signers: [pool],
-        instructions: [
-          await program.account.pool.createInstruction(pool),
-        ],
-      }
-    );
-
-    poolAccount = await program.account.pool.fetch(pool.publicKey);
-
-    assert.ok(poolAccount.authority.equals(provider.wallet.publicKey));
-    assert.equal(poolAccount.nonce, nonce);
-    assert.ok(poolAccount.stakingMint.equals(stakingMint.publicKey));
-    assert.ok(poolAccount.rewardAMint.equals(mintA.publicKey));
-    assert.ok(poolAccount.rewardBMint.equals(mintB.publicKey));
-    assert.ok(poolAccount.rewardPoolMint.equals(rewardPoolMint.publicKey));
-    assert.ok(poolAccount.rewardDuration.eq(rewardDuration));
+  it('waits', async () => {
+    await wait(7);
   });
 
-  let userAccount = null;
-  let userAccountMeta = null;
-  let userNonce = null;
-  let rewardPoolTokenAccount = null;
-
-  it("Creates a user", async () => {
-    setProvider(userProvider);
-
-    const [
-      _userAccount,
-      _userNonce,
-    ] = await anchor.web3.PublicKey.findProgramAddress(
-      [provider.wallet.publicKey.toBuffer(), pool.publicKey.toBuffer()],
-      program.programId
-    );
-    userAccount = _userAccount;
-    userNonce = _userNonce;
-
-    rewardPoolTokenAccount = await rewardPoolMint.createAccount(userAccount);
-
-    const tx = program.transaction.createUser(userNonce, {
-      accounts: {
-        pool: pool.publicKey,
-        user: userAccount,
-        owner: provider.wallet.publicKey,
-        rewardPoolToken: rewardPoolTokenAccount,
-        tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      }
-    });
-
-    await provider.send(tx);
-
-    userAccountMeta = await program.account.user.fetch(userAccount);
-
-    assert.ok(userAccountMeta.pool.equals(pool.publicKey));
-    assert.ok(userAccountMeta.owner.equals(provider.wallet.publicKey));
-    assert.ok(userAccountMeta.rewardPoolToken.equals(rewardPoolTokenAccount));
+  it('Welcome user 4 to the pool in last 3 seconds', async () => {
+      await users[3].stakeTokens(2_000_000_000);
   });
 
-  it("Stake tokens in the pool", async () => {
-    setProvider(userProvider);
-
-    const stakeAmount = new anchor.BN(1_000_000_000);
-    await program.rpc.stake(
-      stakeAmount,
-      {
-      accounts: {
-        // Stake instance.
-        pool: pool.publicKey,
-        rewardPoolMint: rewardPoolMint.publicKey,
-        rewardAMint: mintA.publicKey,
-        rewardBMint: mintB.publicKey,
-        stakingVault: stakingMintVault,
-        // User.
-        user: userAccount,
-        owner: provider.wallet.publicKey,
-        rewardPoolToken: rewardPoolTokenAccount,
-        stakeFromAccount: userStakeToken,
-        // Program signers.
-        poolSigner,
-        // Misc.
-        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-        tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
-      },
-    });
-
-    const userTokenMeta = await serumCmn.getTokenAccount(
-      provider,
-      userStakeToken
-    );
-    const vault = await serumCmn.getTokenAccount(
-      provider,
-      stakingMintVault
-    );
-
-    assert.ok(userTokenMeta.amount.eq(new anchor.BN(0)));
-    assert.ok(vault.amount.eq(new anchor.BN(1_000_000_000)));
+  it('waits', async () => {
+    await wait(4);
   });
 
-  let funderMintAAccount = null;
-  let funderMintBAccount = null;
-
-  it("Fund the pool", async () => {
-    //switch to funder context to create token accounts
-    setProvider(funderProvider);
-
-    const amountA = new anchor.BN(1000000000);
-    const amountB = new anchor.BN(1000000000);
-
-    funderMintAAccount = await mintA.createAccount(provider.wallet.publicKey);
-    funderMintBAccount = await mintB.createAccount(provider.wallet.publicKey);
-
-    //switch to env context to mint (funder doesn't own these)
-    setProvider(envProvider);
-    // Create some rewards to fund contract with
-    await mintA.mintTo(funderMintAAccount, provider.wallet.publicKey, [], amountA.toNumber());
-    await mintB.mintTo(funderMintBAccount, provider.wallet.publicKey, [], amountB.toNumber());
-
-    //back to funder to properly test
-    setProvider(funderProvider);
-    await program.rpc.fund(amountA, amountB, {
-      accounts: {
-        // Stake instance.
-        pool: pool.publicKey,
-        rewardPoolMint: rewardPoolMint.publicKey,
-        rewardAMint: mintA.publicKey,
-        rewardBMint: mintB.publicKey,
-        stakingVault: stakingMintVault,
-        rewardAVault: mintAVault,
-        rewardBVault: mintBVault,
-        funder: provider.wallet.publicKey,
-        fromA: funderMintAAccount,
-        fromB: funderMintBAccount,
-        // Program signers.
-        poolSigner,
-        // Misc.
-        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-        tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
-      },
-    });
-
-    const mintAAccount = await serumCmn.getTokenAccount(
-      provider,
-      mintAVault
-    );
-    const mintBAccount = await serumCmn.getTokenAccount(
-      provider,
-      mintBVault
-    );
-
-    poolAccount = await program.account.pool.fetch(pool.publicKey);
-
-    assert.ok(mintAAccount.amount.eq(amountA));
-    assert.ok(mintBAccount.amount.eq(amountB));
-
-    assert.ok(poolAccount.rewardARate.gt(new anchor.BN(0)));
-    assert.ok(poolAccount.rewardBRate.gt(new anchor.BN(0)));
-    assert.ok(poolAccount.lastUpdateTime.gt(new anchor.BN(0)));
-    assert.ok(poolAccount.rewardDurationEnd.gt(new anchor.BN(0)));
+  it('Users claim, new user should have small amount', async () => {
+    await claimForUsers(users);
+    //users got a smidge less than they would have had user 4 not spoiled the fun
+    assert(0.43 > parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6))
+                      - newValA); //newValA was what they had after last round of payments; 0.4444 is what would have been if user 4 didnt join
+    let user4Amount = parseFloat((await provider.connection.getTokenAccountBalance(users[3].mintAPubkey)).value.uiAmount.toFixed(6));                      
+    assert(0 < user4Amount);
+    assert(0.11 > user4Amount);
   });
 
-  it("Wait to accrue rewards", async () => {
-    await serumCmn.sleep(32 * 1000);
-  });
 
-  let claimerMintAAccount = null;
-  let claimerMintBAccount = null;
+});  
 
-  it("User has accrued rewards", async () => {
-    setProvider(envProvider);
-
-    poolAccountMeta = await program.account.pool.fetch(pool.publicKey);
-    userAccountMeta = await program.account.user.fetch(userAccount);
-
-    claimerMintAAccount = await mintA.createAccount(userProvider.wallet.publicKey);
-    claimerMintBAccount = await mintB.createAccount(userProvider.wallet.publicKey);
-
-    setProvider(userProvider);
-
-    const stakingVaultAccount = await serumCmn.getTokenAccount(
-      provider,
-      stakingMintVault
-    );
-
-    const rewardPoolTokenMeta = await serumCmn.getTokenAccount(
-      provider,
-      userAccountMeta.rewardPoolToken
-    );
-
-    const rewardPoolMintMeta = await serumCmn.getMintInfo(
-      provider,
-      rewardPoolMint.publicKey
-    );
-
-    const stakedBalance = rewardPoolTokenMeta.amount
-      .mul(stakingVaultAccount.amount)
-      .div(rewardPoolMintMeta.supply)
-
-    const mintAInfo = await serumCmn.getMintInfo(
-      provider,
-      mintA.publicKey
-    );
-
-    const mintBInfo = await serumCmn.getMintInfo(
-      provider,
-      mintB.publicKey
-    );
-
-    const _rewardPerToken = rewardPerToken(
-      poolAccount,
-      poolAccount.rewardAPerTokenStored,
-      poolAccount.rewardARate,
-      stakingVaultAccount.amount,
-      new anchor.BN(mintAInfo.decimals)
-    );
-
-
-    const earnedAmt = earned(
-      stakedBalance,
-      _rewardPerToken,
-      userAccountMeta.rewardPerTokenAPaid,
-      userAccountMeta.rewardAEarned,
-      new anchor.BN(mintAInfo.decimals)
-    );
-
-    //console.log("rewardPerToken", _rewardPerToken.toNumber())
-    //console.log("earnedAmt", earnedAmt.toNumber())
-
-    assert.ok(earnedAmt.eq(new anchor.BN(999999990)));
-
-    await program.rpc.claim({
-      accounts: {
-        // Stake instance.
-        pool: pool.publicKey,
-        rewardPoolMint: rewardPoolMint.publicKey,
-        rewardAMint: mintA.publicKey,
-        rewardBMint: mintB.publicKey,
-        stakingVault: stakingMintVault,
-        rewardAVault: mintAVault,
-        rewardBVault: mintBVault,
-        // User.
-        user: userAccount,
-        owner: provider.wallet.publicKey,
-        rewardPoolToken: rewardPoolTokenAccount,
-        rewardAAccount: claimerMintAAccount,
-        rewardBAccount: claimerMintBAccount,
-        // Program signers.
-        poolSigner,
-        // Misc.
-        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-        tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
-      },
-    });
-
-    const rewardAAccount = await serumCmn.getTokenAccount(
-      provider,
-      claimerMintAAccount
-    );
-
-    const rewardBAccount = await serumCmn.getTokenAccount(
-      provider,
-      claimerMintBAccount
-    );
-
-    assert.ok(rewardAAccount.amount.eq(new anchor.BN(999999990)));
-    assert.ok(rewardBAccount.amount.eq(new anchor.BN(999999990)));
-  });
-
-  it("Unstake tokens from pool", async () => {
-    setProvider(userProvider);
-
-    userAccountMeta = await program.account.user.fetch(userAccount);
-
-    let rewardPoolTokenMeta = await serumCmn.getTokenAccount(
-      provider,
-      userAccountMeta.rewardPoolToken
-    );
-
-    await program.rpc.unstake(rewardPoolTokenMeta.amount, {
-      accounts: {
-        // Stake instance.
-        pool: pool.publicKey,
-        rewardPoolMint: rewardPoolMint.publicKey,
-        rewardAMint: mintA.publicKey,
-        rewardBMint: mintB.publicKey,
-        stakingVault: stakingMintVault,
-        // User.
-        user: userAccount,
-        owner: provider.wallet.publicKey,
-        rewardPoolToken: userAccountMeta.rewardPoolToken,
-        stakeFromAccount: userStakeToken,
-        // Program signers.
-        poolSigner,
-        // Misc.
-        clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
-        tokenProgram: TokenInstructions.TOKEN_PROGRAM_ID,
-      },
-    });
-
-    const userTokenMeta = await serumCmn.getTokenAccount(
-      provider,
-      userStakeToken
-    );
-    const vault = await serumCmn.getTokenAccount(
-      provider,
-      stakingMintVault
-    );
-
-    assert.ok(userTokenMeta.amount.eq(new anchor.BN(1000000000)));
-    assert.ok(vault.amount.eq(new anchor.BN(0)));
-  });
-});
-*/
+async function wait(seconds) {
+  while(seconds > 0) {
+    console.log("countdown " + seconds--);
+    await new Promise(a=>setTimeout(a, 1000));
+  }
+  console.log("wait over");
+}
