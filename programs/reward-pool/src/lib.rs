@@ -454,7 +454,7 @@ pub struct InitializeProgram<'info> {
 
 #[derive(Accounts)]
 pub struct InitializePool<'info> {
-    //no assertions needed here; anchor's owner and discriminator checks assert trust
+    //no assertions needed here; anchor's owner and discriminator checks assert
     config: ProgramAccount<'info, ProgramConfig>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
@@ -494,8 +494,6 @@ pub struct CreateUser<'info> {
     #[account(signer)]
     owner: AccountInfo<'info>,
     // Misc.
-    #[account(address = token::ID)]
-    token_program: AccountInfo<'info>,
     #[account(address = system_program::ID)]
     system_program: AccountInfo<'info>,
 }
@@ -514,13 +512,16 @@ pub struct Stake<'info> {
     #[account(
         mut, 
         has_one = reward_a_mint,
-        has_one = reward_b_mint
+        has_one = reward_b_mint,
+        has_one = staking_vault,
     )]
     pool: ProgramAccount<'info, Pool>,
+    //reqd for decimals calcs; could have alternatively stored the decimals on pool
     reward_a_mint: CpiAccount<'info, Mint>,
     reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
-        constraint = staking_vault.owner == *pool_signer.key
+        constraint = staking_vault.owner == *pool_signer.key,
+        constraint = staking_vault.mint = pool.staking_mint,
     )]
     staking_vault: CpiAccount<'info, TokenAccount>,
 
@@ -536,11 +537,12 @@ pub struct Stake<'info> {
         ],
     )]
     user: ProgramAccount<'info, User>,
-    #[account(signer)] //todo not signer; require stake_from_account auth to user program account instead?
+    #[account(signer)] 
     owner: AccountInfo<'info>,
     #[account(mut,
         constraint = stake_from_account.mint == pool.staking_mint,
-        has_one = owner
+        //no, could just be a delegated auth
+        //has_one = owner,
     )]
     stake_from_account: CpiAccount<'info, TokenAccount>,
 
@@ -564,8 +566,12 @@ pub struct Fund<'info> {
     // Global accounts for the staking instance.
     #[account(
         mut, 
+        has_one = staking_vault,
         has_one = reward_a_mint,
         has_one = reward_b_mint,
+        has_one = reward_a_vault,
+        has_one = reward_b_vault,
+        //require signed funder auth - otherwise constant micro fund could hold funds hostage
         constraint = pool.authority == *funder.to_account_info().key,
     )]
     pool: ProgramAccount<'info, Pool>,
@@ -584,7 +590,7 @@ pub struct Fund<'info> {
     )]
     reward_b_vault: CpiAccount<'info, TokenAccount>,
 
-    #[account(signer)] //todo remove signer and add approval to pool authority on tokens
+    #[account(signer)]
     funder: AccountInfo<'info>,
     #[account(mut)]
     from_a: CpiAccount<'info, TokenAccount>,
@@ -611,8 +617,11 @@ pub struct ClaimReward<'info> {
     // Global accounts for the staking instance.
     #[account(
         mut, 
+        has_one = staking_vault,
         has_one = reward_a_mint,
-        has_one = reward_b_mint
+        has_one = reward_b_mint,
+        has_one = reward_a_vault,
+        has_one = reward_b_vault,
     )]
     pool: ProgramAccount<'info, Pool>,
     reward_a_mint: CpiAccount<'info, Mint>,
@@ -646,12 +655,10 @@ pub struct ClaimReward<'info> {
     owner: AccountInfo<'info>,
     #[account(mut,
         constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
-        constraint = reward_a_account.owner == *owner.key
     )]
     reward_a_account: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_b_account.mint == *reward_b_mint.to_account_info().key,
-        constraint = reward_b_account.owner == *owner.key
     )]
     reward_b_account: CpiAccount<'info, TokenAccount>,
 
