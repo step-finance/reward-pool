@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
-use anchor_spl::token::{self, Mint, TokenAccount};
+use anchor_spl::token::{self, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
 
@@ -160,11 +160,8 @@ pub mod reward_pool {
         ctx: Context<InitializePool>,
         authority: Pubkey,
         nonce: u8,
-        staking_mint: Pubkey,
         staking_vault: Pubkey,
-        reward_a_mint: Pubkey,
         reward_a_vault: Pubkey,
-        reward_b_mint: Pubkey,
         reward_b_vault: Pubkey,
         reward_duration: u64,
     ) -> Result<()> {
@@ -173,11 +170,8 @@ pub mod reward_pool {
         pool.authority = authority;
         pool.nonce = nonce;
         pool.paused = false;
-        pool.staking_mint = staking_mint;
         pool.staking_vault = staking_vault;
-        pool.reward_a_mint = reward_a_mint;
         pool.reward_a_vault = reward_a_vault;
-        pool.reward_b_mint = reward_b_mint;
         pool.reward_b_vault = reward_b_vault;
         pool.reward_duration = reward_duration;
         pool.reward_duration_end = 0;
@@ -586,17 +580,12 @@ pub struct Stake<'info> {
     // Global accounts for the staking instance.
     #[account(
         mut, 
-        has_one = reward_a_mint,
-        has_one = reward_b_mint,
         has_one = staking_vault,
     )]
     pool: ProgramAccount<'info, Pool>,
-    //reqd for decimals calcs; could have alternatively stored the decimals on pool
-    reward_a_mint: CpiAccount<'info, Mint>,
-    reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key,
-        constraint = staking_vault.mint == pool.staking_mint,
+        constraint = *staking_vault.to_account_info().key == pool.staking_vault,
     )]
     staking_vault: CpiAccount<'info, TokenAccount>,
 
@@ -615,7 +604,7 @@ pub struct Stake<'info> {
     #[account(signer)] 
     owner: AccountInfo<'info>,
     #[account(mut,
-        constraint = stake_from_account.mint == pool.staking_mint,
+        constraint = stake_from_account.mint == staking_vault.mint,
         //no, could just be a delegated auth
         //has_one = owner,
     )]
@@ -642,16 +631,12 @@ pub struct Fund<'info> {
     #[account(
         mut, 
         has_one = staking_vault,
-        has_one = reward_a_mint,
-        has_one = reward_b_mint,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
         //require signed funder auth - otherwise constant micro fund could hold funds hostage
         constraint = pool.authority == *funder.to_account_info().key,
     )]
     pool: ProgramAccount<'info, Pool>,
-    reward_a_mint: CpiAccount<'info, Mint>,
-    reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key
     )]
@@ -667,9 +652,15 @@ pub struct Fund<'info> {
 
     #[account(signer)]
     funder: AccountInfo<'info>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = from_a.mint == reward_a_vault.mint,
+    )]
     from_a: CpiAccount<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = from_b.mint == reward_b_vault.mint,
+    )]
     from_b: CpiAccount<'info, TokenAccount>,
 
     // Program signers.
@@ -693,14 +684,10 @@ pub struct ClaimReward<'info> {
     #[account(
         mut, 
         has_one = staking_vault,
-        has_one = reward_a_mint,
-        has_one = reward_b_mint,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
     )]
     pool: ProgramAccount<'info, Pool>,
-    reward_a_mint: CpiAccount<'info, Mint>,
-    reward_b_mint: CpiAccount<'info, Mint>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key
     )]
@@ -729,11 +716,11 @@ pub struct ClaimReward<'info> {
     #[account(signer)]
     owner: AccountInfo<'info>,
     #[account(mut,
-        constraint = reward_a_account.mint == *reward_a_mint.to_account_info().key,
+        constraint = reward_a_account.mint == reward_a_vault.mint,
     )]
     reward_a_account: CpiAccount<'info, TokenAccount>,
     #[account(mut,
-        constraint = reward_b_account.mint == *reward_b_mint.to_account_info().key,
+        constraint = reward_b_account.mint == reward_b_vault.mint,
     )]
     reward_b_account: CpiAccount<'info, TokenAccount>,
 
@@ -847,17 +834,11 @@ pub struct Pool {
     pub nonce: u8,
     /// Paused state of the program
     pub paused: bool,
-    /// Mint of the token that can be staked.
-    pub staking_mint: Pubkey,
     /// Vault to store staked tokens.
     pub staking_vault: Pubkey,
     /// Mint of the reward A token.
-    pub reward_a_mint: Pubkey,
-    /// Vault to store reward A tokens.
     pub reward_a_vault: Pubkey,
     /// Mint of the reward A token.
-    pub reward_b_mint: Pubkey,
-    /// Vault to store reward B tokens.
     pub reward_b_vault: Pubkey,
     /// The period which rewards are linearly distributed.
     pub reward_duration: u64,
@@ -908,8 +889,6 @@ pub enum ErrorCode {
     InvalidUserSigner,
     #[msg("An unknown error has occured.")]
     Unknown,
-    #[msg("Invalid mint supplied.")]
-    InvalidMint,
     #[msg("Invalid config supplied.")]
     InvalidConfig,
     #[msg("Please specify the correct authority for this program.")]

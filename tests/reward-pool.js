@@ -397,13 +397,12 @@ describe('Multiuser Reward Pool', () => {
   it('Pool 2 users claim', async () => {
     await claimForUsers(users2);
 
-    //assert everything distributed, user1 has approx 1/3 proportion
-    assert.strictEqual(
-      await getTokenBalance(funders[1].admin.mintAVault),
-      0);
-    assert.strictEqual(
-      await getTokenBalance(funders[1].admin.mintBVault),
-      0);
+    //assert everything distributed, user1 has approx 1/8 proportion
+
+    //possible dust
+    assert(.01 > await getTokenBalance(funders[1].admin.mintAVault));
+    assert(.01 > await getTokenBalance(funders[1].admin.mintBVault));
+
     let u1A = await getTokenBalance(users2[0].mintAPubkey);
     let u1B = await getTokenBalance(users2[0].mintBPubkey);
     let u2A = await getTokenBalance(users2[1].mintAPubkey);
