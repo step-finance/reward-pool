@@ -408,6 +408,7 @@ describe('Multiuser Reward Pool', () => {
     let u2A = await getTokenBalance(users2[1].mintAPubkey);
     let u2B = await getTokenBalance(users2[1].mintBPubkey);
 
+    //user balances are almost total (account for dust)
     assert(.05 > 1 - (u1A + u2A));
     assert(.05 > 1 - (u1B + u2B));
 
@@ -418,6 +419,32 @@ describe('Multiuser Reward Pool', () => {
     //probably .875 and .125
     assert(u2B < u1B/6);
     assert(u2B > u1B/10);
+  });
+
+  it("Tries to close a pool with active user", async () => {
+    try {
+      await funders[1].closePool();
+      assert.fail("should have failed closing active pool")
+    } catch {
+    }
+  });
+
+  it('Pool 2 users unstake all, all close', async () => {
+    await Promise.all(users2.map(a => a.unstakeTokens(250_000)));
+    await Promise.all(users2.map(a => a.closeUser()));
+  });
+
+  it("Pool 2 closes", async () => {
+    await funders[1].closePool();
+    let pool = await provider.connection.getAccountInfo(funders[1].admin.poolKeypair.publicKey);
+    let sv = await provider.connection.getAccountInfo(funders[1].admin.stakingMintVault);
+    let av = await provider.connection.getAccountInfo(funders[1].admin.mintAVault);
+    let bv = await provider.connection.getAccountInfo(funders[1].admin.mintBVault);
+
+    assert.strictEqual(pool, null);
+    assert.strictEqual(sv, null);
+    assert.strictEqual(av, null);
+    assert.strictEqual(bv, null);
   });
 
 });  

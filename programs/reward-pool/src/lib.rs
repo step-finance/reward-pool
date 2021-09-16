@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::system_program;
+use anchor_lang::solana_program::sysvar;
 use anchor_spl::token::{self, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
@@ -10,13 +11,8 @@ pub fn update_rewards(
     clock: &Clock,
     total_staked: u64,
 ) -> Result<()> {
-    msg!("pool.reward_duration_end: {}", pool.reward_duration_end);
-    msg!("pool.clock.unix_timestamp: {}", clock.unix_timestamp);
-
     let last_time_reward_applicable =
         last_time_reward_applicable(pool.reward_duration_end, clock.unix_timestamp);
-
-    msg!("last_time_reward_applicable: {}", last_time_reward_applicable);
 
     pool.reward_a_per_token_stored = reward_per_token(
         total_staked,
@@ -26,8 +22,6 @@ pub fn update_rewards(
         pool.reward_a_rate,
     );
 
-    msg!("pool.reward_a_per_token_stored: {}", pool.reward_a_per_token_stored);
-
     pool.reward_b_per_token_stored = reward_per_token(
         total_staked,
         pool.reward_b_per_token_stored,
@@ -36,15 +30,9 @@ pub fn update_rewards(
         pool.reward_b_rate,
     );
 
-    msg!("pool.reward_b_per_token_stored: {}", pool.reward_b_per_token_stored);
-
     pool.last_update_time = last_time_reward_applicable;
 
-    msg!("pool.last_update_time: {}", pool.last_update_time);
-
     if let Some(u) = user {
-        msg!("has user");
-        
         u.reward_a_per_token_pending = earned(
             u.balance_staked,
             pool.reward_a_per_token_stored,
@@ -53,9 +41,6 @@ pub fn update_rewards(
         );
         u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
 
-        msg!("u.reward_a_per_token_pending: {}", u.reward_a_per_token_pending);
-        msg!("u.reward_a_per_token_complete: {}", u.reward_a_per_token_complete);
-
         u.reward_b_per_token_pending = earned(
             u.balance_staked,
             pool.reward_b_per_token_stored,
@@ -63,11 +48,8 @@ pub fn update_rewards(
             u.reward_b_per_token_pending,
         );
         u.reward_b_per_token_complete = pool.reward_b_per_token_stored;
-
-        msg!("u.reward_b_per_token_pending: {}", u.reward_b_per_token_pending);
-        msg!("u.reward_b_per_token_complete: {}", u.reward_b_per_token_complete);
     }
-
+    
     Ok(())
 }
 
@@ -87,11 +69,6 @@ pub fn reward_per_token(
     if total_staked == 0 {
         return reward_per_token_stored;
     }
-
-    msg!("reward_per_token_stored: {}", reward_per_token_stored);
-    msg!("+ last_time_reward_applicable - last_update_time: {}", last_time_reward_applicable - last_update_time);
-    msg!("* reward_rate: {}", reward_rate);
-    msg!("/ total_staked: {}", total_staked);
 
     return reward_per_token_stored
                 .checked_add(
@@ -181,8 +158,6 @@ pub mod reward_pool {
         pool.reward_a_per_token_stored = 0;
         pool.reward_b_per_token_stored = 0;
 
-        msg!("created pool nonce {}", nonce);
-
         Ok(())
     }
 
@@ -200,7 +175,6 @@ pub mod reward_pool {
         let pool = &mut ctx.accounts.pool;
         pool.user_stake_count = pool.user_stake_count.checked_add(1).unwrap();
 
-        msg!("created user nonce {}", nonce);
         Ok(())
     }
 
@@ -382,9 +356,6 @@ pub mod reward_pool {
             let mut reward_amount = ctx.accounts.user.reward_a_per_token_pending;
             let vault_balance = ctx.accounts.reward_a_vault.amount;
 
-            msg!("reward_a_amount {}", reward_amount);
-            msg!("vault_a_balance {}", vault_balance);
-
             ctx.accounts.user.reward_a_per_token_pending = 0;
             if vault_balance < reward_amount {
                 reward_amount = vault_balance;
@@ -407,9 +378,6 @@ pub mod reward_pool {
         if ctx.accounts.user.reward_b_per_token_pending > 0 {
             let mut reward_amount = ctx.accounts.user.reward_b_per_token_pending;
             let vault_balance = ctx.accounts.reward_b_vault.amount;
-
-            msg!("reward_b_amount {}", reward_amount);
-            msg!("vault_b_balance {}", vault_balance);
 
             ctx.accounts.user.reward_b_per_token_pending = 0;
             if vault_balance < reward_amount {
@@ -445,6 +413,24 @@ pub mod reward_pool {
         let signer_seeds = &[pool.to_account_info().key.as_ref(), &[ctx.accounts.pool.nonce]];
         
         //close staking vault
+        let ix = spl_token::instruction::transfer(
+            &spl_token::ID,
+            ctx.accounts.staking_vault.to_account_info().key,
+            ctx.accounts.staking_refundee.to_account_info().key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+            ctx.accounts.staking_vault.amount,
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.staking_vault.to_account_info(),
+                ctx.accounts.staking_refundee.to_account_info(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
         let ix = spl_token::instruction::close_account(
             &spl_token::ID,
             ctx.accounts.staking_vault.to_account_info().key,
@@ -464,6 +450,24 @@ pub mod reward_pool {
         )?;
         
         //close token a vault
+        let ix = spl_token::instruction::transfer(
+            &spl_token::ID,
+            ctx.accounts.reward_a_vault.to_account_info().key,
+            ctx.accounts.reward_a_refundee.to_account_info().key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+            ctx.accounts.reward_a_vault.amount,
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.reward_a_vault.to_account_info(),
+                ctx.accounts.reward_a_refundee.to_account_info(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
         let ix = spl_token::instruction::close_account(
             &spl_token::ID,
             ctx.accounts.reward_a_vault.to_account_info().key,
@@ -483,6 +487,24 @@ pub mod reward_pool {
         )?;
         
         //close token b vault
+        let ix = spl_token::instruction::transfer(
+            &spl_token::ID,
+            ctx.accounts.reward_b_vault.to_account_info().key,
+            ctx.accounts.reward_b_refundee.to_account_info().key,
+            ctx.accounts.pool_signer.key,
+            &[ctx.accounts.pool_signer.key],
+            ctx.accounts.reward_b_vault.amount,
+        )?;
+        solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.token_program.clone(),
+                ctx.accounts.reward_b_vault.to_account_info(),
+                ctx.accounts.reward_b_refundee.to_account_info(),
+                ctx.accounts.pool_signer.clone(),
+            ],
+            &[signer_seeds],
+        )?;
         let ix = spl_token::instruction::close_account(
             &spl_token::ID,
             ctx.accounts.reward_b_vault.to_account_info().key,
@@ -784,12 +806,19 @@ pub struct ClosePool<'info> {
     authority_token_owner: AccountInfo<'info>,
     #[account(mut)]
     refundee: AccountInfo<'info>,
+    #[account(mut)]
+    staking_refundee: CpiAccount<'info, TokenAccount>,
+    #[account(mut)]
+    reward_a_refundee: CpiAccount<'info, TokenAccount>,
+    #[account(mut)]
+    reward_b_refundee: CpiAccount<'info, TokenAccount>,
     #[account(
         mut,
         close = refundee,
         has_one = staking_vault,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
+        constraint = pool.reward_duration_end < sysvar::clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap(),
         constraint = pool.user_stake_count == 0,
     )]
     pool: ProgramAccount<'info, Pool>,
@@ -800,12 +829,14 @@ pub struct ClosePool<'info> {
     staking_vault: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_a_vault.owner == *pool_signer.key,
-        constraint = reward_a_vault.amount == 0,
+        //dust may remain
+        //constraint = reward_a_vault.amount == 0,
     )]
     reward_a_vault: CpiAccount<'info, TokenAccount>,
     #[account(mut,
         constraint = reward_b_vault.owner == *pool_signer.key,
-        constraint = reward_b_vault.amount == 0,
+        //dust may remain
+        //constraint = reward_b_vault.amount == 0,
     )]
     reward_b_vault: CpiAccount<'info, TokenAccount>,
     #[account(
