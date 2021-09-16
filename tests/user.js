@@ -98,11 +98,8 @@ class User {
         await this.program.rpc.initializePool(
             this.provider.wallet.publicKey,
             nonce,
-            this.stakingMintObject.publicKey,
             stakingMintVault,
-            this.mintAObject.publicKey,
             mintAVault,
-            this.mintBObject.publicKey,
             mintBVault,
             rewardDuration,
             {
@@ -169,8 +166,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    rewardAMint: poolObject.rewardAMint,
-                    rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
@@ -215,8 +210,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    rewardAMint: poolObject.rewardAMint,
-                    rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
@@ -250,8 +243,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    rewardAMint: poolObject.rewardAMint,
-                    rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     rewardAVault: poolObject.rewardAVault,
                     rewardBVault: poolObject.rewardBVault,
@@ -283,8 +274,6 @@ class User {
             accounts: {
                 // Stake instance.
                 pool: this.poolPubkey,
-                rewardAMint: poolObject.rewardAMint,
-                rewardBMint: poolObject.rewardBMint,
                 stakingVault: poolObject.stakingVault,
                 rewardAVault: poolObject.rewardAVault,
                 rewardBVault: poolObject.rewardBVault,
@@ -326,8 +315,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    rewardAMint: poolObject.rewardAMint,
-                    rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
@@ -346,8 +333,6 @@ class User {
             accounts: {
                 // Stake instance.
                 pool: this.poolPubkey,
-                rewardAMint: poolObject.rewardAMint,
-                rewardBMint: poolObject.rewardBMint,
                 stakingVault: poolObject.stakingVault,
                 rewardAVault: poolObject.rewardAVault,
                 rewardBVault: poolObject.rewardBVault,
@@ -370,8 +355,6 @@ class User {
                 accounts: {
                     // Stake instance.
                     pool: this.poolPubkey,
-                    rewardAMint: poolObject.rewardAMint,
-                    rewardBMint: poolObject.rewardBMint,
                     stakingVault: poolObject.stakingVault,
                     // User.
                     user: this.userPubkey,
