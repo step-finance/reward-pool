@@ -29,14 +29,19 @@ setProvider(provider);
 describe('Multiuser Reward Pool', () => {
 
   const rewardDuration = new anchor.BN(10);
+  const rewardDuration2 = new anchor.BN(20);
 
   let users;
+  let users2;
   let funders;
   let mintA;
   let mintB;
+  let mintC;
   let stakingMint;
+  let stakingMint2;
   let poolCreationAuthorityMint;
   let poolKeypair = anchor.web3.Keypair.generate();
+  let poolKeypair2 = anchor.web3.Keypair.generate();
 
   it("Initialize mints", async () => {
     setProvider(envProvider);
@@ -44,7 +49,9 @@ describe('Multiuser Reward Pool', () => {
     //by funder or user
     mintA = await utils.createMint(provider, 9);
     mintB = await utils.createMint(provider, 9);
+    mintC = await utils.createMint(provider, 3);
     stakingMint = await utils.createMint(provider, 9);
+    stakingMint2 = await utils.createMint(provider, 5);
     poolCreationAuthorityMint = await utils.createMint(provider, 0);
   });
 
@@ -56,16 +63,21 @@ describe('Multiuser Reward Pool', () => {
 
   it("Initialize users", async () => {
     users = [1, 2, 3, 4, 5].map(a => new User(a));
+    users2 = [11, 12].map(a => new User(a));
     await Promise.all(
       users.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, false, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+        .concat(
+          users2.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, false, stakingMint2.publicKey, 500_000, mintB.publicKey, 0, mintC.publicKey, 0))
+        )
     );
   })
 
   it("Initialize funders", async () => {
-    funders = [1, 2].map(a => new User(a));
-    await Promise.all(
-      funders.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000))
-    );
+    funders = [0, 10].map(a => new User(a));
+    await Promise.all([
+      funders[0].init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
+      funders[1].init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
+    ]);
   });
 
   it("Creates a pool", async () => {
@@ -73,16 +85,22 @@ describe('Multiuser Reward Pool', () => {
 
     //second funder tries to create with same pubkey
     try {
-      await funders[1].initializePool(poolKeypair, rewardDuration);
+      await funders[1].initializePool(poolKeypair, rewardDuration2);
       assert.fail("did not fail to create dupe pool");
     } catch (e) { }
+
+    await funders[1].initializePool(poolKeypair2, rewardDuration2);
   });
 
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
+    let pool2 = funders[1].poolPubkey;
 
     await Promise.all(
       users.map(a => a.createUserStakingAccount(pool))
+        .concat(
+          users2.map(a => a.createUserStakingAccount(pool2))
+          )
     );
 
     //user tries to create a dupe account
@@ -116,8 +134,6 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail closing active staking account");
     } catch (e) { }
   });
-
-  //these are all good, commenting just to get to the bottom faster
 
   it('User tries to stake more tokens than they have', async () => {
     try {
@@ -198,14 +214,22 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail on user unstaking when more than they have");
     } catch (e) { }
   });
+  
+  //delete me
+  it('Pool 2 stakers', async () => {
+    await users2[0].stakeTokens(250_000);
+  });
 
   //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
   it('Funder funds the pool', async () => {
+      //10 second duration
       await funders[0].fund(1_000_000_000, 2_000_000_000);
+      //30 second duration
+      await funders[1].fund(1_000_000_000, 1_000); //with decimals, this is 1 of each
   });
 
   it('waits', async () => {
-    await wait(5);
+    await wait(5); //pool 1 @ 5, pool 2 @ 25
   });
 
   it('User 5 snipes', async () => {
@@ -226,25 +250,29 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(6);
+    await wait(6); //pool 1 @ -1, pool 2 @ 19
   });
 
   it('Users claim at end of fund', async () => {
     await claimForUsers(users);
 
-    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0, await getTokenBalance(funders[0].admin.mintAVault));
+    assert.strictEqual(0, await getTokenBalance(funders[0].admin.mintBVault));
 
-    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.111111, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.222222, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.444444, await getTokenBalance(users[0].mintAPubkey));
+    assert.strictEqual(0.888889, await getTokenBalance(users[0].mintBPubkey));
+    assert.strictEqual(0.444444, await getTokenBalance(users[1].mintAPubkey));
+    assert.strictEqual(0.888889, await getTokenBalance(users[1].mintBPubkey));
+    assert.strictEqual(0.111111, await getTokenBalance(users[2].mintAPubkey));
+    assert.strictEqual(0.222222, await getTokenBalance(users[2].mintBPubkey));
   });
 
   it('waits', async () => {
-    await wait(2);
+    await wait(2); //pool 1 @ -3, pool 2 @ 16
+  });
+
+  it('Pool 2 stake only stakes halfway through duration', async () => {
+    await Promise.all(users2.map(a => a.stakeTokens(250_000)));
   });
 
   it('Users tries to close staking account', async () => {
@@ -256,12 +284,12 @@ describe('Multiuser Reward Pool', () => {
 
   it('Users claim after end of fund', async () => {
     await claimForUsers(users);
-    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.444444, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.888889, parseFloat((await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.111111, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintAPubkey)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0.222222, parseFloat((await provider.connection.getTokenAccountBalance(users[2].mintBPubkey)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0.444444, await getTokenBalance(users[0].mintAPubkey));
+    assert.strictEqual(0.888889, await getTokenBalance(users[0].mintBPubkey));
+    assert.strictEqual(0.444444, await getTokenBalance(users[1].mintAPubkey));
+    assert.strictEqual(0.888889, await getTokenBalance(users[1].mintBPubkey));
+    assert.strictEqual(0.111111, await getTokenBalance(users[2].mintAPubkey));
+    assert.strictEqual(0.222222, await getTokenBalance(users[2].mintBPubkey));
   });
 
   it('Funder funds the pool again', async () => {
@@ -269,15 +297,19 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(5);
+    await wait(4); //pool 1 @ 6, pool 2 @ 12
   });
 
   it('Funder funds the pool during emissions', async () => {
       await funders[0].fund(30_000_000_000, 50_000_000_000);
   });
 
+  it('Pool 2 one user unstakes all', async () => {
+    await users2[0].unstakeTokens(250_000);
+  });
+
   it('waits', async () => {
-    await wait(6);
+    await wait(7); //pool 1 @ 3, pool 2 @ 5
   });
 
   let oldValA;
@@ -286,15 +318,15 @@ describe('Multiuser Reward Pool', () => {
   it('Users claim at original end of fund', async () => {
     await claimForUsers(users);
     //rewards remain
-    assert(0 < parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
-    assert(0 < parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+    assert(0 < await getTokenBalance(funders[0].admin.mintAVault));
+    assert(0 < await getTokenBalance(funders[0].admin.mintBVault));
 
-    oldValA = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6));
-    oldValB = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6));
+    oldValA = await getTokenBalance(users[0].mintAPubkey);
+    oldValB = await getTokenBalance(users[0].mintBPubkey);
   });
 
   it('waits', async () => {
-    await wait(5);
+    await wait(5); //pool 1 @ -1, pool 2 @ 0
   });
 
   let newValA;
@@ -303,11 +335,11 @@ describe('Multiuser Reward Pool', () => {
   it('Users claim at proper new end of fund', async () => {
     await claimForUsers(users);
     //no rewards remain
-    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintAVault)).value.uiAmount.toFixed(6)));
-    assert.strictEqual(0, parseFloat((await provider.connection.getTokenAccountBalance(funders[0].admin.mintBVault)).value.uiAmount.toFixed(6)));
+    assert.strictEqual(0, await getTokenBalance(funders[0].admin.mintAVault));
+    assert.strictEqual(0, await getTokenBalance(funders[0].admin.mintBVault));
 
-    newValA = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6));
-    newValB = parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintBPubkey)).value.uiAmount.toFixed(6));
+    newValA = await getTokenBalance(users[0].mintAPubkey);
+    newValB = await getTokenBalance(users[0].mintBPubkey);
     assert(oldValA < newValA);
     assert(oldValB < newValB);
   });
@@ -317,7 +349,7 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(7);
+    await wait(7); //pool 1 @ 3, pool 2 done
   });
 
   it('Welcome user 4 to the pool in last 3 seconds', async () => {
@@ -325,15 +357,15 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(4);
+    await wait(4); //pool 1 @ -1, pool 2 done
   });
 
   it('Users claim, new user should have small amount', async () => {
     await claimForUsers(users);
     //users got a smidge less than they would have had user 4 not spoiled the fun
-    assert(0.43 > parseFloat((await provider.connection.getTokenAccountBalance(users[0].mintAPubkey)).value.uiAmount.toFixed(6))
+    assert(0.43 > await getTokenBalance(users[0].mintAPubkey)
                       - newValA); //newValA was what they had after last round of payments; 0.4444 is what would have been if user 4 didnt join
-    let user4Amount = parseFloat((await provider.connection.getTokenAccountBalance(users[3].mintAPubkey)).value.uiAmount.toFixed(6));                      
+    let user4Amount = await getTokenBalance(users[3].mintAPubkey);                      
     assert(0 < user4Amount);
     assert(0.11 > user4Amount);
   });
@@ -360,7 +392,40 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
   });
 
+  //pool2 ending
+  
+  it('Pool 2 users claim', async () => {
+    await claimForUsers(users2);
+
+    //assert everything distributed, user1 has approx 1/3 proportion
+    assert.strictEqual(
+      await getTokenBalance(funders[1].admin.mintAVault),
+      0);
+    assert.strictEqual(
+      await getTokenBalance(funders[1].admin.mintBVault),
+      0);
+    let u1A = await getTokenBalance(users2[0].mintAPubkey);
+    let u1B = await getTokenBalance(users2[0].mintBPubkey);
+    let u2A = await getTokenBalance(users2[1].mintAPubkey);
+    let u2B = await getTokenBalance(users2[1].mintBPubkey);
+
+    assert.strictEqual(u1A + u2A, 1);
+    assert.strictEqual(u1B + u2B, 1);
+
+    //probably .875 and .125
+    assert(u2A < u1A/6);
+    assert(u2A > u1A/10);
+
+    //probably .875 and .125
+    assert(u2B < u1B/6);
+    assert(u2B > u1B/10);
+  });
+
 });  
+
+async function getTokenBalance(pubkey) {
+  return parseFloat((await provider.connection.getTokenAccountBalance(pubkey)).value.uiAmount.toFixed(6))
+}
 
 async function wait(seconds) {
   while(seconds > 0) {

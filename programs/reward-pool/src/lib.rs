@@ -6,15 +6,12 @@ use std::convert::TryInto;
 
 pub fn update_rewards(
     pool: &mut ProgramAccount<Pool>,
-    reward_a_mint: &CpiAccount<anchor_spl::token::Mint>,
-    reward_b_mint: &CpiAccount<anchor_spl::token::Mint>,
     user: Option<&mut ProgramAccount<User>>,
     clock: &Clock,
     total_staked: u64,
 ) -> Result<()> {
-    let base_ten: u64 = 10;
-    let reward_a_decimals: u64 = base_ten.pow(reward_a_mint.decimals.into());
-    let reward_b_decimals: u64 = base_ten.pow(reward_b_mint.decimals.into());
+    msg!("pool.reward_duration_end: {}", pool.reward_duration_end);
+    msg!("pool.clock.unix_timestamp: {}", clock.unix_timestamp);
 
     let last_time_reward_applicable =
         last_time_reward_applicable(pool.reward_duration_end, clock.unix_timestamp);
@@ -27,7 +24,6 @@ pub fn update_rewards(
         last_time_reward_applicable,
         pool.last_update_time,
         pool.reward_a_rate,
-        reward_a_decimals,
     );
 
     msg!("pool.reward_a_per_token_stored: {}", pool.reward_a_per_token_stored);
@@ -38,20 +34,22 @@ pub fn update_rewards(
         last_time_reward_applicable,
         pool.last_update_time,
         pool.reward_b_rate,
-        reward_b_decimals,
     );
+
+    msg!("pool.reward_b_per_token_stored: {}", pool.reward_b_per_token_stored);
 
     pool.last_update_time = last_time_reward_applicable;
 
     msg!("pool.last_update_time: {}", pool.last_update_time);
 
     if let Some(u) = user {
+        msg!("has user");
+        
         u.reward_a_per_token_pending = earned(
             u.balance_staked,
             pool.reward_a_per_token_stored,
             u.reward_a_per_token_complete,
             u.reward_a_per_token_pending,
-            reward_a_decimals,
         );
         u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
 
@@ -63,9 +61,11 @@ pub fn update_rewards(
             pool.reward_b_per_token_stored,
             u.reward_b_per_token_complete,
             u.reward_b_per_token_pending,
-            reward_b_decimals,
         );
         u.reward_b_per_token_complete = pool.reward_b_per_token_stored;
+
+        msg!("u.reward_b_per_token_pending: {}", u.reward_b_per_token_pending);
+        msg!("u.reward_b_per_token_complete: {}", u.reward_b_per_token_complete);
     }
 
     Ok(())
@@ -75,17 +75,24 @@ pub fn last_time_reward_applicable(reward_duration_end: u64, unix_timestamp: i64
     return std::cmp::min(unix_timestamp.try_into().unwrap(), reward_duration_end);
 }
 
+const E18: u128 = 1_000_000_000_000_000_000;
+
 pub fn reward_per_token(
     total_staked: u64,
-    reward_per_token_stored: u64,
+    reward_per_token_stored: u128,
     last_time_reward_applicable: u64,
     last_update_time: u64,
     reward_rate: u64,
-    reward_decimals: u64,
-) -> u64 {
+) -> u128 {
     if total_staked == 0 {
         return reward_per_token_stored;
     }
+
+    msg!("reward_per_token_stored: {}", reward_per_token_stored);
+    msg!("+ last_time_reward_applicable - last_update_time: {}", last_time_reward_applicable - last_update_time);
+    msg!("* reward_rate: {}", reward_rate);
+    msg!("/ total_staked: {}", total_staked);
+
     return reward_per_token_stored
                 .checked_add(
                     (last_time_reward_applicable as u128)
@@ -93,22 +100,19 @@ pub fn reward_per_token(
                     .unwrap()
                     .checked_mul(reward_rate as u128)
                     .unwrap()
-                    .checked_mul(reward_decimals as u128)
+                    .checked_mul(E18)
                     .unwrap()
                     .checked_div(total_staked as u128)
                     .unwrap()
-                    .try_into()
-                    .unwrap(),
                 )
                 .unwrap();
 }
 
 pub fn earned(
     balance_staked: u64,
-    reward_per_token_x: u64,
-    user_reward_per_token_x_paid: u64,
+    reward_per_token_x: u128,
+    user_reward_per_token_x_paid: u128,
     user_reward_x_pending: u64,
-    reward_decimals: u64,
 ) -> u64 {
     return (balance_staked as u128)
         .checked_mul(
@@ -117,11 +121,11 @@ pub fn earned(
                 .unwrap(),
         )
         .unwrap()
-        .checked_div(reward_decimals as u128)
+        .checked_div(E18)
         .unwrap()
         .checked_add(user_reward_x_pending as u128)
         .unwrap()
-        .try_into() //the divide by decimals will shrink to u64 again
+        .try_into() 
         .unwrap()
 }
 
@@ -224,8 +228,6 @@ pub mod reward_pool {
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
             &mut ctx.accounts.pool,
-            &ctx.accounts.reward_a_mint,
-            &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
             total_staked,
@@ -260,8 +262,6 @@ pub mod reward_pool {
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
             &mut ctx.accounts.pool,
-            &ctx.accounts.reward_a_mint,
-            &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
             total_staked,
@@ -303,8 +303,6 @@ pub mod reward_pool {
 
         update_rewards(
             pool,
-            &ctx.accounts.reward_a_mint,
-            &ctx.accounts.reward_b_mint,
             None,
             &ctx.accounts.clock,
             total_staked,
@@ -374,8 +372,6 @@ pub mod reward_pool {
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
             &mut ctx.accounts.pool,
-            &ctx.accounts.reward_a_mint,
-            &ctx.accounts.reward_b_mint,
             user_opt,
             &ctx.accounts.clock,
             total_staked,
@@ -392,8 +388,8 @@ pub mod reward_pool {
             let mut reward_amount = ctx.accounts.user.reward_a_per_token_pending;
             let vault_balance = ctx.accounts.reward_a_vault.amount;
 
-            msg!("reward_amount {}", reward_amount);
-            msg!("vault_balance {}", vault_balance);
+            msg!("reward_a_amount {}", reward_amount);
+            msg!("vault_a_balance {}", vault_balance);
 
             ctx.accounts.user.reward_a_per_token_pending = 0;
             if vault_balance < reward_amount {
@@ -417,6 +413,10 @@ pub mod reward_pool {
         if ctx.accounts.user.reward_b_per_token_pending > 0 {
             let mut reward_amount = ctx.accounts.user.reward_b_per_token_pending;
             let vault_balance = ctx.accounts.reward_b_vault.amount;
+
+            msg!("reward_b_amount {}", reward_amount);
+            msg!("vault_b_balance {}", vault_balance);
+
             ctx.accounts.user.reward_b_per_token_pending = 0;
             if vault_balance < reward_amount {
                 reward_amount = vault_balance;
@@ -870,9 +870,9 @@ pub struct Pool {
     /// Rate of reward B distribution.
     pub reward_b_rate: u64,
     /// Last calculated reward A per pool token.
-    pub reward_a_per_token_stored: u64,
+    pub reward_a_per_token_stored: u128,
     /// Last calculated reward B per pool token.
-    pub reward_b_per_token_stored: u64,
+    pub reward_b_per_token_stored: u128,
     /// Users staked
     pub user_stake_count: u32,
 }
@@ -885,9 +885,9 @@ pub struct User {
     /// The owner of this account.
     pub owner: Pubkey,
     /// The amount of token A claimed.
-    pub reward_a_per_token_complete: u64,
+    pub reward_a_per_token_complete: u128,
     /// The amount of token B claimed.
-    pub reward_b_per_token_complete: u64,
+    pub reward_b_per_token_complete: u128,
     /// The amount of token A pending claim.
     pub reward_a_per_token_pending: u64,
     /// The amount of token B pending claim.
