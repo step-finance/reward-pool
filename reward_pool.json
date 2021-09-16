@@ -408,6 +408,21 @@
           "isSigner": false
         },
         {
+          "name": "stakingRefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardARefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBRefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "pool",
           "isMut": true,
           "isSigner": false
@@ -607,6 +622,6 @@
     }
   ],
   "metadata": {
-    "address": "B9oiB84Dz7LhbAp7yvnBUsGQfWqe3bDzUNQt6kvzbLMm"
+    "address": "67Hy8SbHTMMjoVKxowfouKawTfpqXAf8FGrL1n5uHoUR"
   }
 }
