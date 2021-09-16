@@ -390,6 +390,46 @@ class User {
                 },
             });
     }
+
+    async closePool() {
+        let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
+
+        const [ configPubkey, ___nonce] = 
+            await anchor.web3.PublicKey.findProgramAddress(
+                [Buffer.from("config")], 
+                this.program.programId
+            );
+
+        const [
+            _poolSigner,
+            _nonce,
+        ] = await anchor.web3.PublicKey.findProgramAddress(
+            [this.poolPubkey.toBuffer()],
+            this.program.programId
+        );
+        let poolSigner = _poolSigner;
+        let nonce = _nonce;
+
+        await this.program.rpc.closePool(
+            {
+                accounts: {
+                    // Stake instance.
+                    config: configPubkey,
+                    authorityTokenAccount: this.authPubkey,
+                    authorityTokenOwner: this.provider.wallet.publicKey,
+                    refundee: this.provider.wallet.publicKey,
+                    stakingRefundee: this.stakingPubkey,
+                    rewardARefundee: this.mintAPubkey,
+                    rewardBRefundee: this.mintBPubkey,
+                    pool: this.poolPubkey,
+                    stakingVault: poolObject.stakingVault,
+                    rewardAVault: poolObject.rewardAVault,
+                    rewardBVault: poolObject.rewardBVault,
+                    poolSigner,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                },
+            });
+    }
 }
 
 module.exports = {
