@@ -75,7 +75,7 @@ pub fn last_time_reward_applicable(reward_duration_end: u64, unix_timestamp: i64
     return std::cmp::min(unix_timestamp.try_into().unwrap(), reward_duration_end);
 }
 
-const E18: u128 = 1_000_000_000_000_000_000;
+const PRECISION: u128 = u64::MAX as u128;
 
 pub fn reward_per_token(
     total_staked: u64,
@@ -100,7 +100,7 @@ pub fn reward_per_token(
                     .unwrap()
                     .checked_mul(reward_rate as u128)
                     .unwrap()
-                    .checked_mul(E18)
+                    .checked_mul(PRECISION)
                     .unwrap()
                     .checked_div(total_staked as u128)
                     .unwrap()
@@ -121,7 +121,7 @@ pub fn earned(
                 .unwrap(),
         )
         .unwrap()
-        .checked_div(E18)
+        .checked_div(PRECISION)
         .unwrap()
         .checked_add(user_reward_x_pending as u128)
         .unwrap()

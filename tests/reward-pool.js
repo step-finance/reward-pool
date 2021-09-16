@@ -408,8 +408,8 @@ describe('Multiuser Reward Pool', () => {
     let u2A = await getTokenBalance(users2[1].mintAPubkey);
     let u2B = await getTokenBalance(users2[1].mintBPubkey);
 
-    assert.strictEqual(u1A + u2A, 1);
-    assert.strictEqual(u1B + u2B, 1);
+    assert(.05 > 1 - (u1A + u2A));
+    assert(.05 > 1 - (u1B + u2B));
 
     //probably .875 and .125
     assert(u2A < u1A/6);
