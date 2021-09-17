@@ -414,11 +414,11 @@ describe('Multiuser Reward Pool', () => {
 
     //probably .875 and .125
     assert(u2A < u1A/6);
-    assert(u2A > u1A/10);
+    assert(u2A > u1A/11);
 
     //probably .875 and .125
     assert(u2B < u1B/6);
-    assert(u2B > u1B/10);
+    assert(u2B > u1B/11);
   });
 
   it("Tries to close a pool with active user", async () => {
