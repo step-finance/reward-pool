@@ -7,3 +7,4 @@ test-ledger
 keys/
 .rustc_info.json
 debug/
+node_modules
