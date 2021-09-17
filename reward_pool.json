@@ -66,11 +66,23 @@
           "type": "u8"
         },
         {
+          "name": "stakingMint",
+          "type": "publicKey"
+        },
+        {
           "name": "stakingVault",
           "type": "publicKey"
         },
         {
+          "name": "rewardAMint",
+          "type": "publicKey"
+        },
+        {
           "name": "rewardAVault",
+          "type": "publicKey"
+        },
+        {
+          "name": "rewardBMint",
           "type": "publicKey"
         },
         {
@@ -487,11 +499,23 @@
             "type": "bool"
           },
           {
+            "name": "stakingMint",
+            "type": "publicKey"
+          },
+          {
             "name": "stakingVault",
             "type": "publicKey"
           },
           {
+            "name": "rewardAMint",
+            "type": "publicKey"
+          },
+          {
             "name": "rewardAVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardBMint",
             "type": "publicKey"
           },
           {
