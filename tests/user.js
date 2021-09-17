@@ -98,8 +98,11 @@ class User {
         await this.program.rpc.initializePool(
             this.provider.wallet.publicKey,
             nonce,
+            this.stakingMintObject.publicKey,
             stakingMintVault,
+            this.mintAObject.publicKey,
             mintAVault,
+            this.mintBObject.publicKey,
             mintBVault,
             rewardDuration,
             {

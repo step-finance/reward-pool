@@ -132,13 +132,15 @@ pub mod reward_pool {
 
         Ok(())
     }
-
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
         authority: Pubkey,
         nonce: u8,
+        staking_mint: Pubkey,
         staking_vault: Pubkey,
+        reward_a_mint: Pubkey,
         reward_a_vault: Pubkey,
+        reward_b_mint: Pubkey,
         reward_b_vault: Pubkey,
         reward_duration: u64,
     ) -> Result<()> {
@@ -147,8 +149,11 @@ pub mod reward_pool {
         pool.authority = authority;
         pool.nonce = nonce;
         pool.paused = false;
+        pool.staking_mint = staking_mint;
         pool.staking_vault = staking_vault;
+        pool.reward_a_mint = reward_a_mint;
         pool.reward_a_vault = reward_a_vault;
+        pool.reward_b_mint = reward_b_mint;
         pool.reward_b_vault = reward_b_vault;
         pool.reward_duration = reward_duration;
         pool.reward_duration_end = 0;
@@ -865,11 +870,17 @@ pub struct Pool {
     pub nonce: u8,
     /// Paused state of the program
     pub paused: bool,
+    /// Mint of the token that can be staked.
+    pub staking_mint: Pubkey,
     /// Vault to store staked tokens.
     pub staking_vault: Pubkey,
     /// Mint of the reward A token.
+    pub reward_a_mint: Pubkey,
+    /// Vault to store reward A tokens.
     pub reward_a_vault: Pubkey,
     /// Mint of the reward A token.
+    pub reward_b_mint: Pubkey,
+    /// Vault to store reward B tokens.
     pub reward_b_vault: Pubkey,
     /// The period which rewards are linearly distributed.
     pub reward_duration: u64,
