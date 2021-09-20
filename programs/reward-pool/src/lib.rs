@@ -1,13 +1,14 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::system_program;
 use anchor_lang::solana_program::sysvar;
-use anchor_spl::token::{self, TokenAccount};
+use anchor_spl::token::{self, TokenAccount, Token};
 use std::convert::Into;
 use std::convert::TryInto;
 
+declare_id!("sTAKyUi6w1xNb9aMc2kjc2oUmuhMn3zxKk5mHxc8uN1");
+
 pub fn update_rewards(
-    pool: &mut ProgramAccount<Pool>,
-    user: Option<&mut ProgramAccount<User>>,
+    pool: &mut Account<Pool>,
+    user: Option<&mut Account<User>>,
     clock: &Clock,
     total_staked: u64,
 ) -> Result<()> {
@@ -112,22 +113,11 @@ pub mod reward_pool {
 
     pub fn initialize_program(
         ctx: Context<InitializeProgram>,
-        nonce: u8, 
+        _nonce: u8, 
         authority_mint: Pubkey,
     ) -> Result<()> {
-        let config = &mut ctx.accounts.config;
-        if config.authority_mint != Pubkey::default() {
-            return Err(ErrorCode::ProgramAlreadyInitialized.into());
-        }
-        
-        let (proper_address, proper_nonce) = Pubkey::find_program_address(
-            &[ &b"config"[..] ], 
-            ctx.program_id
-        );
-        if proper_address != *config.to_account_info().key || proper_nonce != nonce {
-            return Err(ErrorCode::InvalidConfig.into());
-        }
 
+        let config = &mut ctx.accounts.config;
         config.authority_mint = authority_mint;
 
         Ok(())
@@ -188,10 +178,8 @@ pub mod reward_pool {
         Ok(())
     }
 
+    #[access_control(is_unpaused(&ctx.accounts.pool))]
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
-        if ctx.accounts.pool.paused {
-            return Err(ErrorCode::PoolPaused.into());
-        }
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -212,7 +200,7 @@ pub mod reward_pool {
         // Transfer tokens into the stake vault.
         {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
                     from: ctx.accounts.stake_from_account.to_account_info(),
                     to: ctx.accounts.staking_vault.to_account_info(),
@@ -252,7 +240,7 @@ pub mod reward_pool {
             let pool_signer = &[&seeds[..]];
 
             let cpi_ctx = CpiContext::new_with_signer(
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
@@ -266,10 +254,8 @@ pub mod reward_pool {
         Ok(())
     }
 
+    #[access_control(is_unpaused(&ctx.accounts.pool))]
     pub fn fund(ctx: Context<Fund>, amount_a: u64, amount_b: u64) -> Result<()> {
-        if ctx.accounts.pool.paused {
-            return Err(ErrorCode::PoolPaused.into());
-        }
 
         let pool = &mut ctx.accounts.pool;
         let total_staked = ctx.accounts.staking_vault.amount;
@@ -308,7 +294,7 @@ pub mod reward_pool {
         // Transfer reward A tokens into the A vault.
         if amount_a > 0 {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
                     from: ctx.accounts.from_a.to_account_info(),
                     to: ctx.accounts.reward_a_vault.to_account_info(),
@@ -322,7 +308,7 @@ pub mod reward_pool {
         // Transfer reward B tokens into the B vault.
         if amount_b > 0 {
             let cpi_ctx = CpiContext::new(
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
                     from: ctx.accounts.from_b.to_account_info(),
                     to: ctx.accounts.reward_b_vault.to_account_info(),
@@ -368,7 +354,7 @@ pub mod reward_pool {
 
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
-                    ctx.accounts.token_program.clone(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.reward_a_vault.to_account_info(),
                         to: ctx.accounts.reward_a_account.to_account_info(),
@@ -391,7 +377,7 @@ pub mod reward_pool {
 
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
-                    ctx.accounts.token_program.clone(),
+                    ctx.accounts.token_program.to_account_info(),
                     token::Transfer {
                         from: ctx.accounts.reward_b_vault.to_account_info(),
                         to: ctx.accounts.reward_b_account.to_account_info(),
@@ -429,7 +415,7 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
                 ctx.accounts.staking_refundee.to_account_info(),
                 ctx.accounts.pool_signer.clone(),
@@ -446,9 +432,9 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
-                ctx.accounts.refundee.clone(),
+                ctx.accounts.refundee.to_account_info(),
                 ctx.accounts.pool_signer.clone(),
             ],
             &[signer_seeds],
@@ -466,7 +452,7 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
                 ctx.accounts.reward_a_refundee.to_account_info(),
                 ctx.accounts.pool_signer.clone(),
@@ -483,9 +469,9 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
-                ctx.accounts.refundee.clone(),
+                ctx.accounts.refundee.to_account_info(),
                 ctx.accounts.pool_signer.clone(),
             ],
             &[signer_seeds],
@@ -503,7 +489,7 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_b_vault.to_account_info(),
                 ctx.accounts.reward_b_refundee.to_account_info(),
                 ctx.accounts.pool_signer.clone(),
@@ -520,7 +506,7 @@ pub mod reward_pool {
         solana_program::program::invoke_signed(
             &ix,
             &[
-                ctx.accounts.token_program.clone(),
+                ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_b_vault.to_account_info(),
                 ctx.accounts.refundee.clone(),
                 ctx.accounts.pool_signer.clone(),
@@ -533,24 +519,27 @@ pub mod reward_pool {
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
+#[instruction(_nonce: u8)]
 pub struct InitializeProgram<'info> {
     #[account(
         init,
-        seeds = [&b"config"[..], &[nonce]],
+        seeds = [b"config".as_ref()],
+        bump = _nonce,
         payer = payer,
     )]
-    config: ProgramAccount<'info, ProgramConfig>,
-    #[account(signer)]
-    payer: AccountInfo<'info>,
-    #[account(address = system_program::ID)]
-    system_program: AccountInfo<'info>,
+    config: Account<'info, ProgramConfig>,
+
+    payer: Signer<'info>,
+
+    system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct InitializePool<'info> {
     //no assertions needed here; anchor's owner and discriminator checks assert
-    config: ProgramAccount<'info, ProgramConfig>,
+    //the only way to become a ProgramConfig account is through the init method
+    //which has checks on the derivation
+    config: Account<'info, ProgramConfig>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
         constraint = (
@@ -563,11 +552,13 @@ pub struct InitializePool<'info> {
         constraint = authority_token_account.amount > 0,
         constraint = !authority_token_account.is_frozen(),
     )]
-    authority_token_account: CpiAccount<'info, TokenAccount>,
-    #[account(signer)]
-    authority_token_owner: AccountInfo<'info>,
-    #[account(init)]
-    pool: ProgramAccount<'info, Pool>,
+    authority_token_account: Account<'info, TokenAccount>,
+    authority_token_owner: Signer<'info>,
+
+    #[account(
+        zero,
+    )]
+    pool: Account<'info, Pool>,
 }
 
 #[derive(Accounts)]
@@ -575,31 +566,31 @@ pub struct InitializePool<'info> {
 pub struct CreateUser<'info> {
     // Stake instance.
     #[account(mut)]
-    pool: ProgramAccount<'info, Pool>,
+    pool: Account<'info, Pool>,
     // Member.
     #[account(
         init,
+        payer = owner,
         seeds = [
             owner.key.as_ref(), 
-            pool.to_account_info().key.as_ref(),
-            &[nonce],
+            pool.to_account_info().key.as_ref()
         ],
-        payer = owner,
+        bump = nonce,
     )]
-    user: ProgramAccount<'info, User>,
-    #[account(signer)]
-    owner: AccountInfo<'info>,
+    user: Account<'info, User>,
+    owner: Signer<'info>,
     // Misc.
-    #[account(address = system_program::ID)]
-    system_program: AccountInfo<'info>,
+    system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
 pub struct Pause<'info> {
-    #[account(mut, has_one = authority)]
-    pool: ProgramAccount<'info, Pool>,
-    #[account(signer)]
-    authority: AccountInfo<'info>,
+    #[account(
+        mut, 
+        has_one = authority
+    )]
+    pool: Account<'info, Pool>,
+    authority: Signer<'info>,
 }
 
 #[derive(Accounts)]
@@ -609,12 +600,11 @@ pub struct Stake<'info> {
         mut, 
         has_one = staking_vault,
     )]
-    pool: ProgramAccount<'info, Pool>,
+    pool: Account<'info, Pool>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key,
-        constraint = *staking_vault.to_account_info().key == pool.staking_vault,
     )]
-    staking_vault: CpiAccount<'info, TokenAccount>,
+    staking_vault: Account<'info, TokenAccount>,
 
     // User.
     #[account(
@@ -623,33 +613,29 @@ pub struct Stake<'info> {
         has_one = pool,
         seeds = [
             owner.key.as_ref(), 
-            pool.to_account_info().key.as_ref(),
-            &[user.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = user.nonce,
     )]
-    user: ProgramAccount<'info, User>,
-    #[account(signer)] 
-    owner: AccountInfo<'info>,
+    user: Account<'info, User>,
+    owner: Signer<'info>,
     #[account(mut,
         constraint = stake_from_account.mint == staking_vault.mint,
-        //no, could just be a delegated auth
-        //has_one = owner,
     )]
-    stake_from_account: CpiAccount<'info, TokenAccount>,
+    stake_from_account: Account<'info, TokenAccount>,
 
     // Program signers.
     #[account(
         seeds = [
-            pool.to_account_info().key.as_ref(),
-            &[pool.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = pool.nonce,
     )]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
     clock: Sysvar<'info, Clock>,
-    #[account(address = token::ID)]
-    token_program: AccountInfo<'info>,
+    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -663,46 +649,32 @@ pub struct Fund<'info> {
         //require signed funder auth - otherwise constant micro fund could hold funds hostage
         constraint = pool.authority == *funder.to_account_info().key,
     )]
-    pool: ProgramAccount<'info, Pool>,
-    #[account(mut,
-        constraint = staking_vault.owner == *pool_signer.key
-    )]
-    staking_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_a_vault.owner == *pool_signer.key
-    )]
-    reward_a_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_b_vault.owner == *pool_signer.key
-    )]
-    reward_b_vault: CpiAccount<'info, TokenAccount>,
+    pool: Account<'info, Pool>,
+    #[account(mut)]
+    staking_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_a_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_b_vault: Account<'info, TokenAccount>,
 
-    #[account(signer)]
-    funder: AccountInfo<'info>,
-    #[account(
-        mut,
-        constraint = from_a.mint == reward_a_vault.mint,
-    )]
-    from_a: CpiAccount<'info, TokenAccount>,
-    #[account(
-        mut,
-        constraint = from_b.mint == reward_b_vault.mint,
-    )]
-    from_b: CpiAccount<'info, TokenAccount>,
+    funder: Signer<'info>,
+    #[account(mut)]
+    from_a: Account<'info, TokenAccount>,
+    #[account(mut)]
+    from_b: Account<'info, TokenAccount>,
 
     // Program signers.
     #[account(
         seeds = [
-            pool.to_account_info().key.as_ref(),
-            &[pool.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = pool.nonce,
     )]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
     clock: Sysvar<'info, Clock>,
-    #[account(constraint = token_program.key == &token::ID)]
-    token_program: AccountInfo<'info>,
+    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -714,19 +686,13 @@ pub struct ClaimReward<'info> {
         has_one = reward_a_vault,
         has_one = reward_b_vault,
     )]
-    pool: ProgramAccount<'info, Pool>,
-    #[account(mut,
-        constraint = staking_vault.owner == *pool_signer.key
-    )]
-    staking_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_a_vault.owner == *pool_signer.key
-    )]
-    reward_a_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_b_vault.owner == *pool_signer.key
-    )]
-    reward_b_vault: CpiAccount<'info, TokenAccount>,
+    pool: Account<'info, Pool>,
+    #[account(mut)]
+    staking_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_a_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_b_vault: Account<'info, TokenAccount>,
 
     // User.
     #[account(
@@ -735,35 +701,29 @@ pub struct ClaimReward<'info> {
         has_one = pool,
         seeds = [
             owner.to_account_info().key.as_ref(),
-            pool.to_account_info().key.as_ref(),
-            &[user.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = user.nonce,
     )]
-    user: ProgramAccount<'info, User>,
-    #[account(signer)]
-    owner: AccountInfo<'info>,
-    #[account(mut,
-        constraint = reward_a_account.mint == reward_a_vault.mint,
-    )]
-    reward_a_account: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_b_account.mint == reward_b_vault.mint,
-    )]
-    reward_b_account: CpiAccount<'info, TokenAccount>,
+    user: Account<'info, User>,
+    owner: Signer<'info>,
+    #[account(mut)]
+    reward_a_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_b_account: Account<'info, TokenAccount>,
 
     // Program signers.
     #[account(
         seeds = [
-            pool.to_account_info().key.as_ref(),
-            &[pool.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = pool.nonce,
     )]
     pool_signer: AccountInfo<'info>,
 
     // Misc.
     clock: Sysvar<'info, Clock>,
-    #[account(address = token::ID)]
-    token_program: AccountInfo<'info>,
+    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -771,7 +731,7 @@ pub struct CloseUser<'info> {
     #[account(
         mut, 
     )]
-    pool: ProgramAccount<'info, Pool>,
+    pool: Account<'info, Pool>,
     #[account(
         mut,
         close = owner,
@@ -779,44 +739,44 @@ pub struct CloseUser<'info> {
         has_one = pool,
         seeds = [
             owner.to_account_info().key.as_ref(),
-            pool.to_account_info().key.as_ref(),
-            &[user.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = user.nonce,
         constraint = user.balance_staked == 0,
         constraint = user.reward_a_per_token_pending == 0,
         constraint = user.reward_b_per_token_pending == 0,
     )]
-    user: ProgramAccount<'info, User>,
-    #[account(signer)]
-    owner: AccountInfo<'info>,
+    user: Account<'info, User>,
+    owner: Signer<'info>,
 }
 
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
-    config: ProgramAccount<'info, ProgramConfig>,
+    config: Account<'info, ProgramConfig>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
         constraint = (
             authority_token_account.owner == *authority_token_owner.to_account_info().key
             ||
-            (authority_token_account.delegate.is_some()
+            (
+                authority_token_account.delegate.is_some()
                 && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
-                && authority_token_account.delegated_amount > 0)
+                && authority_token_account.delegated_amount > 0
+            )
         ),
         constraint = authority_token_account.amount > 0,
         constraint = !authority_token_account.is_frozen(),
     )]
-    authority_token_account: CpiAccount<'info, TokenAccount>,
-    #[account(signer)]
-    authority_token_owner: AccountInfo<'info>,
+    authority_token_account: Account<'info, TokenAccount>,
+    authority_token_owner: Signer<'info>,
     #[account(mut)]
     refundee: AccountInfo<'info>,
     #[account(mut)]
-    staking_refundee: CpiAccount<'info, TokenAccount>,
+    staking_refundee: Account<'info, TokenAccount>,
     #[account(mut)]
-    reward_a_refundee: CpiAccount<'info, TokenAccount>,
+    reward_a_refundee: Account<'info, TokenAccount>,
     #[account(mut)]
-    reward_b_refundee: CpiAccount<'info, TokenAccount>,
+    reward_b_refundee: Account<'info, TokenAccount>,
     #[account(
         mut,
         close = refundee,
@@ -826,33 +786,23 @@ pub struct ClosePool<'info> {
         constraint = pool.reward_duration_end < sysvar::clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap(),
         constraint = pool.user_stake_count == 0,
     )]
-    pool: ProgramAccount<'info, Pool>,
+    pool: Account<'info, Pool>,
     #[account(mut,
-        constraint = staking_vault.owner == *pool_signer.key,
         constraint = staking_vault.amount == 0,
     )]
-    staking_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_a_vault.owner == *pool_signer.key,
-        //dust may remain
-        //constraint = reward_a_vault.amount == 0,
-    )]
-    reward_a_vault: CpiAccount<'info, TokenAccount>,
-    #[account(mut,
-        constraint = reward_b_vault.owner == *pool_signer.key,
-        //dust may remain
-        //constraint = reward_b_vault.amount == 0,
-    )]
-    reward_b_vault: CpiAccount<'info, TokenAccount>,
+    staking_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_a_vault: Account<'info, TokenAccount>,
+    #[account(mut)]
+    reward_b_vault: Account<'info, TokenAccount>,
     #[account(
         seeds = [
-            pool.to_account_info().key.as_ref(),
-            &[pool.nonce],
+            pool.to_account_info().key.as_ref()
         ],
+        bump = pool.nonce,
     )]
     pool_signer: AccountInfo<'info>,
-    #[account(address = token::ID)]
-    token_program: AccountInfo<'info>,
+    token_program: Program<'info, Token>,
 }
 
 #[account]
@@ -919,6 +869,13 @@ pub struct User {
     pub balance_staked: u64,
     /// Signer nonce.
     pub nonce: u8,
+}
+
+fn is_unpaused<'info>(pool: &Account<'info, Pool>) -> Result<()> {
+    if pool.paused {
+        return Err(ErrorCode::PoolPaused.into());
+    }
+    Ok(())
 }
 
 #[error]

@@ -5,8 +5,9 @@ const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 async function initializeProgram(program, provider, authMintPubkey) {
     const [ _configPubkey, _nonce] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config")], program.programId);
     configPubkey = _configPubkey;
+    let nonce = _nonce;
     await program.rpc.initializeProgram(
-        _nonce,
+        nonce,
         authMintPubkey,
         {
             accounts: {

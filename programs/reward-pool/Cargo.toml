@@ -13,8 +13,8 @@ no-entrypoint = []
 cpi = ["no-entrypoint"]
 
 [dependencies]
-anchor-lang = "0.13.2"
-anchor-spl = "0.13.2"
+anchor-lang = "0.16.1"
+anchor-spl = "0.16.1"
 solana-program = "1.7.7"
 
 [dependencies.spl-token]
