@@ -8,7 +8,7 @@ declare_id!("sTAKyUi6w1xNb9aMc2kjc2oUmuhMn3zxKk5mHxc8uN1");
 
 pub fn update_rewards(
     pool: &mut Account<Pool>,
-    user: Option<&mut Account<User>>,
+    user: Option<&mut Box<Account<User>>>,
     clock: &Clock,
     total_staked: u64,
 ) -> Result<()> {
@@ -527,7 +527,7 @@ pub struct InitializeProgram<'info> {
         bump = _nonce,
         payer = payer,
     )]
-    config: Account<'info, ProgramConfig>,
+    config: Box<Account<'info, ProgramConfig>>,
 
     payer: Signer<'info>,
 
@@ -539,7 +539,7 @@ pub struct InitializePool<'info> {
     //no assertions needed here; anchor's owner and discriminator checks assert
     //the only way to become a ProgramConfig account is through the init method
     //which has checks on the derivation
-    config: Account<'info, ProgramConfig>,
+    config: Box<Account<'info, ProgramConfig>>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
         constraint = (
@@ -552,13 +552,13 @@ pub struct InitializePool<'info> {
         constraint = authority_token_account.amount > 0,
         constraint = !authority_token_account.is_frozen(),
     )]
-    authority_token_account: Account<'info, TokenAccount>,
+    authority_token_account: Box<Account<'info, TokenAccount>>,
     authority_token_owner: Signer<'info>,
 
     #[account(
         zero,
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
 }
 
 #[derive(Accounts)]
@@ -566,7 +566,7 @@ pub struct InitializePool<'info> {
 pub struct CreateUser<'info> {
     // Stake instance.
     #[account(mut)]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     // Member.
     #[account(
         init,
@@ -577,7 +577,7 @@ pub struct CreateUser<'info> {
         ],
         bump = nonce,
     )]
-    user: Account<'info, User>,
+    user: Box<Account<'info, User>>,
     owner: Signer<'info>,
     // Misc.
     system_program: Program<'info, System>,
@@ -589,7 +589,7 @@ pub struct Pause<'info> {
         mut, 
         has_one = authority
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     authority: Signer<'info>,
 }
 
@@ -600,11 +600,11 @@ pub struct Stake<'info> {
         mut, 
         has_one = staking_vault,
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     #[account(mut,
         constraint = staking_vault.owner == *pool_signer.key,
     )]
-    staking_vault: Account<'info, TokenAccount>,
+    staking_vault: Box<Account<'info, TokenAccount>>,
 
     // User.
     #[account(
@@ -617,12 +617,12 @@ pub struct Stake<'info> {
         ],
         bump = user.nonce,
     )]
-    user: Account<'info, User>,
+    user: Box<Account<'info, User>>,
     owner: Signer<'info>,
     #[account(mut,
         constraint = stake_from_account.mint == staking_vault.mint,
     )]
-    stake_from_account: Account<'info, TokenAccount>,
+    stake_from_account: Box<Account<'info, TokenAccount>>,
 
     // Program signers.
     #[account(
@@ -649,19 +649,19 @@ pub struct Fund<'info> {
         //require signed funder auth - otherwise constant micro fund could hold funds hostage
         constraint = pool.authority == *funder.to_account_info().key,
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     #[account(mut)]
-    staking_vault: Account<'info, TokenAccount>,
+    staking_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_a_vault: Account<'info, TokenAccount>,
+    reward_a_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_b_vault: Account<'info, TokenAccount>,
+    reward_b_vault: Box<Account<'info, TokenAccount>>,
 
     funder: Signer<'info>,
     #[account(mut)]
-    from_a: Account<'info, TokenAccount>,
+    from_a: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    from_b: Account<'info, TokenAccount>,
+    from_b: Box<Account<'info, TokenAccount>>,
 
     // Program signers.
     #[account(
@@ -686,13 +686,13 @@ pub struct ClaimReward<'info> {
         has_one = reward_a_vault,
         has_one = reward_b_vault,
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     #[account(mut)]
-    staking_vault: Account<'info, TokenAccount>,
+    staking_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_a_vault: Account<'info, TokenAccount>,
+    reward_a_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_b_vault: Account<'info, TokenAccount>,
+    reward_b_vault: Box<Account<'info, TokenAccount>>,
 
     // User.
     #[account(
@@ -705,12 +705,12 @@ pub struct ClaimReward<'info> {
         ],
         bump = user.nonce,
     )]
-    user: Account<'info, User>,
+    user: Box<Account<'info, User>>,
     owner: Signer<'info>,
     #[account(mut)]
-    reward_a_account: Account<'info, TokenAccount>,
+    reward_a_account: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_b_account: Account<'info, TokenAccount>,
+    reward_b_account: Box<Account<'info, TokenAccount>>,
 
     // Program signers.
     #[account(
@@ -731,7 +731,7 @@ pub struct CloseUser<'info> {
     #[account(
         mut, 
     )]
-    pool: Account<'info, Pool>,
+    pool: Box<Account<'info, Pool>>,
     #[account(
         mut,
         close = owner,
@@ -752,7 +752,7 @@ pub struct CloseUser<'info> {
 
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
-    config: Account<'info, ProgramConfig>,
+    config: Box<Account<'info, ProgramConfig>>,
     #[account(
         constraint = authority_token_account.mint == config.authority_mint,
         constraint = (
@@ -767,16 +767,16 @@ pub struct ClosePool<'info> {
         constraint = authority_token_account.amount > 0,
         constraint = !authority_token_account.is_frozen(),
     )]
-    authority_token_account: Account<'info, TokenAccount>,
+    authority_token_account: Box<Account<'info, TokenAccount>>,
     authority_token_owner: Signer<'info>,
     #[account(mut)]
     refundee: AccountInfo<'info>,
     #[account(mut)]
-    staking_refundee: Account<'info, TokenAccount>,
+    staking_refundee: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_a_refundee: Account<'info, TokenAccount>,
+    reward_a_refundee: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_b_refundee: Account<'info, TokenAccount>,
+    reward_b_refundee: Box<Account<'info, TokenAccount>>,
     #[account(
         mut,
         close = refundee,
@@ -790,11 +790,11 @@ pub struct ClosePool<'info> {
     #[account(mut,
         constraint = staking_vault.amount == 0,
     )]
-    staking_vault: Account<'info, TokenAccount>,
+    staking_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_a_vault: Account<'info, TokenAccount>,
+    reward_a_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
-    reward_b_vault: Account<'info, TokenAccount>,
+    reward_b_vault: Box<Account<'info, TokenAccount>>,
     #[account(
         seeds = [
             pool.to_account_info().key.as_ref()
