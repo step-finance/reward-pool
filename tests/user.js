@@ -111,7 +111,6 @@ class User {
                     authorityTokenAccount: this.authPubkey,
                     authorityTokenOwner: this.provider.wallet.publicKey,
                     pool: this.poolPubkey,
-                    rent: anchor.web3.SYSVAR_RENT_PUBKEY,
                 },
                 signers: [poolKeypair],
                 instructions: [
@@ -144,9 +143,7 @@ class User {
                 pool: poolPubkey,
                 user: this.userPubkey,
                 owner: this.provider.wallet.publicKey,
-                tokenProgram: TOKEN_PROGRAM_ID,
                 systemProgram: anchor.web3.SystemProgram.programId,
-                rent: anchor.web3.SYSVAR_RENT_PUBKEY,
             },
         });
     }

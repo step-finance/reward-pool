@@ -400,13 +400,23 @@ describe('Multiuser Reward Pool', () => {
     //assert everything distributed, user1 has approx 1/8 proportion
 
     //possible dust
-    assert(.01 > await getTokenBalance(funders[1].admin.mintAVault));
-    assert(.01 > await getTokenBalance(funders[1].admin.mintBVault));
+    let temp = await getTokenBalance(funders[1].admin.mintAVault);
+    console.log(temp);
+    assert(.01 > temp);
+
+    temp = await getTokenBalance(funders[1].admin.mintBVault);
+    console.log(temp);
+    assert(.01 > temp);
 
     let u1A = await getTokenBalance(users2[0].mintAPubkey);
     let u1B = await getTokenBalance(users2[0].mintBPubkey);
     let u2A = await getTokenBalance(users2[1].mintAPubkey);
     let u2B = await getTokenBalance(users2[1].mintBPubkey);
+
+    console.log(u1A);
+    console.log(u1B);
+    console.log(u2A);
+    console.log(u2B);
 
     //user balances are almost total (account for dust)
     assert(.05 > 1 - (u1A + u2A));
