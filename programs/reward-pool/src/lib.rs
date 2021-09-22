@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::sysvar;
-use anchor_spl::token::{self, TokenAccount, Token};
+use anchor_lang::solana_program::{sysvar, program_option::COption};
+use anchor_spl::token::{self, TokenAccount, Token, Mint};
 use std::convert::Into;
 use std::convert::TryInto;
 
@@ -113,27 +113,20 @@ pub mod reward_pool {
 
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
-        authority: Pubkey,
-        nonce: u8,
-        staking_mint: Pubkey,
-        staking_vault: Pubkey,
-        reward_a_mint: Pubkey,
-        reward_a_vault: Pubkey,
-        reward_b_mint: Pubkey,
-        reward_b_vault: Pubkey,
+        pool_nonce: u8,
         reward_duration: u64,
     ) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
 
-        pool.authority = authority;
-        pool.nonce = nonce;
+        pool.authority = ctx.accounts.authority.key();
+        pool.nonce = pool_nonce;
         pool.paused = false;
-        pool.staking_mint = staking_mint;
-        pool.staking_vault = staking_vault;
-        pool.reward_a_mint = reward_a_mint;
-        pool.reward_a_vault = reward_a_vault;
-        pool.reward_b_mint = reward_b_mint;
-        pool.reward_b_vault = reward_b_vault;
+        pool.staking_mint = ctx.accounts.staking_mint.key();
+        pool.staking_vault = ctx.accounts.staking_vault.key();
+        pool.reward_a_mint = ctx.accounts.reward_a_mint.key();
+        pool.reward_a_vault = ctx.accounts.reward_a_vault.key();
+        pool.reward_b_mint = ctx.accounts.reward_b_mint.key();
+        pool.reward_b_vault = ctx.accounts.reward_b_vault.key();
         pool.reward_duration = reward_duration;
         pool.reward_duration_end = 0;
         pool.last_update_time = 0;
@@ -141,7 +134,8 @@ pub mod reward_pool {
         pool.reward_b_rate = 0;
         pool.reward_a_per_token_stored = 0;
         pool.reward_b_per_token_stored = 0;
-
+        pool.user_stake_count = 0;
+        
         Ok(())
     }
 
@@ -508,8 +502,45 @@ pub mod reward_pool {
 }
 
 #[derive(Accounts)]
+#[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
     authority: Signer<'info>,
+
+    staking_mint: Box<Account<'info, Mint>>,
+    #[account(
+        constraint = staking_vault.mint == staking_mint.key(),
+        constraint = staking_vault.owner == pool_signer.key(),
+        //strangely, spl maintains this on owner reassignment for non-native accounts
+        //we don't want to be given an account that someone else could close when empty
+        //because in our pool close operation we want to assert it is still open
+        constraint = staking_vault.close_authority == COption::None,
+    )]
+    staking_vault: Box<Account<'info, TokenAccount>>,
+
+    reward_a_mint: Box<Account<'info, Mint>>,
+    #[account(
+        constraint = reward_a_vault.mint == reward_a_mint.key(),
+        constraint = reward_a_vault.owner == pool_signer.key(),
+        constraint = staking_vault.close_authority == COption::None,
+    )]
+    reward_a_vault: Box<Account<'info, TokenAccount>>,
+
+    reward_b_mint: Box<Account<'info, Mint>>,
+    #[account(
+        constraint = reward_b_vault.mint == reward_b_mint.key(),
+        constraint = reward_b_vault.owner == pool_signer.key(),
+        constraint = staking_vault.close_authority == COption::None,
+    )]
+    reward_b_vault: Box<Account<'info, TokenAccount>>,
+
+    #[account(
+        seeds = [
+            pool.to_account_info().key.as_ref()
+        ],
+        bump = pool_nonce,
+    )]
+    pool_signer: AccountInfo<'info>,
+
     #[account(
         zero,
     )]
@@ -556,7 +587,8 @@ pub struct Stake<'info> {
         has_one = staking_vault,
     )]
     pool: Box<Account<'info, Pool>>,
-    #[account(mut,
+    #[account(
+        mut,
         constraint = staking_vault.owner == *pool_signer.key,
     )]
     staking_vault: Box<Account<'info, TokenAccount>>,
