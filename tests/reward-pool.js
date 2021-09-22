@@ -39,7 +39,6 @@ describe('Multiuser Reward Pool', () => {
   let mintC;
   let stakingMint;
   let stakingMint2;
-  let poolCreationAuthorityMint;
   let poolKeypair = anchor.web3.Keypair.generate();
   let poolKeypair2 = anchor.web3.Keypair.generate();
 
@@ -52,22 +51,15 @@ describe('Multiuser Reward Pool', () => {
     mintC = await utils.createMint(provider, 3);
     stakingMint = await utils.createMint(provider, 9);
     stakingMint2 = await utils.createMint(provider, 5);
-    poolCreationAuthorityMint = await utils.createMint(provider, 0);
-  });
-
-  it("Initialize program", async () => {
-    setProvider(envProvider);
-    //by funder or user
-    await utils.initializeProgram(program, provider, poolCreationAuthorityMint.publicKey);
   });
 
   it("Initialize users", async () => {
     users = [1, 2, 3, 4, 5].map(a => new User(a));
     users2 = [11, 12].map(a => new User(a));
     await Promise.all(
-      users.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, false, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+      users.map(a => a.init(10_000_000_000, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
         .concat(
-          users2.map(a => a.init(10_000_000_000, poolCreationAuthorityMint.publicKey, false, stakingMint2.publicKey, 500_000, mintB.publicKey, 0, mintC.publicKey, 0))
+          users2.map(a => a.init(10_000_000_000, stakingMint2.publicKey, 500_000, mintB.publicKey, 0, mintC.publicKey, 0))
         )
     );
   })
@@ -75,8 +67,8 @@ describe('Multiuser Reward Pool', () => {
   it("Initialize funders", async () => {
     funders = [0, 10].map(a => new User(a));
     await Promise.all([
-      funders[0].init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
-      funders[1].init(10_000_000_000, poolCreationAuthorityMint.publicKey, true, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
+      funders[0].init(10_000_000_000, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
+      funders[1].init(10_000_000_000, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
     ]);
   });
 
@@ -422,13 +414,13 @@ describe('Multiuser Reward Pool', () => {
     assert(.05 > 1 - (u1A + u2A));
     assert(.05 > 1 - (u1B + u2B));
 
-    //probably .875 and .125
-    assert(u2A < u1A/6);
-    assert(u2A > u1A/11);
+    //probably .915 and .083
+    assert(u2A < u1A/8);
+    assert(u2A > u1A/12);
 
-    //probably .875 and .125
-    assert(u2B < u1B/6);
-    assert(u2B > u1B/11);
+    //probably .915 and .083
+    assert(u2B < u1B/8);
+    assert(u2B > u1B/12);
   });
 
   it("Tries to close a pool with active user", async () => {

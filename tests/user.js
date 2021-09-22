@@ -21,7 +21,7 @@ async function claimForUsers(users) {
 class User {
     constructor(a) { this.id = a; }
 
-    async init(initialLamports, authMint, shouldAuth, stakingMint, initialStaking, mintA, initialA, mintB, initialB) {
+    async init(initialLamports, stakingMint, initialStaking, mintA, initialA, mintB, initialB) {
         this.keypair = new anchor.web3.Keypair();
         this.pubkey = this.keypair.publicKey;
 
@@ -33,8 +33,6 @@ class User {
         this.program = new anchor.Program(program.idl, program.programId, this.provider);
 
         this.initialLamports = initialLamports;
-        this.authMintObject = new Token(this.provider.connection, authMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
-        this.shouldAuth = shouldAuth;
         this.stakingMintObject = new Token(this.provider.connection, stakingMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
         this.initialStaking = initialStaking;
         this.mintAObject = new Token(this.provider.connection, mintA, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
@@ -47,10 +45,6 @@ class User {
         this.userNonce = null;
         this.lpPubkey = null;
 
-        this.authPubkey = await this.authMintObject.createAssociatedTokenAccount(this.pubkey);
-        if (shouldAuth) {
-            await this.authMintObject.mintTo(this.authPubkey, envProvider.wallet.payer, [], 1);
-        }
         this.stakingPubkey = await this.stakingMintObject.createAssociatedTokenAccount(this.pubkey);
         if (initialStaking > 0) {
             await this.stakingMintObject.mintTo(this.stakingPubkey, envProvider.wallet.payer, [], initialStaking);
@@ -107,9 +101,7 @@ class User {
             rewardDuration,
             {
                 accounts: {
-                    config: configPubkey,
-                    authorityTokenAccount: this.authPubkey,
-                    authorityTokenOwner: this.provider.wallet.publicKey,
+                    authority: this.provider.wallet.publicKey,
                     pool: this.poolPubkey,
                 },
                 signers: [poolKeypair],
@@ -414,9 +406,7 @@ class User {
             {
                 accounts: {
                     // Stake instance.
-                    config: configPubkey,
-                    authorityTokenAccount: this.authPubkey,
-                    authorityTokenOwner: this.provider.wallet.publicKey,
+                    authority: this.provider.wallet.publicKey,
                     refundee: this.provider.wallet.publicKey,
                     stakingRefundee: this.stakingPubkey,
                     rewardARefundee: this.mintAPubkey,

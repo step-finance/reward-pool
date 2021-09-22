@@ -4,7 +4,7 @@ use anchor_spl::token::{self, TokenAccount, Token};
 use std::convert::Into;
 use std::convert::TryInto;
 
-declare_id!("sTAKyUi6w1xNb9aMc2kjc2oUmuhMn3zxKk5mHxc8uN1");
+declare_id!("SrWDHBuK1WAP2T5SB7vfm5kSyww8hbyCjj5zRivdEWY");
 
 pub fn update_rewards(
     pool: &mut Account<Pool>,
@@ -111,17 +111,6 @@ pub fn earned(
 pub mod reward_pool {
     use super::*;
 
-    pub fn initialize_program(
-        ctx: Context<InitializeProgram>,
-        _nonce: u8, 
-        authority_mint: Pubkey,
-    ) -> Result<()> {
-
-        let config = &mut ctx.accounts.config;
-        config.authority_mint = authority_mint;
-
-        Ok(())
-    }
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
         authority: Pubkey,
@@ -519,42 +508,8 @@ pub mod reward_pool {
 }
 
 #[derive(Accounts)]
-#[instruction(_nonce: u8)]
-pub struct InitializeProgram<'info> {
-    #[account(
-        init,
-        seeds = [b"config".as_ref()],
-        bump = _nonce,
-        payer = payer,
-    )]
-    config: Box<Account<'info, ProgramConfig>>,
-
-    payer: Signer<'info>,
-
-    system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 pub struct InitializePool<'info> {
-    //no assertions needed here; anchor's owner and discriminator checks assert
-    //the only way to become a ProgramConfig account is through the init method
-    //which has checks on the derivation
-    config: Box<Account<'info, ProgramConfig>>,
-    #[account(
-        constraint = authority_token_account.mint == config.authority_mint,
-        constraint = (
-            authority_token_account.owner == *authority_token_owner.to_account_info().key
-            ||
-            (authority_token_account.delegate.is_some()
-                && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
-                && authority_token_account.delegated_amount > 0)
-        ),
-        constraint = authority_token_account.amount > 0,
-        constraint = !authority_token_account.is_frozen(),
-    )]
-    authority_token_account: Box<Account<'info, TokenAccount>>,
-    authority_token_owner: Signer<'info>,
-
+    authority: Signer<'info>,
     #[account(
         zero,
     )]
@@ -752,23 +707,6 @@ pub struct CloseUser<'info> {
 
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
-    config: Box<Account<'info, ProgramConfig>>,
-    #[account(
-        constraint = authority_token_account.mint == config.authority_mint,
-        constraint = (
-            authority_token_account.owner == *authority_token_owner.to_account_info().key
-            ||
-            (
-                authority_token_account.delegate.is_some()
-                && authority_token_account.delegate.unwrap() == *authority_token_owner.to_account_info().key
-                && authority_token_account.delegated_amount > 0
-            )
-        ),
-        constraint = authority_token_account.amount > 0,
-        constraint = !authority_token_account.is_frozen(),
-    )]
-    authority_token_account: Box<Account<'info, TokenAccount>>,
-    authority_token_owner: Signer<'info>,
     #[account(mut)]
     refundee: AccountInfo<'info>,
     #[account(mut)]
@@ -780,6 +718,7 @@ pub struct ClosePool<'info> {
     #[account(
         mut,
         close = refundee,
+        has_one = authority,
         has_one = staking_vault,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
@@ -787,6 +726,7 @@ pub struct ClosePool<'info> {
         constraint = pool.user_stake_count == 0,
     )]
     pool: Account<'info, Pool>,
+    authority: Signer<'info>,
     #[account(mut,
         constraint = staking_vault.amount == 0,
     )]
@@ -803,12 +743,6 @@ pub struct ClosePool<'info> {
     )]
     pool_signer: AccountInfo<'info>,
     token_program: Program<'info, Token>,
-}
-
-#[account]
-#[derive(Default)]
-pub struct ProgramConfig {
-    pub authority_mint: Pubkey,
 }
 
 #[account]
