@@ -60,11 +60,6 @@ class User {
     }
 
     async initializePool(poolKeypair, rewardDuration) {
-        const [ configPubkey, ___nonce] = 
-            await anchor.web3.PublicKey.findProgramAddress(
-                [Buffer.from("config")], 
-                this.program.programId
-            );
         const [
             _poolSigner,
             _nonce,
@@ -73,7 +68,7 @@ class User {
             this.program.programId
         );
         let poolSigner = _poolSigner;
-        let nonce = _nonce;
+        let poolNonce = _nonce;
 
         let stakingMintVault = await this.stakingMintObject.createAccount(poolSigner);
         let mintAVault = await this.mintAObject.createAccount(poolSigner);
@@ -83,25 +78,24 @@ class User {
         this.admin = {
             poolKeypair,
             poolSigner,
-            nonce,
+            poolNonce,
             stakingMintVault,
             mintAVault,
             mintBVault
         };
-
         await this.program.rpc.initializePool(
-            this.provider.wallet.publicKey,
-            nonce,
-            this.stakingMintObject.publicKey,
-            stakingMintVault,
-            this.mintAObject.publicKey,
-            mintAVault,
-            this.mintBObject.publicKey,
-            mintBVault,
+            poolNonce,
             rewardDuration,
             {
                 accounts: {
                     authority: this.provider.wallet.publicKey,
+                    stakingMint: this.stakingMintObject.publicKey,
+                    stakingVault: stakingMintVault,
+                    rewardAMint: this.mintAObject.publicKey,
+                    rewardAVault: mintAVault,
+                    rewardBMint: this.mintBObject.publicKey,
+                    rewardBVault: mintBVault,
+                    poolSigner: poolSigner,
                     pool: this.poolPubkey,
                 },
                 signers: [poolKeypair],
