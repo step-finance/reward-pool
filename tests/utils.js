@@ -1,6 +1,6 @@
 const anchor = require("@project-serum/anchor");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
-const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
+const { TOKEN_PROGRAM_ID, Token, MintLayout } = require("@solana/spl-token");
 
 async function initializeProgram(program, provider, authMintPubkey) {
     const [ _configPubkey, _nonce] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config")], program.programId);
@@ -36,6 +36,51 @@ async function createMintAndVault(provider, vaultOwner, decimals) {
 
     const vault = await mint.createAccount(vaultOwner ? vaultOwner : provider.wallet.publicKey);
     return [mint, vault];
+}
+
+async function createMintFromPriv(
+    mintAccount,
+    provider,
+    mintAuthority,
+    freezeAuthority,
+    decimals,
+    programId,
+) {
+    const token = new Token(
+        provider.connection,
+        mintAccount.publicKey,
+        programId,
+        provider.wallet.payer,
+      );
+  
+    // Allocate memory for the account
+    const balanceNeeded = await Token.getMinBalanceRentForExemptMint(
+        provider.connection,
+    );
+
+    const transaction = new anchor.web3.Transaction();
+    transaction.add(
+        anchor.web3.SystemProgram.createAccount({
+            fromPubkey: provider.wallet.payer.publicKey,
+            newAccountPubkey: mintAccount.publicKey,
+            lamports: balanceNeeded,
+            space: MintLayout.span,
+            programId,
+        }),
+    );
+
+    transaction.add(
+        Token.createInitMintInstruction(
+            programId,
+            mintAccount.publicKey,
+            decimals,
+            mintAuthority,
+            freezeAuthority,
+        ),
+    );
+  
+    await provider.send(transaction, [mintAccount]);
+    return token;
 }
 
 async function mintToAccount(
@@ -76,25 +121,10 @@ async function sendLamports(
     await provider.send(tx);
 }
 
-async function createMintToAccountInstrs(
-    mint,
-    destination,
-    amount,
-    mintAuthority
-) {
-return [
-    TokenInstructions.mintTo({
-    mint,
-    destination: destination,
-    amount: amount,
-    mintAuthority: mintAuthority,
-    }),
-];
-}
-
 module.exports = {
     mintToAccount,
     createMintAndVault,
+    createMintFromPriv,
     createMint,
     sendLamports,
     initializeProgram,
