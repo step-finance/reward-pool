@@ -59,9 +59,14 @@ class User {
         if (initialA > 0) {
             await this.mintAObject.mintTo(this.mintAPubkey, envProvider.wallet.payer, [], initialA);
         }
-        this.mintBPubkey = await this.mintBObject.createAssociatedTokenAccount(this.pubkey);
-        if (initialB > 0) {
-            await this.mintBObject.mintTo(this.mintBPubkey, envProvider.wallet.payer, [], initialB);
+        //single staking, will use same for each
+        if (mintA != mintB) {
+            this.mintBPubkey = await this.mintBObject.createAssociatedTokenAccount(this.pubkey);
+            if (initialB > 0) {
+                await this.mintBObject.mintTo(this.mintBPubkey, envProvider.wallet.payer, [], initialB);
+            }
+        } else {
+            this.mintBPubkey = this.mintAPubkey;
         }
     }
 
