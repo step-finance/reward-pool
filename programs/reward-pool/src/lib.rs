@@ -42,7 +42,7 @@ pub fn update_rewards(
         pool.reward_a_rate,
     );
 
-    if pool.reward_a_vault.key() != pool.reward_b_vault.key() {
+    if pool.reward_a_vault != pool.reward_b_vault {
         pool.reward_b_per_token_stored = reward_per_token(
             total_staked,
             pool.reward_b_per_token_stored,
@@ -256,11 +256,16 @@ pub mod reward_pool {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
 
+        let pool = &mut ctx.accounts.pool;
+        if pool.paused {
+            return Err(ErrorCode::PoolPaused.into());
+        }
+
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
-            &mut ctx.accounts.pool,
+            pool,
             user_opt,
             total_staked,
         )
@@ -552,7 +557,7 @@ pub mod reward_pool {
             &[signer_seeds],
         )?;
         
-        if ctx.accounts.reward_a_vault.key() != ctx.accounts.reward_b_vault.key() {
+        if pool.reward_a_vault != pool.reward_b_vault {
             //close token b vault
             let ix = spl_token::instruction::transfer(
                 &spl_token::ID,
@@ -748,7 +753,6 @@ pub struct Stake<'info> {
     #[account(
         mut, 
         has_one = staking_vault,
-        constraint = !pool.paused,
     )]
     pool: Box<Account<'info, Pool>>,
     #[account(
@@ -770,9 +774,7 @@ pub struct Stake<'info> {
     )]
     user: Box<Account<'info, User>>,
     owner: Signer<'info>,
-    #[account(mut,
-        constraint = stake_from_account.mint == staking_vault.mint,
-    )]
+    #[account(mut)]
     stake_from_account: Box<Account<'info, TokenAccount>>,
 
     // Program signers.

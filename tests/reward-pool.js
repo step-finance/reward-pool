@@ -31,7 +31,7 @@ describe('Multiuser Reward Pool', () => {
 
   const rewardDuration = new anchor.BN(10);
   const rewardDuration2 = new anchor.BN(30);
-  const rewardDuration3 = new anchor.BN(20);
+  const rewardDuration3 = new anchor.BN(5);
 
   let xMintKey;
   let xMintObject;
@@ -83,7 +83,7 @@ describe('Multiuser Reward Pool', () => {
     await Promise.all([
       funders[0].init(10_000_000_000, xMintPubkey, 9_999_999_999_999, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
       funders[1].init(10_000_000_000, xMintPubkey, 10_000_000_000_000, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
-      funders[2].init(10_000_000_000, xMintPubkey, 10_000_000_000_000, stakingMint3.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 1),
+      funders[2].init(10_000_000_000, xMintPubkey, 10_000_000_000_000, stakingMint3.publicKey, 0, mintB.publicKey, 10_000_000_000, mintB.publicKey, 0),
     ]);
   });
 
@@ -106,6 +106,30 @@ describe('Multiuser Reward Pool', () => {
     await funders[1].initializePool(poolKeypair2, rewardDuration2, false);
     await funders[2].initializePool(poolKeypair3, rewardDuration3, true);
   });
+
+  it('User does some single staking', async () => {
+
+    //we test all this in greater detail later, but this is a flow for single reward staking
+
+    let pool = funders[2].poolPubkey;
+    let user = new User(99);
+    await user.init(10_000_000_000, xMintPubkey, 0, stakingMint3.publicKey, 500_000, mintB.publicKey, 0, mintB.publicKey, 0);
+    await user.createUserStakingAccount(pool);
+    await user.stakeTokens(100_000);
+    
+    try {
+      await funders[2].fund(1_000_000_000, 1);
+      assert.fail("single stake pool should fail if funded token b");
+    } catch (e) { }
+
+    await funders[2].fund(1_000_000_000, 0);
+    await wait(5);
+    await claimForUsers([user]);
+    await user.unstakeTokens(100_000);
+    await user.closeUser();
+    await funders[2].pausePool();
+    await funders[2].closePool();
+  });
   
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
@@ -124,7 +148,7 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail to create dupe user");
     } catch (e) { }
   });
-
+  
   it('Users closes staking account', async () => {
     await users[0].closeUser();
   });
@@ -133,7 +157,7 @@ describe('Multiuser Reward Pool', () => {
     let pool = funders[0].poolPubkey;
     await users[0].createUserStakingAccount(pool);
   });
-
+  
   it('Some users stake some tokens', async () => {
 
     await Promise.all([
@@ -170,19 +194,18 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("did not fail on user unstaking when more than they have");
     } catch (e) { }
   });
+  
+  it('Pool 2 has one initial staker', async () => {
+    await users2[0].stakeTokens(250_000);
+  });
 
-  //now is still users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
+  //now is pool 1 users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
+  //now is pool 2 users stakes: 250_000, 0
   it('Funder funds the pool', async () => {
     //10 second duration
     await funders[0].fund(1_000_000_000, 2_000_000_000);
     //30 second duration
     await funders[1].fund(1_000_000_000, 1_000); //with decimals, this is 1 of each
-    
-    try {
-      await funders[2].fund(1_000_000_000, 1);
-      assert.fail("single stake pool should fail if funded token b");
-    } catch (e) { }
-    await funders[2].fund(1_000_000_000, 0);
   });
 
   it('waits', async () => {
@@ -225,10 +248,11 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(2); //pool 1 @ -3, pool 2 @ 17
+    await wait(3); //pool 1 @ -4, pool 2 @ 16
   });
 
-  it('Pool 2 stake only stakes halfway through duration', async () => {
+  //now is pool 2 users stakes: 500_000, 250_000
+  it('Pool 2 users stake ~halfway through duration', async () => {
     await Promise.all(users2.map(a => a.stakeTokens(250_000)));
   });
 
@@ -244,15 +268,11 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('waits', async () => {
-    await wait(4); //pool 1 @ 6, pool 2 @ 13
+    await wait(4); //pool 1 @ 6, pool 2 @ 12
   });
 
   it('Funder funds the pool during emissions', async () => {
       await funders[0].fund(30_000_000_000, 50_000_000_000);
-  });
-
-  it('Pool 2 one user unstakes all', async () => {
-    await users2[0].unstakeTokens(250_000);
   });
 
   it('waits', async () => {
@@ -344,16 +364,18 @@ describe('Multiuser Reward Pool', () => {
   it('Pool 2 users claim', async () => {
     await claimForUsers(users2);
 
-    //assert everything distributed, user1 has approx 1/8 proportion
+    //assert everything distributed, 
+    //user 1 has 100% of 1/2 and 2/3 of other 1/2 = 3/6 + 2/6 = 5/6
+    //user 2 has 0% of 1/2 and 1/3 of other 1/2 = 0/6 + 1/6 = 1/6
 
-    //possible dust
-    let temp = await getTokenBalance(funders[1].admin.mintAVault);
-    console.log(temp);
-    assert(.01 > temp);
+    //possible dust remaining - but not too much
+    let remain1 = await getTokenBalance(funders[1].admin.mintAVault);
+    console.log(remain1);
+    assert(.02 > remain1);
 
-    temp = await getTokenBalance(funders[1].admin.mintBVault);
-    console.log(temp);
-    assert(.01 > temp);
+    let remain2 = await getTokenBalance(funders[1].admin.mintBVault);
+    console.log(remain2);
+    assert(.02 > remain2);
 
     let u1A = await getTokenBalance(users2[0].mintAPubkey);
     let u1B = await getTokenBalance(users2[0].mintBPubkey);
@@ -365,17 +387,17 @@ describe('Multiuser Reward Pool', () => {
     console.log(u2A);
     console.log(u2B);
 
-    //user balances are almost total (account for dust)
-    assert(.05 > 1 - (u1A + u2A));
-    assert(.05 > 1 - (u1B + u2B));
+    //user balances plus remainder = 1 (initial rewards total) 
+    assert.strictEqual(remain1 + u1A + u2A, 1);
+    assert.strictEqual(remain2 + u1B + u2B, 1);
 
-    //probably .915 and .083
-    assert(u2A < u1A/8);
-    assert(u2A > u1A/12);
+    //probably 0.833333323 and 0.166666664, or 5/6 vs 1/6, or 5x difference
+    assert(u2A < u1A/4);
+    assert(u2A > u1A/6);
 
-    //probably .915 and .083
-    assert(u2B < u1B/8);
-    assert(u2B > u1B/12);
+    //probably 0.823 and 0.164, or 5/6 vs 1/6, or 5x difference
+    assert(u2B < u1B/4);
+    assert(u2B > u1B/6);
   });
 
   it('User tries to pause the pool using own pubkey', async () => {
@@ -459,13 +481,15 @@ describe('Multiuser Reward Pool', () => {
 
   it('Pool 2 users unstake all, all close', async () => {
     await Promise.all(users2.map(a => a.unstakeTokens(250_000)));
+    //this dude had another 250k staked
+    await users2[0].unstakeTokens(250_000);
     await Promise.all(users2.map(a => a.closeUser()));
   });
 
   it("Pool 2 closes", async () => {
     try {
       await funders[1].closePool();
-      throw "funder was able to close pool without pausing first?!"
+      assert.fail("funder was able to close pool without pausing first?!");
     } catch { }
     await funders[1].pausePool();
     await funders[1].closePool();
@@ -479,7 +503,7 @@ describe('Multiuser Reward Pool', () => {
     assert.strictEqual(av, null);
     assert.strictEqual(bv, null);
   });
-
+  
 });  
 
 async function getTokenBalance(pubkey) {
