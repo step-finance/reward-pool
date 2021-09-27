@@ -12,6 +12,10 @@ name = "reward_pool"
 no-entrypoint = []
 cpi = ["no-entrypoint"]
 
+#add to default for local testing
+#default = ["local-testing"]
+local-testing = []
+
 [dependencies]
 anchor-lang = "0.16.1"
 anchor-spl = "0.16.1"

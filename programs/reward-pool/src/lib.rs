@@ -14,7 +14,7 @@ declare_id!("SRWdZfXVSH7usoNVGAMBMpTnRf4PDQWRCtd3ZLUYDsP");
 #[cfg(not(feature = "local-testing"))]
 mod constants {
     pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xStpgUCss9piqeFUk2iLVcvJEGhAdJxJQuwLkXP555G";
-    pub const MIN_DURATION: u64 = 1440;
+    pub const MIN_DURATION: u64 = 86400;
 }
 
 #[cfg(feature = "local-testing")]
