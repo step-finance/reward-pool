@@ -514,6 +514,10 @@ pub mod reward_pool {
         
         let signer_seeds = &[pool.to_account_info().key.as_ref(), &[ctx.accounts.pool.nonce]];
         
+        //instead of closing these vaults, we could technically just 
+        //set_authority on them. it's not very ata clean, but it'd work
+        //if size of tx is an issue, thats an approach
+
         //close staking vault
         let ix = spl_token::instruction::transfer(
             &spl_token::ID,
@@ -529,7 +533,7 @@ pub mod reward_pool {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
                 ctx.accounts.staking_refundee.to_account_info(),
-                ctx.accounts.pool_signer.clone(),
+                ctx.accounts.pool_signer.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -546,7 +550,7 @@ pub mod reward_pool {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
                 ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.clone(),
+                ctx.accounts.pool_signer.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -566,7 +570,7 @@ pub mod reward_pool {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
                 ctx.accounts.reward_a_refundee.to_account_info(),
-                ctx.accounts.pool_signer.clone(),
+                ctx.accounts.pool_signer.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -583,7 +587,7 @@ pub mod reward_pool {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
                 ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.clone(),
+                ctx.accounts.pool_signer.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -604,7 +608,7 @@ pub mod reward_pool {
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.reward_b_vault.to_account_info(),
                     ctx.accounts.reward_b_refundee.to_account_info(),
-                    ctx.accounts.pool_signer.clone(),
+                    ctx.accounts.pool_signer.to_account_info(),
                 ],
                 &[signer_seeds],
             )?;
@@ -620,8 +624,8 @@ pub mod reward_pool {
                 &[
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.reward_b_vault.to_account_info(),
-                    ctx.accounts.refundee.clone(),
-                    ctx.accounts.pool_signer.clone(),
+                    ctx.accounts.refundee.to_account_info(),
+                    ctx.accounts.pool_signer.to_account_info(),
                 ],
                 &[signer_seeds],
             )?;
@@ -634,7 +638,7 @@ pub mod reward_pool {
 #[derive(Accounts)]
 #[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
-    authority: AccountInfo<'info>,
+    authority: UncheckedAccount<'info>,
 
     #[account(
         mut,
@@ -682,7 +686,7 @@ pub struct InitializePool<'info> {
         ],
         bump = pool_nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
 
     #[account(
         zero,
@@ -741,7 +745,7 @@ pub struct Pause<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
 
@@ -774,7 +778,7 @@ pub struct Unpause<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
 
@@ -815,7 +819,7 @@ pub struct Stake<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
 
     // Misc.
     token_program: Program<'info, Token>,
@@ -866,7 +870,7 @@ pub struct Fund<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
 
     // Misc.
     token_program: Program<'info, Token>,
@@ -914,7 +918,7 @@ pub struct ClaimReward<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
 
     // Misc.
     token_program: Program<'info, Token>,
@@ -947,7 +951,7 @@ pub struct CloseUser<'info> {
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
     #[account(mut)]
-    refundee: AccountInfo<'info>,
+    refundee: UncheckedAccount<'info>,
     #[account(mut)]
     staking_refundee: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
@@ -982,7 +986,7 @@ pub struct ClosePool<'info> {
         ],
         bump = pool.nonce,
     )]
-    pool_signer: AccountInfo<'info>,
+    pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
 
