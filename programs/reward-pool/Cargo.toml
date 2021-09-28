@@ -17,8 +17,8 @@ default = ["local-testing"]
 local-testing = []
 
 [dependencies]
-anchor-lang = "0.16.1"
-anchor-spl = "0.16.1"
+anchor-lang = "0.16.2"
+anchor-spl = "0.16.2"
 solana-program = "1.7.7"
 
 [dependencies.spl-token]
