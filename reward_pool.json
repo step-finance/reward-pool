@@ -3,91 +3,78 @@
   "name": "reward_pool",
   "instructions": [
     {
-      "name": "initializeProgram",
+      "name": "initializePool",
       "accounts": [
         {
-          "name": "config",
+          "name": "authority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenPoolVault",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "payer",
+          "name": "xTokenDepositor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositAuthority",
           "isMut": false,
           "isSigner": true
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
-          "name": "authorityMint",
-          "type": "publicKey"
-        }
-      ]
-    },
-    {
-      "name": "initializePool",
-      "accounts": [
-        {
-          "name": "config",
+          "name": "stakingMint",
           "isMut": false,
           "isSigner": false
         },
         {
-          "name": "authorityTokenAccount",
+          "name": "stakingVault",
           "isMut": false,
           "isSigner": false
         },
         {
-          "name": "authorityTokenOwner",
+          "name": "rewardAMint",
           "isMut": false,
-          "isSigner": true
+          "isSigner": false
+        },
+        {
+          "name": "rewardAVault",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBVault",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
         },
         {
           "name": "pool",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
       "args": [
         {
-          "name": "authority",
-          "type": "publicKey"
-        },
-        {
-          "name": "nonce",
+          "name": "poolNonce",
           "type": "u8"
-        },
-        {
-          "name": "stakingMint",
-          "type": "publicKey"
-        },
-        {
-          "name": "stakingVault",
-          "type": "publicKey"
-        },
-        {
-          "name": "rewardAMint",
-          "type": "publicKey"
-        },
-        {
-          "name": "rewardAVault",
-          "type": "publicKey"
-        },
-        {
-          "name": "rewardBMint",
-          "type": "publicKey"
-        },
-        {
-          "name": "rewardBVault",
-          "type": "publicKey"
         },
         {
           "name": "rewardDuration",
@@ -130,6 +117,16 @@
       "name": "pause",
       "accounts": [
         {
+          "name": "xTokenPoolVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
           "name": "pool",
           "isMut": true,
           "isSigner": false
@@ -138,14 +135,60 @@
           "name": "authority",
           "isMut": false,
           "isSigner": true
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
       ],
-      "args": [
+      "args": []
+    },
+    {
+      "name": "unpause",
+      "accounts": [
         {
-          "name": "paused",
-          "type": "bool"
+          "name": "xTokenPoolVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
         }
-      ]
+      ],
+      "args": []
     },
     {
       "name": "stake",
@@ -177,11 +220,6 @@
         },
         {
           "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
           "isMut": false,
           "isSigner": false
         },
@@ -232,11 +270,6 @@
           "isSigner": false
         },
         {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -246,6 +279,48 @@
         {
           "name": "sptAmount",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "authorizeFunder",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "funderToAdd",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "deauthorizeFunder",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "funderToRemove",
+          "type": "publicKey"
         }
       ]
     },
@@ -289,11 +364,6 @@
         },
         {
           "name": "poolSigner",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "clock",
           "isMut": false,
           "isSigner": false
         },
@@ -363,11 +433,6 @@
           "isSigner": false
         },
         {
-          "name": "clock",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
@@ -400,21 +465,6 @@
       "name": "closePool",
       "accounts": [
         {
-          "name": "config",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authorityTokenAccount",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "authorityTokenOwner",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
           "name": "refundee",
           "isMut": true,
           "isSigner": false
@@ -438,6 +488,11 @@
           "name": "pool",
           "isMut": true,
           "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
         },
         {
           "name": "stakingVault",
@@ -470,18 +525,6 @@
   ],
   "accounts": [
     {
-      "name": "ProgramConfig",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "authorityMint",
-            "type": "publicKey"
-          }
-        ]
-      }
-    },
-    {
       "name": "Pool",
       "type": {
         "kind": "struct",
@@ -497,6 +540,10 @@
           {
             "name": "paused",
             "type": "bool"
+          },
+          {
+            "name": "xTokenPoolVault",
+            "type": "publicKey"
           },
           {
             "name": "stakingMint",
@@ -553,6 +600,15 @@
           {
             "name": "userStakeCount",
             "type": "u32"
+          },
+          {
+            "name": "funders",
+            "type": {
+              "array": [
+                "publicKey",
+                5
+              ]
+            }
           }
         ]
       }
@@ -601,51 +657,51 @@
   "errors": [
     {
       "code": 300,
-      "name": "PoolPaused",
-      "msg": "The pool is paused."
-    },
-    {
-      "code": 301,
-      "name": "InvalidNonce",
-      "msg": "The nonce given doesn't derive a valid program address."
-    },
-    {
-      "code": 302,
-      "name": "InvalidUserSigner",
-      "msg": "User signer doesn't match the derived address."
-    },
-    {
-      "code": 303,
-      "name": "Unknown",
-      "msg": "An unknown error has occured."
-    },
-    {
-      "code": 304,
-      "name": "InvalidConfig",
-      "msg": "Invalid config supplied."
-    },
-    {
-      "code": 305,
-      "name": "InvalidProgramAuthority",
-      "msg": "Please specify the correct authority for this program."
-    },
-    {
-      "code": 306,
       "name": "InsufficientFundUnstake",
       "msg": "Insufficient funds to unstake."
     },
     {
-      "code": 307,
+      "code": 301,
       "name": "AmountMustBeGreaterThanZero",
       "msg": "Amount must be greater than zero."
     },
     {
+      "code": 302,
+      "name": "SingleStakeTokenBCannotBeFunded",
+      "msg": "Reward B cannot be funded - pool is single stake."
+    },
+    {
+      "code": 303,
+      "name": "PoolPaused",
+      "msg": "Pool is paused."
+    },
+    {
+      "code": 304,
+      "name": "DurationTooShort",
+      "msg": "Duration cannot be shorter than one day."
+    },
+    {
+      "code": 305,
+      "name": "FunderAlreadyAuthorized",
+      "msg": "Provided funder is already authorized to fund."
+    },
+    {
+      "code": 306,
+      "name": "MaxFunders",
+      "msg": "Maximum funders already authorized."
+    },
+    {
+      "code": 307,
+      "name": "CannotDeauthorizePoolAuthority",
+      "msg": "Cannot deauthorize the primary pool authority."
+    },
+    {
       "code": 308,
-      "name": "ProgramAlreadyInitialized",
-      "msg": "Program already initialized."
+      "name": "CannotDeauthorizeMissingAuthority",
+      "msg": "Authority not found for deauthorization."
     }
   ],
   "metadata": {
-    "address": "SRWdZmG93LMynvb4xZLsodmzEcivtwDRLB6G7adMXms"
+    "address": "SRWdZfXVSH7usoNVGAMBMpTnRf4PDQWRCtd3ZLUYDsP"
   }
 }

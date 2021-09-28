@@ -10,16 +10,17 @@ declare_id!("UNKNOWN" fail build );
 #[cfg(feature = "local-testing")]
 declare_id!("SRWdZfXVSH7usoNVGAMBMpTnRf4PDQWRCtd3ZLUYDsP");
 
-
 #[cfg(not(feature = "local-testing"))]
 mod constants {
     pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xStpgUCss9piqeFUk2iLVcvJEGhAdJxJQuwLkXP555G";
+    pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 86400;
 }
 
 #[cfg(feature = "local-testing")]
 mod constants {
     pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xsTPvEj7rELYcqe2D1k3M5zRe85xWWFK3x1SWDN5qPY";
+    pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 1;
 }
 
@@ -149,7 +150,7 @@ pub mod reward_pool {
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
             },
         );
-        token::transfer(cpi_ctx, 10_000_000_000_000)?;
+        token::transfer(cpi_ctx, constants::X_STEP_DEPOSIT_REQUIREMENT)?;
 
         let pool = &mut ctx.accounts.pool;
 
@@ -329,6 +330,36 @@ pub mod reward_pool {
             token::transfer(cpi_ctx, spt_amount.try_into().unwrap())?;
         }
 
+        Ok(())
+    }
+
+    pub fn authorize_funder(ctx: Context<FunderChange>, funder_to_add: Pubkey) -> Result<()> {
+        if funder_to_add == ctx.accounts.pool.authority.key() {
+            return Err(ErrorCode::FunderAlreadyAuthorized.into());
+        }
+        let funders = &mut ctx.accounts.pool.funders;
+        if funders.iter().any(|x| *x == funder_to_add) {
+            return Err(ErrorCode::FunderAlreadyAuthorized.into());
+        }
+        let default_pubkey = Pubkey::default();
+        if let Some(idx) = funders.iter().position(|x| *x == default_pubkey) {
+            funders[idx] = funder_to_add;
+        } else {
+            return Err(ErrorCode::MaxFunders.into());
+        }
+        Ok(())
+    }
+
+    pub fn deauthorize_funder(ctx: Context<FunderChange>, funder_to_remove: Pubkey) -> Result<()> {
+        if funder_to_remove == ctx.accounts.pool.authority.key() {
+            return Err(ErrorCode::CannotDeauthorizePoolAuthority.into());
+        }
+        let funders = &mut ctx.accounts.pool.funders;
+        if let Some(idx) = funders.iter().position(|x| *x == funder_to_remove) {
+            funders[idx] = Pubkey::default();
+        } else {
+            return Err(ErrorCode::CannotDeauthorizeMissingAuthority.into());
+        }
         Ok(())
     }
 
@@ -791,6 +822,17 @@ pub struct Stake<'info> {
 }
 
 #[derive(Accounts)]
+pub struct FunderChange<'info> {
+    // Global accounts for the staking instance.
+    #[account(
+        mut, 
+        has_one = authority,
+    )]
+    pool: Box<Account<'info, Pool>>,
+    authority: Signer<'info>,
+}
+
+#[derive(Accounts)]
 pub struct Fund<'info> {
     // Global accounts for the staking instance.
     #[account(
@@ -798,8 +840,6 @@ pub struct Fund<'info> {
         has_one = staking_vault,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
-        //require signed funder auth - otherwise constant micro fund could hold funds hostage
-        constraint = pool.authority == *funder.to_account_info().key,
         constraint = !pool.paused,
     )]
     pool: Box<Account<'info, Pool>>,
@@ -809,7 +849,10 @@ pub struct Fund<'info> {
     reward_a_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
-
+    #[account(
+        //require signed funder auth - otherwise constant micro fund could hold funds hostage
+        constraint = funder.key() == pool.authority || pool.funders.iter().any(|x| *x == funder.key()),
+    )]
     funder: Signer<'info>,
     #[account(mut)]
     from_a: Box<Account<'info, TokenAccount>>,
@@ -944,7 +987,6 @@ pub struct ClosePool<'info> {
 }
 
 #[account]
-#[derive(Default)]
 pub struct Pool {
     /// Priviledged account.
     pub authority: Pubkey,
@@ -982,6 +1024,10 @@ pub struct Pool {
     pub reward_b_per_token_stored: u128,
     /// Users staked
     pub user_stake_count: u32,
+    /// authorized funders
+    /// [] because short size, fixed account size, and ease of use on 
+    /// client due to auto generated account size property
+    pub funders: [Pubkey; 5],
 }
 
 #[account]
@@ -1017,4 +1063,12 @@ pub enum ErrorCode {
     PoolPaused,
     #[msg("Duration cannot be shorter than one day.")]
     DurationTooShort,
+    #[msg("Provided funder is already authorized to fund.")]
+    FunderAlreadyAuthorized,
+    #[msg("Maximum funders already authorized.")]
+    MaxFunders,
+    #[msg("Cannot deauthorize the primary pool authority.")]
+    CannotDeauthorizePoolAuthority,
+    #[msg("Authority not found for deauthorization.")]
+    CannotDeauthorizeMissingAuthority,
 }
