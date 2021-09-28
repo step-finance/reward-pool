@@ -49,6 +49,8 @@ describe('Multiuser Reward Pool', () => {
   let poolKeypair3 = anchor.web3.Keypair.generate();
 
   it("Initialize mints", async () => {
+    console.log("Program ID: ", program.programId.toString());
+    console.log("Wallet: ", provider.wallet.publicKey.toString());
     //this is the xstep token
     //test xstep token hardcoded in program, mint authority is itself
     rawdata = fs.readFileSync('tests/keys/TESTING-xsTPvEj7rELYcqe2D1k3M5zRe85xWWFK3x1SWDN5qPY.json');
@@ -94,7 +96,7 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
 
     //give just ONE more xSTEP
-    xMintObject.mintTo(funders[0].xTokenPubkey, envProvider.wallet.payer, [], 1)
+    xMintObject.mintTo(funders[0].xTokenPubkey, envProvider.wallet.payer, [], 1);
     await funders[0].initializePool(poolKeypair, rewardDuration, false);
 
     //second funder tries to create with same pubkey
@@ -197,6 +199,44 @@ describe('Multiuser Reward Pool', () => {
   
   it('Pool 2 has one initial staker', async () => {
     await users2[0].stakeTokens(250_000);
+  });
+
+  it('Fails to authorize 6th funder', async () => {
+    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
+    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
+    let tmpAuth = anchor.web3.Keypair.generate().publicKey;
+    await funders[1].authorizeFunder(tmpAuth);
+    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
+    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
+    try {
+      await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
+      assert.fail("did not fail on authorizing 6th funder");
+    } catch (e) { }
+    //deauth a funder in the middle of the array
+    await funders[1].deauthorizeFunder(tmpAuth);
+  });
+  
+  it('Funder funds pool with a delegated funder', async () => {
+    //funder 1 authorize funder 2 to fund its pool
+    await funders[1].authorizeFunder(funders[2].provider.wallet.publicKey);
+
+    //validate the pool's contents. This funder should be in position 3, since 1,2 and 4,5 are filled
+    let acct = await program.account.pool.fetch(funders[1].poolPubkey);
+    assert.equal(acct.funders[2].toString(), funders[2].provider.wallet.publicKey.toString());
+
+    //funder 2 fund funder 1's pool
+    await funders[2].fund(1, 0, funders[1].poolPubkey);
+    //remove the funding permission
+    await funders[1].deauthorizeFunder(funders[2].provider.wallet.publicKey);
+    //funder 2 fail to fund funder 1's pool
+    try {
+      await funders[2].fund(1, 0, funders[1].poolPubkey);
+      assert.fail("did not fail on funder unauthorized funding");
+    } catch (e) { }
+    
+    //validate the pool's contents. Position 3 should be empty
+    acct = await program.account.pool.fetch(funders[1].poolPubkey);
+    assert.equal(acct.funders[2].toString(), anchor.web3.PublicKey.default.toString());
   });
 
   //now is pool 1 users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
@@ -503,7 +543,7 @@ describe('Multiuser Reward Pool', () => {
     assert.strictEqual(av, null);
     assert.strictEqual(bv, null);
   });
-  
+
 });  
 
 async function getTokenBalance(pubkey) {

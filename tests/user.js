@@ -84,7 +84,10 @@ class User {
         let xTokenPoolVault = await this.xTokenMintObject.createAccount(poolSigner);
         let stakingMintVault = await this.stakingMintObject.createAccount(poolSigner);
         let mintAVault = await this.mintAObject.createAccount(poolSigner);
-        let mintBVault = await this.mintBObject.createAccount(poolSigner);
+        let mintBVault = null;
+        if (!singleStake) {
+            mintBVault = await this.mintBObject.createAccount(poolSigner);
+        }
 
         this.poolPubkey = poolKeypair.publicKey;
         this.admin = {
@@ -96,15 +99,16 @@ class User {
             mintAVault,
             mintBVault
         };
+
         await this.program.rpc.initializePool(
             poolNonce,
             rewardDuration,
             {
                 accounts: {
                     authority: this.provider.wallet.publicKey,
-                    xTokenDepositAuthority: this.provider.wallet.publicKey,
                     xTokenPoolVault: xTokenPoolVault,
                     xTokenDepositor: this.xTokenPubkey,
+                    xTokenDepositAuthority: this.provider.wallet.publicKey,
                     stakingMint: this.stakingMintObject.publicKey,
                     stakingVault: stakingMintVault,
                     rewardAMint: this.mintAObject.publicKey,
@@ -117,7 +121,7 @@ class User {
                 },
                 signers: [poolKeypair],
                 instructions: [
-                    await this.program.account.pool.createInstruction(poolKeypair),
+                    await this.program.account.pool.createInstruction(poolKeypair, ),
                 ],
             }
         );
@@ -273,14 +277,37 @@ class User {
             });
     }
 
-    async fund(amountA, amountB) {
-        let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
+    async authorizeFunder(newFunder) {
+        await this.program.rpc.authorizeFunder(
+            newFunder,
+            {
+                accounts: {
+                    pool: this.poolPubkey,
+                    authority: this.provider.wallet.publicKey,
+                },
+            });
+    }
+
+    async deauthorizeFunder(oldFunder) {
+        await this.program.rpc.deauthorizeFunder(
+            oldFunder,
+            {
+                accounts: {
+                    pool: this.poolPubkey,
+                    authority: this.provider.wallet.publicKey,
+                },
+            });
+    }
+
+    async fund(amountA, amountB, poolPubkey) {
+        let pubkeyToUse = poolPubkey ?? this.poolPubkey;
+        let poolObject = await this.program.account.pool.fetch(pubkeyToUse);
 
         const [
             _poolSigner,
             _nonce,
         ] = await anchor.web3.PublicKey.findProgramAddress(
-            [this.poolPubkey.toBuffer()],
+            [pubkeyToUse.toBuffer()],
             this.program.programId
         );
         let poolSigner = _poolSigner;
@@ -291,7 +318,7 @@ class User {
             {
                 accounts: {
                     // Stake instance.
-                    pool: this.poolPubkey,
+                    pool: pubkeyToUse,
                     stakingVault: poolObject.stakingVault,
                     rewardAVault: poolObject.rewardAVault,
                     rewardBVault: poolObject.rewardBVault,
