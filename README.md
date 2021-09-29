@@ -42,3 +42,19 @@ anchor verify <program-id | write-buffer>
 ```
 
 A list of build artifacts can be found under [releases](https://github.com/step-finance/reward-pool/releases).
+
+### Deploy
+
+To deploy the program, configure your CLI to the desired network/wallet and run 
+
+```bash
+solana program deploy --programid <keypair> target/verifiable/reward_pool.so
+```
+
+I would not suggest using anchor deploy at this time; it wouldn't/couldn't really add much value.  Be sure to use `--programid <keypair>` to deploy to the correct address.
+
+Note: By default, programs are deployed to accounts that are twice the size of the original deployment. Doing so leaves room for program growth in future redeployments. For this program, I beleive that's proper - I wouldn't want to limit  further, but I do see some possibility for growth, but not beyond double.
+
+### Initial Migration
+
+There is no initial migration required with this program.
