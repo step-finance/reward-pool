@@ -4,7 +4,7 @@
 target
 test-ledger
 **/*.rs.bk
-keys/
+/keys/
 .rustc_info.json
 debug/
 node_modules
