@@ -53,7 +53,7 @@ describe('Multiuser Reward Pool', () => {
     console.log("Wallet: ", provider.wallet.publicKey.toString());
     //this is the xstep token
     //test xstep token hardcoded in program, mint authority is itself
-    rawdata = fs.readFileSync('tests/keys/TESTING-xsTPvEj7rELYcqe2D1k3M5zRe85xWWFK3x1SWDN5qPY.json');
+    rawdata = fs.readFileSync('tests/keys/xstep-tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s.json');
     keyData = JSON.parse(rawdata);
     xMintKey = anchor.web3.Keypair.fromSecretKey(new Uint8Array(keyData));
     xMintPubkey = xMintKey.publicKey;

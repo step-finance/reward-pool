@@ -13,7 +13,7 @@ no-entrypoint = []
 cpi = ["no-entrypoint"]
 
 #add to default for local testing
-default = ["local-testing"]
+#default = ["local-testing"]
 local-testing = []
 
 [dependencies]

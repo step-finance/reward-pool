@@ -8,7 +8,7 @@ use std::convert::TryInto;
 #[cfg(not(feature = "local-testing"))]
 declare_id!("UNKNOWN" fail build );
 #[cfg(feature = "local-testing")]
-declare_id!("SRWdZfXVSH7usoNVGAMBMpTnRf4PDQWRCtd3ZLUYDsP");
+declare_id!("TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36");
 
 #[cfg(not(feature = "local-testing"))]
 mod constants {
@@ -19,7 +19,7 @@ mod constants {
 
 #[cfg(feature = "local-testing")]
 mod constants {
-    pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xsTPvEj7rELYcqe2D1k3M5zRe85xWWFK3x1SWDN5qPY";
+    pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s";
     pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 1;
 }
