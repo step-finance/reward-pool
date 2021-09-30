@@ -343,7 +343,8 @@ class User {
     // this function is accurate forever (even after pool ends), unless the pool is changed through
     // funding, or anyone staking/unstaking.
     // Querying the chain is only done on initial call (this method) to build the function.
-    // Computations are done against current date/time every time the returned function is called.
+    // Computations are done against current date/time every time the returned function is called; thus you
+    //   could hook this up to a timer for a fancy UX.
     static async getPendingRewardsFunction(rewardsPoolAnchorProgram, rewardsPoolPubkey) {
         const U64_MAX = new anchor.BN("18446744073709551615", 10);
         let poolObject = await rewardsPoolAnchorProgram.account.pool.fetch(rewardsPoolPubkey);
