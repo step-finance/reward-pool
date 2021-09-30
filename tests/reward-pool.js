@@ -140,8 +140,35 @@ describe('Multiuser Reward Pool', () => {
       assert.fail("single stake pool should fail if funded token b");
     } catch (e) { }
 
+    try {
+    var expected = (await user.getUserPendingRewardsFunction())();
+    console.log("Expected", expected[0], expected[1]);
+    } catch (e) {
+      console.log(e);
+      process.exit();
+    }
+
     await funders[2].fund(1_000_000_000, 0);
-    await wait(5);
+
+    expected = await user.getUserPendingRewardsFunction();
+    var e = expected()
+    console.log("Expected", e[0], e[1]);
+    await wait(1);
+    e = expected()
+    console.log("Expected", e[0], e[1]);
+    await wait(1);
+    e = expected()
+    console.log("Expected", e[0], e[1]);
+    await wait(1);
+    e = expected()
+    console.log("Expected", e[0], e[1]);
+    await wait(1);
+    e = expected()
+    console.log("Expected", e[0], e[1]);
+    await wait(1);
+    e = expected()
+    console.log("Expected", e[0], e[1]);
+
     await claimForUsers([user]);
     await user.unstakeTokens(100_000);
     await user.closeUser();
@@ -285,8 +312,26 @@ describe('Multiuser Reward Pool', () => {
     assert(0 < (await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount);
   });
 
-  it('waits', async () => {
-    await wait(6); //pool 1 @ -1, pool 2 @ 19
+  it('waits and watches', async () => {
+    var expectedFn = await users[0].getUserPendingRewardsFunction();
+    await wait(1);
+    var expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
+    await wait(1);
+    expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
+    await wait(1);
+    expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
+    await wait(1);
+    expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
+    await wait(1);
+    expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
+    await wait(1); //pool 1 @ -1, pool 2 @ 19
+    expected = expectedFn();
+    console.log('user 1 estimated A', expected[0], 'estimated B', expected[1]);
   });
 
   it('Users claim at end of fund', async () => {

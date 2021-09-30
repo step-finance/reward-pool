@@ -26,6 +26,7 @@ class User {
         this.pubkey = this.keypair.publicKey;
 
         let envProvider = anchor.Provider.env();
+        envProvider.commitment = 'pending';
         await utils.sendLamports(envProvider, this.pubkey, initialLamports);
 
         this.provider = new anchor.Provider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
@@ -332,6 +333,72 @@ class User {
                     tokenProgram: TOKEN_PROGRAM_ID,
                 },
             });
+    }
+
+    async getUserPendingRewardsFunction() {
+        return await User.getPendingRewardsFunction(this.program, this.poolPubkey);
+    }
+    
+    // *returns a function* that when called returns an array of 2 values, the pending rewardA and rewardB
+    // this function is accurate forever (even after pool ends), unless the pool is changed through
+    // funding, or anyone staking/unstaking.
+    // Querying the chain is only done on initial call (this method) to build the function.
+    // Computations are done against current date/time every time the returned function is called.
+    static async getPendingRewardsFunction(rewardsPoolAnchorProgram, rewardsPoolPubkey) {
+        const U64_MAX = new anchor.BN("18446744073709551615", 10);
+        let poolObject = await rewardsPoolAnchorProgram.account.pool.fetch(rewardsPoolPubkey);
+        let rewardAPerToken = new anchor.BN(poolObject.rewardAPerTokenStored);
+        let rewardBPerToken = new anchor.BN(poolObject.rewardBPerTokenStored);
+        let rewardARate = new anchor.BN(poolObject.rewardARate);
+        let rewardBRate = new anchor.BN(poolObject.rewardBRate);
+        let lastUpdate = poolObject.lastUpdateTime;
+        var singleStaking = poolObject.rewardAMint.toString() == poolObject.rewardBMint.toString();
+
+        let vaultBalance = await rewardsPoolAnchorProgram.provider.connection.getTokenAccountBalance(poolObject.stakingVault);
+        vaultBalance = new anchor.BN(parseInt(vaultBalance.value.amount));
+
+        //a function that gives the total rewards emitted over the whole pool since last update
+        let fnAllRewardsPerToken = () => {
+            var lastApplicable = Math.min(Math.floor(Date.now() / 1000), poolObject.rewardDurationEnd);
+            var elapsed = new anchor.BN(lastApplicable - lastUpdate);
+            var currentARewardPerToken = rewardAPerToken.add(elapsed.mul(rewardARate).mul(U64_MAX).div(vaultBalance));
+            var currentBRewardPerToken;
+            if (singleStaking) {
+                currentBRewardPerToken = new anchor.BN(0);
+            } else {
+                currentBRewardPerToken = rewardBPerToken.add(elapsed.mul(rewardBRate).mul(U64_MAX).div(vaultBalance));
+            }
+            return [currentARewardPerToken, currentBRewardPerToken];
+        };
+
+        const [
+            userPubkey, _userNonce,
+        ] = await anchor.web3.PublicKey.findProgramAddress(
+            [rewardsPoolAnchorProgram.provider.wallet.publicKey.toBuffer(), rewardsPoolPubkey.toBuffer()],
+            rewardsPoolAnchorProgram.programId
+        );
+        let userObject = await rewardsPoolAnchorProgram.account.user.fetch(userPubkey);
+        let completeA = new anchor.BN(userObject.rewardAPerTokenComplete);
+        let completeB = new anchor.BN(userObject.rewardBPerTokenComplete);
+        let pendingA = new anchor.BN(userObject.rewardAPerTokenPending);
+        let pendingB = new anchor.BN(userObject.rewardBPerTokenPending);
+        let balanceStaked = new anchor.BN(userObject.balanceStaked);
+
+        //a function that gives a user's total unclaimed rewards since last update
+        let currentPending = () => {
+            var rwds = fnAllRewardsPerToken();
+            var a = balanceStaked.mul(rwds[0]).sub(completeA).div(U64_MAX).add(pendingA).toNumber();
+            var b;
+            if (singleStaking) {
+                b = 0;
+            } else {
+                b = balanceStaked.mul(rwds[0]).sub(completeB).div(U64_MAX).add(pendingB).toNumber();
+            }
+            return [a, b];
+            
+        }
+
+        return currentPending;
     }
 
     async claim() {
