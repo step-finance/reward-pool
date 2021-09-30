@@ -29,6 +29,8 @@ setProvider(provider);
 
 describe('Multiuser Reward Pool', () => {
 
+  let EXPECTED_POOL_CREATE_COST = 12_551_920;
+
   const rewardDuration = new anchor.BN(10);
   const rewardDuration2 = new anchor.BN(30);
   const rewardDuration3 = new anchor.BN(5);
@@ -89,6 +91,9 @@ describe('Multiuser Reward Pool', () => {
     ]);
   });
 
+  //to track cost to create pool, and compare to refund at teardown
+  let costInLamports; 
+
   it("Creates a pool", async () => {
     try {
       await funders[0].initializePool(poolKeypair, rewardDuration, false);
@@ -97,6 +102,7 @@ describe('Multiuser Reward Pool', () => {
 
     //give just ONE more xSTEP
     xMintObject.mintTo(funders[0].xTokenPubkey, envProvider.wallet.payer, [], 1);
+
     await funders[0].initializePool(poolKeypair, rewardDuration, false);
 
     //second funder tries to create with same pubkey
@@ -104,8 +110,18 @@ describe('Multiuser Reward Pool', () => {
       await funders[1].initializePool(poolKeypair, rewardDuration2, false);
       assert.fail("did not fail to create dupe pool");
     } catch (e) { }
+    
+    //track cost of creating a pool
+    let startLamports = (await provider.connection.getBalance(funders[1].pubkey));
 
     await funders[1].initializePool(poolKeypair2, rewardDuration2, false);
+
+    //validate cost
+    let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
+    costInLamports = startLamports - endLamports;
+    console.log("Cost of creating a pool", (costInLamports / 1_000_000_000));
+    assert.equal(costInLamports, EXPECTED_POOL_CREATE_COST);
+
     await funders[2].initializePool(poolKeypair3, rewardDuration3, true);
   });
 
@@ -531,8 +547,20 @@ describe('Multiuser Reward Pool', () => {
       await funders[1].closePool();
       assert.fail("funder was able to close pool without pausing first?!");
     } catch { }
+
+    //track refund on teardown
+    let startLamports = (await provider.connection.getBalance(funders[1].pubkey));
+
     await funders[1].pausePool();
     await funders[1].closePool();
+
+    //validate cost
+    let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
+    let refundInLamports = endLamports - startLamports;
+    console.log("Refund when destroying a pool", (refundInLamports / 1_000_000_000));
+    assert.equal(refundInLamports, EXPECTED_POOL_CREATE_COST - 20_000); //20k in tx fees during test
+    
+
     let pool = await provider.connection.getAccountInfo(funders[1].admin.poolKeypair.publicKey);
     let sv = await provider.connection.getAccountInfo(funders[1].admin.stakingMintVault);
     let av = await provider.connection.getAccountInfo(funders[1].admin.mintAVault);
