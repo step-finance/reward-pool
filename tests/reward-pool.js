@@ -29,7 +29,7 @@ setProvider(provider);
 
 describe('Multiuser Reward Pool', () => {
 
-  let EXPECTED_POOL_CREATE_COST = 12_551_920;
+  let EXPECTED_POOL_CREATE_COST = 12_546_920;
 
   const rewardDuration = new anchor.BN(10);
   const rewardDuration2 = new anchor.BN(30);
@@ -120,7 +120,7 @@ describe('Multiuser Reward Pool', () => {
     let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
     costInLamports = startLamports - endLamports;
     console.log("Cost of creating a pool", (costInLamports / 1_000_000_000));
-    assert.equal(costInLamports, EXPECTED_POOL_CREATE_COST);
+    assert.equal(costInLamports, EXPECTED_POOL_CREATE_COST + 5_000); //5k tx fee
 
     await funders[2].initializePool(poolKeypair3, rewardDuration3, true);
   });
@@ -558,7 +558,7 @@ describe('Multiuser Reward Pool', () => {
     let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
     let refundInLamports = endLamports - startLamports;
     console.log("Refund when destroying a pool", (refundInLamports / 1_000_000_000));
-    assert.equal(refundInLamports, EXPECTED_POOL_CREATE_COST - 20_000); //20k in tx fees during test
+    assert.equal(refundInLamports, EXPECTED_POOL_CREATE_COST - 15_000); //15k in tx fees during close, unclear why not 10k
     
 
     let pool = await provider.connection.getAccountInfo(funders[1].admin.poolKeypair.publicKey);
