@@ -393,7 +393,7 @@ class User {
             if (singleStaking) {
                 b = 0;
             } else {
-                b = balanceStaked.mul(rwds[0]).sub(completeB).div(U64_MAX).add(pendingB).toNumber();
+                b = balanceStaked.mul(rwds[1]).sub(completeB).div(U64_MAX).add(pendingB).toNumber();
             }
             return [a, b];
             
