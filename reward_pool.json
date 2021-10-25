@@ -1,0 +1,707 @@
+{
+  "version": "0.0.0",
+  "name": "reward_pool",
+  "instructions": [
+    {
+      "name": "initializePool",
+      "accounts": [
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenPoolVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "stakingMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "stakingVault",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardAMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardAVault",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBMint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBVault",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "poolNonce",
+          "type": "u8"
+        },
+        {
+          "name": "rewardDuration",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "createUser",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "nonce",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "accounts": [
+        {
+          "name": "xTokenPoolVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenReceiver",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unpause",
+      "accounts": [
+        {
+          "name": "xTokenPoolVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositor",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "xTokenDepositAuthority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "stake",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakingVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "stakeFromAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "unstake",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakingVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "stakeFromAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "sptAmount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "authorizeFunder",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "funderToAdd",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "deauthorizeFunder",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "funderToRemove",
+          "type": "publicKey"
+        }
+      ]
+    },
+    {
+      "name": "fund",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakingVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardAVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "funder",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "fromA",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "fromB",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amountA",
+          "type": "u64"
+        },
+        {
+          "name": "amountB",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakingVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardAVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "rewardAAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closeUser",
+      "accounts": [
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "user",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "owner",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "closePool",
+      "accounts": [
+        {
+          "name": "refundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "stakingRefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardARefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBRefundee",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "pool",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "stakingVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardAVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "rewardBVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "poolSigner",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Pool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "publicKey"
+          },
+          {
+            "name": "nonce",
+            "type": "u8"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "xTokenPoolVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "stakingMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "stakingVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardAMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardAVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardBMint",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardBVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardDuration",
+            "type": "u64"
+          },
+          {
+            "name": "rewardDurationEnd",
+            "type": "u64"
+          },
+          {
+            "name": "lastUpdateTime",
+            "type": "u64"
+          },
+          {
+            "name": "rewardARate",
+            "type": "u64"
+          },
+          {
+            "name": "rewardBRate",
+            "type": "u64"
+          },
+          {
+            "name": "rewardAPerTokenStored",
+            "type": "u128"
+          },
+          {
+            "name": "rewardBPerTokenStored",
+            "type": "u128"
+          },
+          {
+            "name": "userStakeCount",
+            "type": "u32"
+          },
+          {
+            "name": "funders",
+            "type": {
+              "array": [
+                "publicKey",
+                5
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "User",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "publicKey"
+          },
+          {
+            "name": "owner",
+            "type": "publicKey"
+          },
+          {
+            "name": "rewardAPerTokenComplete",
+            "type": "u128"
+          },
+          {
+            "name": "rewardBPerTokenComplete",
+            "type": "u128"
+          },
+          {
+            "name": "rewardAPerTokenPending",
+            "type": "u64"
+          },
+          {
+            "name": "rewardBPerTokenPending",
+            "type": "u64"
+          },
+          {
+            "name": "balanceStaked",
+            "type": "u64"
+          },
+          {
+            "name": "nonce",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 300,
+      "name": "InsufficientFundUnstake",
+      "msg": "Insufficient funds to unstake."
+    },
+    {
+      "code": 301,
+      "name": "AmountMustBeGreaterThanZero",
+      "msg": "Amount must be greater than zero."
+    },
+    {
+      "code": 302,
+      "name": "SingleStakeTokenBCannotBeFunded",
+      "msg": "Reward B cannot be funded - pool is single stake."
+    },
+    {
+      "code": 303,
+      "name": "PoolPaused",
+      "msg": "Pool is paused."
+    },
+    {
+      "code": 304,
+      "name": "DurationTooShort",
+      "msg": "Duration cannot be shorter than one day."
+    },
+    {
+      "code": 305,
+      "name": "FunderAlreadyAuthorized",
+      "msg": "Provided funder is already authorized to fund."
+    },
+    {
+      "code": 306,
+      "name": "MaxFunders",
+      "msg": "Maximum funders already authorized."
+    },
+    {
+      "code": 307,
+      "name": "CannotDeauthorizePoolAuthority",
+      "msg": "Cannot deauthorize the primary pool authority."
+    },
+    {
+      "code": 308,
+      "name": "CannotDeauthorizeMissingAuthority",
+      "msg": "Authority not found for deauthorization."
+    }
+  ],
+  "metadata": {
+    "address": "UNKNOWN"
+  }
+}
