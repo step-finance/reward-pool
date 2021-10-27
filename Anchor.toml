@@ -17,10 +17,10 @@ test = "mocha -t 1000000 tests/"
 reward_pool = "TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36"
 
 #[programs.devnet]
-#reward_pool = "UNKNOWN"
+#reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"
 
 #[programs.testnet]
-#reward_pool = "UNKNOWN"
+#reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"
 
 #[programs.mainnet]
-#reward_pool = "UNKNOWN"
+#reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"

@@ -6,7 +6,7 @@ use std::convert::Into;
 use std::convert::TryInto;
 
 #[cfg(not(feature = "local-testing"))]
-declare_id!("UNKNOWN" fail build );
+declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
 #[cfg(feature = "local-testing")]
 declare_id!("TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36");
 
