@@ -1,3 +1,9 @@
+<h1 align="center">
+  <br>
+   <img width="400" src="https://github.com/step-finance/reward-pool/blob/main/logo.svg?raw=true" alt="step logo"/>
+  <br>
+</h1>
+
 # Reward Pool
 
 Program for staking and receiving rewards. 
