@@ -4,7 +4,7 @@ Program for staking and receiving rewards.
 
 ## Design Overview
 
-![reward pool account overview](https://github.com/step-finance/reward-pool/blob/initial/account-design.png)
+![reward pool account overview](https://github.com/step-finance/reward-pool/blob/main/account-design.png)
 
 *draw.io editable*
 
