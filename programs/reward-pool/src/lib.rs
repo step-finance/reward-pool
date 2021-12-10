@@ -342,6 +342,8 @@ pub mod reward_pool {
         }
 
         let pool = &mut ctx.accounts.pool;
+        pool.upgrade_if_needed();
+
         let total_staked = ctx.accounts.staking_vault.amount;
 
         update_rewards(
