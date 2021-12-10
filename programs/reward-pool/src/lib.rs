@@ -1,14 +1,15 @@
 mod version;
+mod calculator;
 
-use crate::constants::*;
 use crate::version::*;
+use crate::constants::*;
+use crate::calculator::*;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{sysvar, clock, program_option::COption};
 use anchor_spl::token::{self, TokenAccount, Token, Mint};
 use std::convert::Into;
 use std::convert::TryInto;
-
 
 #[cfg(not(feature = "local-testing"))]
 declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
@@ -32,30 +33,18 @@ mod constants {
 const PRECISION: u128 = u64::MAX as u128;
 
 pub fn update_rewards(
-    pool: &mut Account<Pool>,
+    pool: &mut Box<Account<Pool>>,
     user: Option<&mut Box<Account<User>>>,
     total_staked: u64,
 ) -> Result<()> {
-    let clock = clock::Clock::get().unwrap();
-    let last_time_reward_applicable =
-        last_time_reward_applicable(pool.reward_duration_end, clock.unix_timestamp);
+    let last_time_reward_applicable = last_time_reward_applicable(pool.reward_duration_end);
 
-    pool.reward_a_per_token_stored = reward_per_token(
-        total_staked,
-        pool.reward_a_per_token_stored,
-        last_time_reward_applicable,
-        pool.last_update_time,
-        pool.reward_a_rate,
-    );
+    let calc = get_calculator(pool);
+    let (reward_a, reward_b) = calc.reward_per_token(total_staked, last_time_reward_applicable);
 
+    pool.reward_a_per_token_stored = reward_a;
     if pool.reward_a_vault != pool.reward_b_vault {
-        pool.reward_b_per_token_stored = reward_per_token(
-            total_staked,
-            pool.reward_b_per_token_stored,
-            last_time_reward_applicable,
-            pool.last_update_time,
-            pool.reward_b_rate,
-        );
+        pool.reward_b_per_token_stored = reward_b;
     }
 
     pool.last_update_time = last_time_reward_applicable;
@@ -81,34 +70,9 @@ pub fn update_rewards(
     Ok(())
 }
 
-pub fn last_time_reward_applicable(reward_duration_end: u64, unix_timestamp: i64) -> u64 {
-    return std::cmp::min(unix_timestamp.try_into().unwrap(), reward_duration_end);
-}
-
-pub fn reward_per_token(
-    total_staked: u64,
-    reward_per_token_stored: u128,
-    last_time_reward_applicable: u64,
-    last_update_time: u64,
-    reward_rate: u64,
-) -> u128 {
-    if total_staked == 0 {
-        return reward_per_token_stored;
-    }
-
-    return reward_per_token_stored
-                .checked_add(
-                    (last_time_reward_applicable as u128)
-                    .checked_sub(last_update_time as u128)
-                    .unwrap()
-                    .checked_mul(reward_rate as u128)
-                    .unwrap()
-                    .checked_mul(PRECISION)
-                    .unwrap()
-                    .checked_div(total_staked as u128)
-                    .unwrap()
-                )
-                .unwrap();
+fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
+    let c = clock::Clock::get().unwrap();
+    return std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end);
 }
 
 pub fn earned(
@@ -263,6 +227,7 @@ pub mod reward_pool {
         }
 
         let pool = &mut ctx.accounts.pool;
+
         if pool.paused {
             return Err(ErrorCode::PoolPaused.into());
         }
@@ -300,6 +265,7 @@ pub mod reward_pool {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
 
+        let pool = &mut ctx.accounts.pool;
         let total_staked = ctx.accounts.staking_vault.amount;
         
         if ctx.accounts.user.balance_staked < spt_amount {
@@ -308,7 +274,7 @@ pub mod reward_pool {
 
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
-            &mut ctx.accounts.pool,
+            pool,
             user_opt,
             total_staked,
         )
@@ -318,8 +284,8 @@ pub mod reward_pool {
         // Transfer tokens from the pool vault to user vault.
         {
             let seeds = &[
-                ctx.accounts.pool.to_account_info().key.as_ref(),
-                &[ctx.accounts.pool.nonce],
+                pool.to_account_info().key.as_ref(),
+                &[pool.nonce],
             ];
             let pool_signer = &[&seeds[..]];
 
@@ -385,28 +351,10 @@ pub mod reward_pool {
         )
         .unwrap();
 
-        let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
-        let reward_period_end = pool.reward_duration_end;
-
-        if current_time >= reward_period_end {
-            pool.reward_a_rate = amount_a.checked_div(pool.reward_duration).unwrap();
-            pool.reward_b_rate = amount_b.checked_div(pool.reward_duration).unwrap();
-        } else {
-            let remaining = pool.reward_duration_end.checked_sub(current_time).unwrap();
-            let leftover_a = remaining.checked_mul(pool.reward_a_rate).unwrap();
-            let leftover_b = remaining.checked_mul(pool.reward_b_rate).unwrap();
-
-            pool.reward_a_rate = amount_a
-                .checked_add(leftover_a)
-                .unwrap()
-                .checked_div(pool.reward_duration)
-                .unwrap();
-            pool.reward_b_rate = amount_b
-                .checked_add(leftover_b)
-                .unwrap()
-                .checked_div(pool.reward_duration)
-                .unwrap();
-        }
+        let calc = get_calculator(pool);
+        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(amount_a, amount_b);
+        pool.reward_a_rate = reward_a_rate;
+        pool.reward_b_rate = reward_b_rate;
 
         // Transfer reward A tokens into the A vault.
         if amount_a > 0 {
@@ -436,6 +384,7 @@ pub mod reward_pool {
             token::transfer(cpi_ctx, amount_b)?;
         }
 
+        let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         pool.last_update_time = current_time;
         pool.reward_duration_end = current_time.checked_add(pool.reward_duration).unwrap();
 
@@ -445,9 +394,10 @@ pub mod reward_pool {
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
         let total_staked = ctx.accounts.staking_vault.amount;
 
+        let pool = &mut ctx.accounts.pool;
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(
-            &mut ctx.accounts.pool,
+            pool,
             user_opt,
             total_staked,
         )
