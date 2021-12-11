@@ -1,6 +1,8 @@
 use crate::*;
 use borsh::{ BorshSerialize, BorshDeserialize };
 
+const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
+
 #[derive(Clone, BorshSerialize, BorshDeserialize, PartialEq)]
 #[repr(u8)]
 /// A version marker for different logic pertaining to program upgrades
@@ -17,11 +19,11 @@ impl Pool {
         match self.version {
             PoolVersion::V1 => {
                 //manual bounds checking - if a v1 pool emits > 584,942,417,355 lamport/sec it can't be upgraded
-                if self.reward_a_rate < u64::MAX / (365 * 24 * 60 * 60) {
+                if self.reward_a_rate < u64::MAX / SECONDS_IN_YEAR {
                     msg!("pool upgraded to v2");
                     self.version = PoolVersion::V2;
-                    self.reward_a_rate = self.reward_a_rate.checked_mul(365 * 24 * 60 * 60).unwrap();
-                    self.reward_b_rate = self.reward_b_rate.checked_mul(365 * 24 * 60 * 60).unwrap();
+                    self.reward_a_rate = self.reward_a_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
+                    self.reward_b_rate = self.reward_b_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
                 } else {
                     msg!("pool cannot be upgrade to v2");
                 }

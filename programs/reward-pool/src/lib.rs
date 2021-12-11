@@ -39,8 +39,8 @@ pub fn update_rewards(
 ) -> Result<()> {
     let last_time_reward_applicable = last_time_reward_applicable(pool.reward_duration_end);
 
-    let calc = get_calculator(pool);
-    let (reward_a, reward_b) = calc.reward_per_token(total_staked, last_time_reward_applicable);
+    let calc = get_calculator(&pool);
+    let (reward_a, reward_b) = calc.reward_per_token(&pool, total_staked, last_time_reward_applicable);
 
     pool.reward_a_per_token_stored = reward_a;
     if pool.reward_a_vault != pool.reward_b_vault {
@@ -50,20 +50,12 @@ pub fn update_rewards(
     pool.last_update_time = last_time_reward_applicable;
 
     if let Some(u) = user {
-        u.reward_a_per_token_pending = earned(
-            u.balance_staked,
-            pool.reward_a_per_token_stored,
-            u.reward_a_per_token_complete,
-            u.reward_a_per_token_pending,
-        );
+        let (a, b) = calc.user_earned_amount(&pool, &u);
+
+        u.reward_a_per_token_pending = a;
         u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
 
-        u.reward_b_per_token_pending = earned(
-            u.balance_staked,
-            pool.reward_b_per_token_stored,
-            u.reward_b_per_token_complete,
-            u.reward_b_per_token_pending,
-        );
+        u.reward_b_per_token_pending = b;
         u.reward_b_per_token_complete = pool.reward_b_per_token_stored;
     }
     
@@ -73,27 +65,6 @@ pub fn update_rewards(
 fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
     let c = clock::Clock::get().unwrap();
     return std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end);
-}
-
-pub fn earned(
-    balance_staked: u64,
-    reward_per_token_x: u128,
-    user_reward_per_token_x_paid: u128,
-    user_reward_x_pending: u64,
-) -> u64 {
-    return (balance_staked as u128)
-        .checked_mul(
-            (reward_per_token_x as u128)
-                .checked_sub(user_reward_per_token_x_paid as u128)
-                .unwrap(),
-        )
-        .unwrap()
-        .checked_div(PRECISION)
-        .unwrap()
-        .checked_add(user_reward_x_pending as u128)
-        .unwrap()
-        .try_into() 
-        .unwrap()
 }
 
 #[program]
@@ -353,8 +324,8 @@ pub mod reward_pool {
         )
         .unwrap();
 
-        let calc = get_calculator(pool);
-        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(amount_a, amount_b);
+        let calc = get_calculator(&pool);
+        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(&pool, amount_a, amount_b);
         pool.reward_a_rate = reward_a_rate;
         pool.reward_b_rate = reward_b_rate;
 
