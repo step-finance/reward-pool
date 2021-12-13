@@ -22,6 +22,7 @@ impl Pool {
                 if self.reward_a_rate < u64::MAX / SECONDS_IN_YEAR {
                     msg!("pool upgraded to v2");
                     self.version = PoolVersion::V2;
+                    //if upgrade is only done when funding, this is moot
                     self.reward_a_rate = self.reward_a_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
                     self.reward_b_rate = self.reward_b_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
                 } else {

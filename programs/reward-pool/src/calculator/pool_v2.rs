@@ -1,4 +1,5 @@
 use crate::calculator::*;
+use spl_math::uint::U192;
 
 const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
 
@@ -17,35 +18,36 @@ impl RewardCalculator for RewardCalculatorV2 {
             return (pool.reward_a_per_token_stored, pool.reward_b_per_token_stored);
         }
 
+        let time_period = U192::from(last_time_reward_applicable)
+            .checked_sub(pool.last_update_time.into())
+            .unwrap();
         let a = pool.reward_a_per_token_stored
                 .checked_add(
-                    (last_time_reward_applicable as u128)
-                    .checked_sub(pool.last_update_time as u128)
+                    time_period
+                    .checked_mul(pool.reward_a_rate.into()) 
                     .unwrap()
-                    .checked_mul(pool.reward_a_rate as u128) //todo u192?
+                    .checked_mul(PRECISION.into()) 
                     .unwrap()
-                    .checked_mul(PRECISION) 
+                    .checked_div(SECONDS_IN_YEAR.into())
                     .unwrap()
-                    .checked_div(SECONDS_IN_YEAR as u128)
+                    .checked_div(total_staked.into())
                     .unwrap()
-                    .checked_div(total_staked as u128)
-                    .unwrap()
+                    .try_into().unwrap() //back to u128
                 )
                 .unwrap();
 
         let b = pool.reward_b_per_token_stored
                 .checked_add(
-                    (last_time_reward_applicable as u128)
-                    .checked_sub(pool.last_update_time as u128)
+                    time_period
+                    .checked_mul(pool.reward_b_rate.into()) 
                     .unwrap()
-                    .checked_mul(pool.reward_b_rate as u128) //todo u192?
+                    .checked_mul(PRECISION.into()) 
                     .unwrap()
-                    .checked_mul(PRECISION) 
+                    .checked_div(SECONDS_IN_YEAR.into())
                     .unwrap()
-                    .checked_div(SECONDS_IN_YEAR as u128)
+                    .checked_div(total_staked.into())
                     .unwrap()
-                    .checked_div(total_staked as u128)
-                    .unwrap()
+                    .try_into().unwrap() //back to u128
                 )
                 .unwrap();
 
@@ -71,16 +73,18 @@ impl RewardCalculator for RewardCalculatorV2 {
             b = funding_amount_b.checked_mul(annual_multiplier).unwrap();
         } else {
             let remaining_seconds = pool.reward_duration_end.checked_sub(current_time).unwrap();
-            let leftover_a = remaining_seconds  
-                .checked_mul(pool.reward_a_rate) //todo u128?
+            let leftover_a: u64 = (remaining_seconds as u128)
+                .checked_mul(pool.reward_a_rate.into())
                 .unwrap()
-                .checked_div(SECONDS_IN_YEAR)
-                .unwrap();
-            let leftover_b = remaining_seconds
-                .checked_mul(pool.reward_b_rate) //todo u128?
+                .checked_div(SECONDS_IN_YEAR.into())
                 .unwrap()
-                .checked_div(SECONDS_IN_YEAR)
-                .unwrap();
+                .try_into().unwrap(); //back to u64
+            let leftover_b: u64 = (remaining_seconds as u128)
+                .checked_mul(pool.reward_b_rate.into())
+                .unwrap()
+                .checked_div(SECONDS_IN_YEAR.into())
+                .unwrap()
+                .try_into().unwrap(); //back to u64
 
             a = funding_amount_a
                 .checked_add(leftover_a)
@@ -114,8 +118,7 @@ impl RewardCalculator for RewardCalculatorV2 {
             .unwrap()
             .checked_add(user.reward_a_per_token_pending as u128)
             .unwrap()
-            .try_into()
-            .unwrap();
+            .try_into().unwrap(); //back to u64
 
         let b: u64 = (user.balance_staked as u128)
             .checked_mul(
@@ -128,8 +131,7 @@ impl RewardCalculator for RewardCalculatorV2 {
             .unwrap()
             .checked_add(user.reward_b_per_token_pending as u128)
             .unwrap()
-            .try_into()
-            .unwrap();
+            .try_into().unwrap(); //back to u64
 
         (a, b)
     }

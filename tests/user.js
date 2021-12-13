@@ -346,6 +346,7 @@ class User {
     // Computations are done against current date/time every time the returned function is called; thus you
     //   could hook this up to a timer for a fancy UX.
     static async getPendingRewardsFunction(rewardsPoolAnchorProgram, rewardsPoolPubkey) {
+        const SECONDS_IN_YEAR = new anchor.BN(365 * 24 * 60 * 60);
         const U64_MAX = new anchor.BN("18446744073709551615", 10);
         let poolObject = await rewardsPoolAnchorProgram.account.pool.fetch(rewardsPoolPubkey);
         let rewardAPerToken = new anchor.BN(poolObject.rewardAPerTokenStored);
@@ -355,6 +356,8 @@ class User {
         let lastUpdate = poolObject.lastUpdateTime;
         var singleStaking = poolObject.rewardAMint.toString() == poolObject.rewardBMint.toString();
 
+        let poolVersion = poolObject.version;
+
         let vaultBalance = await rewardsPoolAnchorProgram.provider.connection.getTokenAccountBalance(poolObject.stakingVault);
         vaultBalance = new anchor.BN(parseInt(vaultBalance.value.amount));
 
@@ -362,12 +365,12 @@ class User {
         let fnAllRewardsPerToken = () => {
             var lastApplicable = Math.min(Math.floor(Date.now() / 1000), poolObject.rewardDurationEnd);
             var elapsed = new anchor.BN(lastApplicable - lastUpdate);
-            var currentARewardPerToken = rewardAPerToken.add(elapsed.mul(rewardARate).mul(U64_MAX).div(vaultBalance));
+            var currentARewardPerToken = rewardAPerToken.add(elapsed.mul(rewardARate).mul(U64_MAX).div(poolVersion.v2 ? SECONDS_IN_YEAR : new anchor.BN(1)).div(vaultBalance));
             var currentBRewardPerToken;
             if (singleStaking) {
                 currentBRewardPerToken = new anchor.BN(0);
             } else {
-                currentBRewardPerToken = rewardBPerToken.add(elapsed.mul(rewardBRate).mul(U64_MAX).div(vaultBalance));
+                currentBRewardPerToken = rewardBPerToken.add(elapsed.mul(rewardBRate).mul(U64_MAX).div(poolVersion.v2 ? SECONDS_IN_YEAR : new anchor.BN(1)).div(vaultBalance));
             }
             return [currentARewardPerToken, currentBRewardPerToken];
         };

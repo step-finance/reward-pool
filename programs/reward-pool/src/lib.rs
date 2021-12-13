@@ -112,6 +112,7 @@ pub mod reward_pool {
         pool.reward_a_per_token_stored = 0;
         pool.reward_b_per_token_stored = 0;
         pool.user_stake_count = 0;
+        //pool.version = PoolVersion::V2;
         
         Ok(())
     }
