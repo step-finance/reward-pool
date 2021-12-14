@@ -252,16 +252,15 @@ describe('Multiuser Reward Pool', () => {
     await users2[0].stakeTokens(250_000);
   });
 
-  it('Fails to authorize 6th funder', async () => {
+  it('Fails to authorize 5th funder', async () => {
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     let tmpAuth = anchor.web3.Keypair.generate().publicKey;
     await funders[1].authorizeFunder(tmpAuth);
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
-    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     try {
       await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
-      assert.fail("did not fail on authorizing 6th funder");
+      assert.fail("did not fail on authorizing 5th funder");
     } catch (e) { }
     //deauth a funder in the middle of the array
     await funders[1].deauthorizeFunder(tmpAuth);
