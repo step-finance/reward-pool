@@ -59,7 +59,7 @@ impl RewardCalculator for RewardCalculatorV2 {
         pool: &Account<Pool>,
         funding_amount_a: u64, 
         funding_amount_b: u64
-    ) -> (u64, u64) { 
+    ) -> Result<(u64, u64)> { 
 
         let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         let reward_period_end = pool.reward_duration_end;
@@ -98,7 +98,7 @@ impl RewardCalculator for RewardCalculatorV2 {
                 .unwrap();
         }
 
-        (a, b)
+        Ok((a, b))
     }
 
     fn user_earned_amount(

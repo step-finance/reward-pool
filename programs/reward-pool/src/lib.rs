@@ -314,7 +314,7 @@ pub mod reward_pool {
         }
 
         let pool = &mut ctx.accounts.pool;
-        pool.upgrade_if_needed();
+        pool.upgrade_if_needed(ctx.accounts.reward_a_vault.amount, ctx.accounts.reward_b_vault.amount);
 
         let total_staked = ctx.accounts.staking_vault.amount;
 
@@ -326,7 +326,7 @@ pub mod reward_pool {
         .unwrap();
 
         let calc = get_calculator(&pool);
-        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(&pool, amount_a, amount_b);
+        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(&pool, amount_a, amount_b)?;
         pool.reward_a_rate = reward_a_rate;
         pool.reward_b_rate = reward_b_rate;
 
@@ -1008,4 +1008,7 @@ pub enum ErrorCode {
     CannotDeauthorizePoolAuthority,
     #[msg("Authority not found for deauthorization.")]
     CannotDeauthorizeMissingAuthority,
+    //pools auto-upgrade before they fund
+    #[msg("V1 cannot fund; This err should never raise.")]
+    VersionCannotFund,
 }

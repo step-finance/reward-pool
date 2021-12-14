@@ -54,7 +54,10 @@ impl RewardCalculator for RewardCalculatorV1 {
         pool: &Account<Pool>,
         funding_amount_a: u64,
         funding_amount_b: u64,
-    ) -> (u64, u64) {
+    ) -> Result<(u64, u64)> {
+        Err(ErrorCode::VersionCannotFund.into())
+
+/*
         let current_time = clock::Clock::get()
             .unwrap()
             .unix_timestamp
@@ -86,6 +89,7 @@ impl RewardCalculator for RewardCalculatorV1 {
         }
 
         (a, b)
+        */
     }
 
     fn user_earned_amount(
