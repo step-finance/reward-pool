@@ -1,9 +1,14 @@
+mod version;
+
 use crate::constants::*;
+use crate::version::*;
+
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{sysvar, clock, program_option::COption};
 use anchor_spl::token::{self, TokenAccount, Token, Mint};
 use std::convert::Into;
 use std::convert::TryInto;
+
 
 #[cfg(not(feature = "local-testing"))]
 declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
@@ -1031,7 +1036,11 @@ pub struct Pool {
     /// authorized funders
     /// [] because short size, fixed account size, and ease of use on 
     /// client due to auto generated account size property
-    pub funders: [Pubkey; 5],
+    pub funders: [Pubkey; 4],
+    //the version of the pool
+    pub version: PoolVersion,
+    //trailer for future use
+    pub trailer: [u8; 31],
 }
 
 #[account]
