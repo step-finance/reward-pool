@@ -148,7 +148,7 @@ describe('Multiuser Reward Pool', () => {
       process.exit();
     }
 
-    await funders[2].fund(1_000_000_000, 0);
+    await funders[2].fund(4, 0);
 
     expected = await user.getUserPendingRewardsFunction();
     var e = expected()
@@ -169,13 +169,21 @@ describe('Multiuser Reward Pool', () => {
     e = expected()
     console.log("Expected", e[0], e[1]);
 
-    await claimForUsers([user]);
+    let [ra,rb,a,b] = await user.claim();
+
+    console.log('ra', ra, 'rb', rb, 'a', a.toString(), 'b', b.toString());
+
+    assert.equal(ra, .000000004);
+    assert.equal(rb, 0);
+    assert.equal(a.toString(), 25228800);
+    assert.equal(b.toString(), 0);
+
     await user.unstakeTokens(100_000);
     await user.closeUser();
     await funders[2].pausePool();
     await funders[2].closePool();
   });
-  
+
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
     let pool2 = funders[1].poolPubkey;

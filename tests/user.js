@@ -437,7 +437,12 @@ class User {
         let amtA = await this.provider.connection.getTokenAccountBalance(this.mintAPubkey);
         let amtB = await this.provider.connection.getTokenAccountBalance(this.mintBPubkey);
 
-        return [amtA.value.uiAmount, amtB.value.uiAmount];
+        return [
+            amtA.value.uiAmount, 
+            this.mintAPubkey != this.mintBPubkey ? amtB.value.uiAmount : 0, 
+            poolObject.rewardARate, 
+            this.mintAPubkey != this.mintBPubkey ? poolObject.rewardBRate : new anchor.BN(0, 10), 
+        ];
     }
 
     //a transaction to stake, claim, unstake all at once - should net nothing
