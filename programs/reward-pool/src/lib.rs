@@ -32,6 +32,11 @@ mod constants {
 
 const PRECISION: u128 = u64::MAX as u128;
 
+/// Updates the pool with the total reward per token that is due stakers.
+/// Optionally updates user with pending rewards and "complete" rewards. 
+/// A new user to the pool has their completed set to current amount due 
+/// such that they start earning from that point. Hence "complete" is a 
+/// bit misleading - it does not mean actually earned.
 pub fn update_rewards(
     pool: &mut Box<Account<Pool>>,
     user: Option<&mut Box<Account<User>>>,
@@ -62,6 +67,8 @@ pub fn update_rewards(
     Ok(())
 }
 
+/// The min of current time and reward duration end, such that after the pool reward
+/// period ends, this always returns the pool end time
 fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
     let c = clock::Clock::get().unwrap();
     return std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end);
@@ -71,6 +78,7 @@ fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
 pub mod reward_pool {
     use super::*;
 
+    /// Initializes a new pool
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
         pool_nonce: u8,
@@ -117,6 +125,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Initialize a user staking account
     pub fn create_user(ctx: Context<CreateUser>, nonce: u8) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
@@ -134,6 +143,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Pauses the pool and refunds the xSTEP deposit.
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = true;
@@ -172,6 +182,8 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Unpauses a previously paused pool, taking a xSTEP deposit again and
+    /// allowing for funding
     pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = false;
@@ -188,11 +200,12 @@ pub mod reward_pool {
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
             },
         );
-        token::transfer(cpi_ctx, 10_000_000_000_000)?;
+        token::transfer(cpi_ctx, X_STEP_DEPOSIT_REQUIREMENT)?;
         
         Ok(())
     }
 
+    /// A user stakes tokens in the pool.
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
@@ -232,6 +245,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// A user unstakes tokens in the pool.
     pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
         if spt_amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
@@ -276,6 +290,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Authorize additional funders for the pool
     pub fn authorize_funder(ctx: Context<FunderChange>, funder_to_add: Pubkey) -> Result<()> {
         if funder_to_add == ctx.accounts.pool.authority.key() {
             return Err(ErrorCode::FunderAlreadyAuthorized.into());
@@ -293,6 +308,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Deauthorize funders for the pool
     pub fn deauthorize_funder(ctx: Context<FunderChange>, funder_to_remove: Pubkey) -> Result<()> {
         if funder_to_remove == ctx.accounts.pool.authority.key() {
             return Err(ErrorCode::CannotDeauthorizePoolAuthority.into());
@@ -306,6 +322,8 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Fund the pool with rewards.  This resets the clock on the end date, pushing it out to the set duration
+    /// And linearly redistributes remaining rewards.
     pub fn fund(ctx: Context<Fund>, amount_a: u64, amount_b: u64) -> Result<()> {
 
         //if vault a and b are the same, we just use a
@@ -365,6 +383,7 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// A user claiming rewards
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
         let total_staked = ctx.accounts.staking_vault.amount;
 
@@ -432,12 +451,15 @@ pub mod reward_pool {
         Ok(())
     }
 
+    /// Closes a users stake account. Validation is done to ensure this is only allowed when
+    /// the user has nothing staked and no rewards pending.
     pub fn close_user(ctx: Context<CloseUser>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.user_stake_count = pool.user_stake_count.checked_sub(1).unwrap();
         Ok(())
     }
 
+    /// Closes a pool account. Only able to be done when there are no users staked.
     pub fn close_pool<'info>(ctx: Context<ClosePool>) -> Result<()> {
         let pool = &ctx.accounts.pool;
         
@@ -575,6 +597,7 @@ pub struct InitializePool<'info> {
         constraint = x_token_pool_vault.owner == pool_signer.key(),
     )]
     x_token_pool_vault: Box<Account<'info, TokenAccount>>,
+
     #[account(
         mut,
         constraint = x_token_depositor.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap()
@@ -583,6 +606,7 @@ pub struct InitializePool<'info> {
     x_token_deposit_authority: Signer<'info>,
 
     staking_mint: Box<Account<'info, Mint>>,
+    
     #[account(
         constraint = staking_vault.mint == staking_mint.key(),
         constraint = staking_vault.owner == pool_signer.key(),
@@ -594,6 +618,7 @@ pub struct InitializePool<'info> {
     staking_vault: Box<Account<'info, TokenAccount>>,
 
     reward_a_mint: Box<Account<'info, Mint>>,
+
     #[account(
         constraint = reward_a_vault.mint == reward_a_mint.key(),
         constraint = reward_a_vault.owner == pool_signer.key(),
@@ -602,6 +627,7 @@ pub struct InitializePool<'info> {
     reward_a_vault: Box<Account<'info, TokenAccount>>,
 
     reward_b_mint: Box<Account<'info, Mint>>,
+
     #[account(
         constraint = reward_b_vault.mint == reward_b_mint.key(),
         constraint = reward_b_vault.owner == pool_signer.key(),

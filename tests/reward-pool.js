@@ -174,7 +174,7 @@ describe('Multiuser Reward Pool', () => {
 
     console.log('ra', ra, 'rb', rb, 'a', a.toString(), 'b', b.toString());
 
-    assert.equal(ra, .000000004);
+    assert.equal(ra, .000000003); //actually 3.99999999999 but floor kills this
     assert.equal(rb, 0);
     assert.equal(a.toString(), 25228800);
     assert.equal(b.toString(), 0);

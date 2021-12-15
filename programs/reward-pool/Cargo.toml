@@ -13,15 +13,12 @@ no-entrypoint = []
 cpi = ["no-entrypoint"]
 
 #add to default for local testing
-default = ["local-testing"]
+#default = ["local-testing"]
 local-testing = []
 
 [dependencies]
 anchor-lang = "0.16.2"
 anchor-spl = "0.16.2"
 spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
+spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
 solana-program = "1.7.7"
-
-[dependencies.spl-token]
-version = "3.1.1"
-features = ["no-entrypoint"]
