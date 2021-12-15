@@ -51,9 +51,9 @@ impl RewardCalculator for RewardCalculatorV1 {
 
     fn rate_after_funding(
         &self,
-        pool: &Account<Pool>,
-        funding_amount_a: u64,
-        funding_amount_b: u64,
+        _pool: &Account<Pool>,
+        _funding_amount_a: u64,
+        _funding_amount_b: u64,
     ) -> Result<(u64, u64)> {
         Err(ErrorCode::VersionCannotFund.into())
 
