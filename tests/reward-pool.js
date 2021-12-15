@@ -148,6 +148,7 @@ describe('Multiuser Reward Pool', () => {
       process.exit();
     }
 
+    //fund with < 1 lamport per second
     await funders[2].fund(4, 0);
 
     expected = await user.getUserPendingRewardsFunction();
