@@ -56,10 +56,11 @@ impl RewardCalculator for RewardCalculatorV2 {
 
     fn rate_after_funding(
         &self, 
-        pool: &Account<Pool>,
+        pool: &mut Account<Pool>, 
+        _reward_a_vault: &Account<TokenAccount>, 
+        _reward_b_vault: &Account<TokenAccount>, 
         funding_amount_a: u64, 
-        funding_amount_b: u64
-    ) -> Result<(u64, u64)> { 
+        funding_amount_b: u64) -> Result<(u64, u64)> { 
 
         let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
         let reward_period_end = pool.reward_duration_end;
@@ -72,7 +73,7 @@ impl RewardCalculator for RewardCalculatorV2 {
             a = funding_amount_a.checked_mul(annual_multiplier).unwrap();
             b = funding_amount_b.checked_mul(annual_multiplier).unwrap();
         } else {
-            let remaining_seconds = pool.reward_duration_end.checked_sub(current_time).unwrap();
+            let remaining_seconds = reward_period_end.checked_sub(current_time).unwrap();
             let leftover_a: u64 = (remaining_seconds as u128)
                 .checked_mul(pool.reward_a_rate.into())
                 .unwrap()

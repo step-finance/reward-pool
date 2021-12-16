@@ -16,33 +16,15 @@ pub enum PoolVersion {
 
 impl Pool {
     /// Will upgrade the pool if an upgrade is available and able to be done
-    pub fn upgrade_if_needed(&mut self, a_amount_vault_current: u64, b_amount_vault_current: u64) {
+    pub fn upgrade_if_needed(&mut self) {
         match self.version {
             PoolVersion::V1 => {
 
-                msg!("pool upgraded to v2");
+                self.reward_a_rate = self.reward_a_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
+                self.reward_b_rate = self.reward_b_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
                 self.version = PoolVersion::V2;
 
-                //rescuing borked funds
-                //V1 farms calculated rate using lamports per second resulting in farms with a rate of 0
-                //but token in the vault.  These tokens never emitted anything and won't get picked up unless
-                //the rate is updated based on the vault contents.
-                //We set the rate to one which would emit the contents of the vault starting now.
-                let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
-                todo!("this");
-                if self.reward_a_rate == 0 && a_amount_vault_current > 0 {
-                    //if upgrade is only done when funding, this is moot
-                    self.reward_a_rate = SECONDS_IN_YEAR
-                        .checked_div(self.reward_duration).unwrap()
-                        .checked_mul(a_amount_vault_current).unwrap();
-                }
-                if self.reward_b_rate == 0 && b_amount_vault_current > 0 {
-                    //if upgrade is only done when funding, this is moot
-                    self.reward_b_rate = SECONDS_IN_YEAR
-                        .checked_div(self.reward_duration).unwrap()
-                        .checked_mul(b_amount_vault_current).unwrap();
-                }
-
+                msg!("pool upgraded to v2");
             },
             _ => { },
         };

@@ -50,14 +50,47 @@ impl RewardCalculator for RewardCalculatorV1 {
     }
 
     fn rate_after_funding(
-        &self,
-        _pool: &Account<Pool>,
-        _funding_amount_a: u64,
-        _funding_amount_b: u64,
-    ) -> Result<(u64, u64)> {
-        Err(ErrorCode::VersionCannotFund.into())
+        &self, 
+        pool: &mut Account<Pool>, 
+        reward_a_vault: &Account<TokenAccount>, 
+        reward_b_vault: &Account<TokenAccount>, 
+        funding_amount_a: u64, 
+        funding_amount_b: u64) -> Result<(u64, u64)> {
 
-/*
+        //a little inception here, a pool V1 funding needs to handle the upgrade of the pool
+        //to V2.  However at the same time it needs to handle the reason that pool V2 exists
+        //which is to fix a bug that caused some funds to get stuck and not emit.
+
+        //rescuing borked funds
+        //V1 farms calculated rate using lamports per second resulting in farms with a rate of 0
+        //but token in the vault.  These tokens never emitted anything and won't get picked up unless
+        //the rate is updated based on the *vault contents*, not the computed emissions.
+        //As such, we add the vault contents to the funding amount.
+
+        pool.upgrade_if_needed();
+
+        let mut funding_amount_a = funding_amount_a;
+        let mut funding_amount_b = funding_amount_b;
+
+        if pool.reward_a_rate == 0                  //are not emitting
+            && pool.reward_a_per_token_stored == 0  //never owed anyone anything
+            && reward_a_vault.amount > 0            //yet the fault has funds
+        {
+            funding_amount_a = funding_amount_a.checked_add(reward_a_vault.amount).unwrap();
+        }
+
+        if pool.reward_b_rate == 0                  //are not emitting
+            && pool.reward_b_per_token_stored == 0  //never owed anyone anything
+            && reward_b_vault.amount > 0            //yet the fault has funds
+        {
+            funding_amount_b = funding_amount_b.checked_add(reward_b_vault.amount).unwrap();
+        }
+
+        //now get the latest calc for the pool and use it
+        let calc = get_calculator(pool);
+        calc.rate_after_funding(pool, reward_a_vault, reward_b_vault, funding_amount_a, funding_amount_b)
+        
+        /*
         let current_time = clock::Clock::get()
             .unwrap()
             .unix_timestamp

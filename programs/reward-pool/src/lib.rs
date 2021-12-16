@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::convert::Into;
 use std::convert::TryInto;
 
@@ -355,10 +356,14 @@ pub mod reward_pool {
         )
         .unwrap();
 
-        pool.upgrade_if_needed(ctx.accounts.reward_a_vault.amount, ctx.accounts.reward_b_vault.amount);
-
         let calc = get_calculator(&pool);
-        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(&pool, amount_a, amount_b)?;
+        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(
+            pool, 
+            &ctx.accounts.reward_a_vault, 
+            &ctx.accounts.reward_b_vault, 
+            amount_a, 
+            amount_b
+        )?;
         pool.reward_a_rate = reward_a_rate;
         pool.reward_b_rate = reward_b_rate;
 
@@ -615,6 +620,7 @@ pub struct InitializePool<'info> {
         mut,
         constraint = x_token_pool_vault.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap(),
         constraint = x_token_pool_vault.owner == pool_signer.key(),
+        constraint = x_token_pool_vault.amount == 0,
     )]
     x_token_pool_vault: Box<Account<'info, TokenAccount>>,
 
@@ -966,7 +972,6 @@ pub struct ClosePool<'info> {
 }
 
 #[account]
-#[derive(Debug)]
 pub struct Pool {
     /// Priviledged account.
     pub authority: Pubkey,
@@ -1058,4 +1063,29 @@ pub enum ErrorCode {
     //pools auto-upgrade before they fund
     #[msg("V1 cannot fund; This err should never raise.")]
     VersionCannotFund,
+}
+
+impl Debug for Pool {
+    
+    /// writes a subset of pool fields for debugging
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> { 
+        
+        if cfg!(verbose) {
+            write!(f, "version: {:?} paused: {} reward_duration: {} reward_duration_end: {} reward_a_rate: {} reward_b_rate: {} reward_a_per_token_stored {} reward_b_per_token_stored {}",
+                self.version,
+                self.paused,
+                self.reward_duration,
+                self.reward_duration_end,
+                self.reward_a_rate,
+                self.reward_b_rate,
+                self.reward_a_per_token_stored,
+                self.reward_b_per_token_stored,
+            )
+        } else {
+            write!(f, "version: {:?}",
+                self.version,
+            )
+        }
+
+     }
 }

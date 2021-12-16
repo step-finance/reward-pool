@@ -15,6 +15,7 @@ cpi = ["no-entrypoint"]
 #add to default for local testing
 #default = ["local-testing"]
 local-testing = []
+verbose = []
 
 [dependencies]
 anchor-lang = "0.16.2"
