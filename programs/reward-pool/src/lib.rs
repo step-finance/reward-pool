@@ -14,8 +14,8 @@ mod version;
 mod calculator;
 
 #[cfg(not(feature = "local-testing"))]
-declare_id!("TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36");
-//declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
+declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
+//declare_id!("devR42ArgvbS4mpLyNUrdRdXYcU1XKwwV2irxCpcSPT");
 #[cfg(feature = "local-testing")]
 declare_id!("TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36");
 
@@ -1020,7 +1020,7 @@ pub struct Pool {
 }
 
 #[account]
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct User {
     /// Pool the this user belongs to.
     pub pool: Pubkey,
@@ -1060,9 +1060,6 @@ pub enum ErrorCode {
     CannotDeauthorizePoolAuthority,
     #[msg("Authority not found for deauthorization.")]
     CannotDeauthorizeMissingAuthority,
-    //pools auto-upgrade before they fund
-    #[msg("V1 cannot fund; This err should never raise.")]
-    VersionCannotFund,
 }
 
 impl Debug for Pool {
@@ -1070,7 +1067,7 @@ impl Debug for Pool {
     /// writes a subset of pool fields for debugging
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> { 
         
-        if cfg!(verbose) {
+        if cfg!(feature = "verbose") {
             write!(f, "version: {:?} paused: {} reward_duration: {} reward_duration_end: {} reward_a_rate: {} reward_b_rate: {} reward_a_per_token_stored {} reward_b_per_token_stored {}",
                 self.version,
                 self.paused,
@@ -1084,6 +1081,29 @@ impl Debug for Pool {
         } else {
             write!(f, "version: {:?}",
                 self.version,
+            )
+        }
+
+     }
+}
+
+impl Debug for User {
+    
+    /// writes a subset of pool fields for debugging
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> { 
+        
+        if cfg!(feature = "verbose") {
+            write!(f, "reward_a_per_token_complete: {:?} reward_b_per_token_complete: {} reward_a_per_token_pending: {} reward_b_per_token_pending: {} balance_staked: {} nonce: {}",
+                self.reward_a_per_token_complete,
+                self.reward_b_per_token_complete,
+                self.reward_a_per_token_pending,
+                self.reward_b_per_token_pending,
+                self.balance_staked,
+                self.nonce,
+            )
+        } else {
+            write!(f, "balance_staked: {:?}",
+                self.balance_staked,
             )
         }
 

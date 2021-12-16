@@ -1,7 +1,7 @@
 use crate::*;
 use borsh::{ BorshSerialize, BorshDeserialize };
 
-const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
+pub const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
 
 #[derive(Clone, BorshSerialize, BorshDeserialize, PartialEq)]
 #[repr(u8)]

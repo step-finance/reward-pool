@@ -76,13 +76,16 @@ impl RewardCalculator for RewardCalculatorV1 {
             && pool.reward_a_per_token_stored == 0  //never owed anyone anything
             && reward_a_vault.amount > 0            //yet the fault has funds
         {
+            msg!("applying fix for reward a");
             funding_amount_a = funding_amount_a.checked_add(reward_a_vault.amount).unwrap();
         }
 
-        if pool.reward_b_rate == 0                  //are not emitting
-            && pool.reward_b_per_token_stored == 0  //never owed anyone anything
-            && reward_b_vault.amount > 0            //yet the fault has funds
+        if pool.reward_b_rate == 0                       //are not emitting
+            && pool.reward_b_per_token_stored == 0       //never owed anyone anything
+            && reward_b_vault.amount > 0                 //yet the fault has funds
+            && pool.reward_a_mint != pool.reward_b_mint  //not a single reward asset pool
         {
+            msg!("applying fix for reward b");
             funding_amount_b = funding_amount_b.checked_add(reward_b_vault.amount).unwrap();
         }
 
