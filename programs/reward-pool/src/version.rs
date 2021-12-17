@@ -1,5 +1,5 @@
 use crate::*;
-use borsh::{ BorshSerialize, BorshDeserialize };
+use borsh::{BorshDeserialize, BorshSerialize};
 
 pub const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
 
@@ -17,16 +17,12 @@ pub enum PoolVersion {
 impl Pool {
     /// Will upgrade the pool if an upgrade is available and able to be done
     pub fn upgrade_if_needed(&mut self) {
-        match self.version {
-            PoolVersion::V1 => {
+        if self.version == PoolVersion::V1 {
+            self.reward_a_rate = self.reward_a_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
+            self.reward_b_rate = self.reward_b_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
+            self.version = PoolVersion::V2;
 
-                self.reward_a_rate = self.reward_a_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
-                self.reward_b_rate = self.reward_b_rate.checked_mul(SECONDS_IN_YEAR).unwrap();
-                self.version = PoolVersion::V2;
-
-                msg!("pool upgraded to v2");
-            },
-            _ => { },
-        };
+            msg!("pool upgraded to v2");
+        }
     }
 }

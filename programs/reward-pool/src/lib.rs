@@ -1,23 +1,22 @@
-use std::fmt::Debug;
 use std::convert::Into;
 use std::convert::TryInto;
+use std::fmt::Debug;
 
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{sysvar, clock, program_option::COption};
-use anchor_spl::token::{self, TokenAccount, Token, Mint};
+use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-use crate::version::*;
-use crate::constants::*;
 use crate::calculator::*;
+use crate::constants::*;
+use crate::version::*;
 
-mod version;
 mod calculator;
+mod version;
 
-#[cfg(not(feature = "local-testing"))]
+#[cfg(not(feature = "test-id"))]
 declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
-//declare_id!("devR42ArgvbS4mpLyNUrdRdXYcU1XKwwV2irxCpcSPT");
-#[cfg(feature = "local-testing")]
-declare_id!("TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36");
+#[cfg(feature = "test-id")]
+declare_id!("ddS8eKxapy89xg5NDkQWS97GDrDxCh2ChVF2nbRoa4D");
 
 #[cfg(not(feature = "local-testing"))]
 mod constants {
@@ -35,12 +34,12 @@ mod constants {
 
 const PRECISION: u128 = u64::MAX as u128;
 
-/// Updates the pool with the total reward per token that is due stakers 
-/// Using the calculator specific to that pool version which uses the reward 
+/// Updates the pool with the total reward per token that is due stakers
+/// Using the calculator specific to that pool version which uses the reward
 /// rate on the pool.
-/// Optionally updates user with pending rewards and "complete" rewards. 
-/// A new user to the pool has their completed set to current amount due 
-/// such that they start earning from that point. Hence "complete" is a 
+/// Optionally updates user with pending rewards and "complete" rewards.
+/// A new user to the pool has their completed set to current amount due
+/// such that they start earning from that point. Hence "complete" is a
 /// bit misleading - it does not mean actually earned.
 pub fn update_rewards(
     pool: &mut Box<Account<Pool>>,
@@ -49,8 +48,9 @@ pub fn update_rewards(
 ) -> Result<()> {
     let last_time_reward_applicable = last_time_reward_applicable(pool.reward_duration_end);
 
-    let calc = get_calculator(&pool);
-    let (reward_a, reward_b) = calc.reward_per_token(&pool, total_staked, last_time_reward_applicable);
+    let calc = get_calculator(pool);
+    let (reward_a, reward_b) =
+        calc.reward_per_token(pool, total_staked, last_time_reward_applicable);
 
     pool.reward_a_per_token_stored = reward_a;
     if pool.reward_a_vault != pool.reward_b_vault {
@@ -60,7 +60,7 @@ pub fn update_rewards(
     pool.last_update_time = last_time_reward_applicable;
 
     if let Some(u) = user {
-        let (a, b) = calc.user_earned_amount(&pool, &u);
+        let (a, b) = calc.user_earned_amount(pool, u);
 
         u.reward_a_per_token_pending = a;
         u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
@@ -68,7 +68,7 @@ pub fn update_rewards(
         u.reward_b_per_token_pending = b;
         u.reward_b_per_token_complete = pool.reward_b_per_token_stored;
     }
-    
+
     Ok(())
 }
 
@@ -76,7 +76,7 @@ pub fn update_rewards(
 /// period ends, this always returns the pool end time
 fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
     let c = clock::Clock::get().unwrap();
-    return std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end);
+    std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end)
 }
 
 #[program]
@@ -89,7 +89,6 @@ pub mod reward_pool {
         pool_nonce: u8,
         reward_duration: u64,
     ) -> Result<()> {
-
         if reward_duration < MIN_DURATION {
             return Err(ErrorCode::DurationTooShort.into());
         }
@@ -126,7 +125,7 @@ pub mod reward_pool {
         pool.reward_b_per_token_stored = 0;
         pool.user_stake_count = 0;
         pool.version = PoolVersion::V2;
-        
+
         msg!("Pool: {:?}", **ctx.accounts.pool);
         Ok(())
     }
@@ -157,10 +156,7 @@ pub mod reward_pool {
         pool.paused = true;
 
         //xstep refund
-        let seeds = &[
-            pool.to_account_info().key.as_ref(),
-            &[pool.nonce],
-        ];
+        let seeds = &[pool.to_account_info().key.as_ref(), &[pool.nonce]];
         let pool_signer = &[&seeds[..]];
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -173,7 +169,7 @@ pub mod reward_pool {
         );
 
         token::transfer(cpi_ctx, ctx.accounts.x_token_pool_vault.amount)?;
-        
+
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             token::CloseAccount {
@@ -184,7 +180,7 @@ pub mod reward_pool {
             pool_signer,
         );
         token::close_account(cpi_ctx)?;
-        
+
         pool.x_token_pool_vault = Pubkey::default();
 
         msg!("Pool: {:?}", **ctx.accounts.pool);
@@ -210,7 +206,7 @@ pub mod reward_pool {
             },
         );
         token::transfer(cpi_ctx, X_STEP_DEPOSIT_REQUIREMENT)?;
-        
+
         msg!("Pool: {:?}", **ctx.accounts.pool);
         Ok(())
     }
@@ -230,14 +226,14 @@ pub mod reward_pool {
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(
-            pool,
-            user_opt,
-            total_staked,
-        )
-        .unwrap();
-        
-        ctx.accounts.user.balance_staked = ctx.accounts.user.balance_staked.checked_add(amount).unwrap();
+        update_rewards(pool, user_opt, total_staked).unwrap();
+
+        ctx.accounts.user.balance_staked = ctx
+            .accounts
+            .user
+            .balance_staked
+            .checked_add(amount)
+            .unwrap();
 
         // Transfer tokens into the stake vault.
         {
@@ -265,26 +261,23 @@ pub mod reward_pool {
 
         let pool = &mut ctx.accounts.pool;
         let total_staked = ctx.accounts.staking_vault.amount;
-        
+
         if ctx.accounts.user.balance_staked < spt_amount {
             return Err(ErrorCode::InsufficientFundUnstake.into());
         }
 
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(
-            pool,
-            user_opt,
-            total_staked,
-        )
-        .unwrap();
-        ctx.accounts.user.balance_staked = ctx.accounts.user.balance_staked.checked_sub(spt_amount).unwrap();
+        update_rewards(pool, user_opt, total_staked).unwrap();
+        ctx.accounts.user.balance_staked = ctx
+            .accounts
+            .user
+            .balance_staked
+            .checked_sub(spt_amount)
+            .unwrap();
 
         // Transfer tokens from the pool vault to user vault.
         {
-            let seeds = &[
-                pool.to_account_info().key.as_ref(),
-                &[pool.nonce],
-            ];
+            let seeds = &[pool.to_account_info().key.as_ref(), &[pool.nonce]];
             let pool_signer = &[&seeds[..]];
 
             let cpi_ctx = CpiContext::new_with_signer(
@@ -296,7 +289,7 @@ pub mod reward_pool {
                 },
                 pool_signer,
             );
-            token::transfer(cpi_ctx, spt_amount.try_into().unwrap())?;
+            token::transfer(cpi_ctx, spt_amount)?;
         }
 
         msg!("Pool: {:?}", **ctx.accounts.pool);
@@ -341,7 +334,6 @@ pub mod reward_pool {
     /// Fund the pool with rewards.  This resets the clock on the end date, pushing it out to the set duration
     /// And linearly redistributes remaining rewards.
     pub fn fund(ctx: Context<Fund>, amount_a: u64, amount_b: u64) -> Result<()> {
-
         //if vault a and b are the same, we just use a
         if amount_b > 0 && ctx.accounts.reward_a_vault.key() == ctx.accounts.reward_b_vault.key() {
             return Err(ErrorCode::SingleStakeTokenBCannotBeFunded.into());
@@ -349,20 +341,15 @@ pub mod reward_pool {
 
         let pool = &mut ctx.accounts.pool;
         let total_staked = ctx.accounts.staking_vault.amount;
-        update_rewards(
-            pool,
-            None,
-            total_staked,
-        )
-        .unwrap();
+        update_rewards(pool, None, total_staked).unwrap();
 
-        let calc = get_calculator(&pool);
+        let calc = get_calculator(pool);
         let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(
-            pool, 
-            &ctx.accounts.reward_a_vault, 
-            &ctx.accounts.reward_b_vault, 
-            amount_a, 
-            amount_b
+            pool,
+            &ctx.accounts.reward_a_vault,
+            &ctx.accounts.reward_b_vault,
+            amount_a,
+            amount_b,
         )?;
         pool.reward_a_rate = reward_a_rate;
         pool.reward_b_rate = reward_b_rate;
@@ -395,7 +382,11 @@ pub mod reward_pool {
             token::transfer(cpi_ctx, amount_b)?;
         }
 
-        let current_time = clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap();
+        let current_time = clock::Clock::get()
+            .unwrap()
+            .unix_timestamp
+            .try_into()
+            .unwrap();
         pool.last_update_time = current_time;
         pool.reward_duration_end = current_time.checked_add(pool.reward_duration).unwrap();
 
@@ -409,12 +400,7 @@ pub mod reward_pool {
 
         let pool = &mut ctx.accounts.pool;
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(
-            pool,
-            user_opt,
-            total_staked,
-        )
-        .unwrap();
+        update_rewards(pool, user_opt, total_staked).unwrap();
 
         let seeds = &[
             ctx.accounts.pool.to_account_info().key.as_ref(),
@@ -484,12 +470,15 @@ pub mod reward_pool {
     }
 
     /// Closes a pool account. Only able to be done when there are no users staked.
-    pub fn close_pool<'info>(ctx: Context<ClosePool>) -> Result<()> {
+    pub fn close_pool(ctx: Context<ClosePool>) -> Result<()> {
         let pool = &ctx.accounts.pool;
-        
-        let signer_seeds = &[pool.to_account_info().key.as_ref(), &[ctx.accounts.pool.nonce]];
-        
-        //instead of closing these vaults, we could technically just 
+
+        let signer_seeds = &[
+            pool.to_account_info().key.as_ref(),
+            &[ctx.accounts.pool.nonce],
+        ];
+
+        //instead of closing these vaults, we could technically just
         //set_authority on them. it's not very ata clean, but it'd work
         //if size of tx is an issue, thats an approach
 
@@ -529,7 +518,7 @@ pub mod reward_pool {
             ],
             &[signer_seeds],
         )?;
-        
+
         //close token a vault
         let ix = spl_token::instruction::transfer(
             &spl_token::ID,
@@ -566,7 +555,7 @@ pub mod reward_pool {
             ],
             &[signer_seeds],
         )?;
-        
+
         if pool.reward_a_vault != pool.reward_b_vault {
             //close token b vault
             let ix = spl_token::instruction::transfer(
@@ -669,11 +658,9 @@ pub struct InitializePool<'info> {
     )]
     pool_signer: UncheckedAccount<'info>,
 
-    #[account(
-        zero,
-    )]
+    #[account(zero)]
     pool: Box<Account<'info, Pool>>,
-    
+
     token_program: Program<'info, Token>,
 }
 
@@ -691,7 +678,7 @@ pub struct CreateUser<'info> {
         init,
         payer = owner,
         seeds = [
-            owner.key.as_ref(), 
+            owner.key.as_ref(),
             pool.to_account_info().key.as_ref()
         ],
         bump = nonce,
@@ -710,7 +697,7 @@ pub struct Pause<'info> {
     x_token_receiver: Box<Account<'info, TokenAccount>>,
 
     #[account(
-        mut, 
+        mut,
         has_one = authority,
         has_one = x_token_pool_vault,
         constraint = !pool.paused,
@@ -746,7 +733,7 @@ pub struct Unpause<'info> {
     x_token_deposit_authority: Signer<'info>,
 
     #[account(
-        mut, 
+        mut,
         has_one = authority,
         constraint = pool.paused,
     )]
@@ -767,7 +754,7 @@ pub struct Unpause<'info> {
 pub struct Stake<'info> {
     // Global accounts for the staking instance.
     #[account(
-        mut, 
+        mut,
         has_one = staking_vault,
     )]
     pool: Box<Account<'info, Pool>>,
@@ -779,11 +766,11 @@ pub struct Stake<'info> {
 
     // User.
     #[account(
-        mut, 
-        has_one = owner, 
+        mut,
+        has_one = owner,
         has_one = pool,
         seeds = [
-            owner.key.as_ref(), 
+            owner.key.as_ref(),
             pool.to_account_info().key.as_ref()
         ],
         bump = user.nonce,
@@ -810,7 +797,7 @@ pub struct Stake<'info> {
 pub struct FunderChange<'info> {
     // Global accounts for the staking instance.
     #[account(
-        mut, 
+        mut,
         has_one = authority,
     )]
     pool: Box<Account<'info, Pool>>,
@@ -821,7 +808,7 @@ pub struct FunderChange<'info> {
 pub struct Fund<'info> {
     // Global accounts for the staking instance.
     #[account(
-        mut, 
+        mut,
         has_one = staking_vault,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
@@ -861,7 +848,7 @@ pub struct Fund<'info> {
 pub struct ClaimReward<'info> {
     // Global accounts for the staking instance.
     #[account(
-        mut, 
+        mut,
         has_one = staking_vault,
         has_one = reward_a_vault,
         has_one = reward_b_vault,
@@ -907,9 +894,7 @@ pub struct ClaimReward<'info> {
 
 #[derive(Accounts)]
 pub struct CloseUser<'info> {
-    #[account(
-        mut, 
-    )]
+    #[account(mut)]
     pool: Box<Account<'info, Pool>>,
     #[account(
         mut,
@@ -1010,7 +995,7 @@ pub struct Pool {
     /// Users staked
     pub user_stake_count: u32,
     /// authorized funders
-    /// [] because short size, fixed account size, and ease of use on 
+    /// [] because short size, fixed account size, and ease of use on
     /// client due to auto generated account size property
     pub funders: [Pubkey; 4],
     //the version of the pool
@@ -1063,10 +1048,8 @@ pub enum ErrorCode {
 }
 
 impl Debug for Pool {
-    
     /// writes a subset of pool fields for debugging
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> { 
-        
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         if cfg!(feature = "verbose") {
             write!(f, "version: {:?} paused: {} reward_duration: {} reward_duration_end: {} reward_a_rate: {} reward_b_rate: {} reward_a_per_token_stored {} reward_b_per_token_stored {}",
                 self.version,
@@ -1079,19 +1062,14 @@ impl Debug for Pool {
                 self.reward_b_per_token_stored,
             )
         } else {
-            write!(f, "version: {:?}",
-                self.version,
-            )
+            write!(f, "version: {:?}", self.version,)
         }
-
-     }
+    }
 }
 
 impl Debug for User {
-    
     /// writes a subset of pool fields for debugging
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> { 
-        
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         if cfg!(feature = "verbose") {
             write!(f, "reward_a_per_token_complete: {:?} reward_b_per_token_complete: {} reward_a_per_token_pending: {} reward_b_per_token_pending: {} balance_staked: {} nonce: {}",
                 self.reward_a_per_token_complete,
@@ -1102,10 +1080,7 @@ impl Debug for User {
                 self.nonce,
             )
         } else {
-            write!(f, "balance_staked: {:?}",
-                self.balance_staked,
-            )
+            write!(f, "balance_staked: {:?}", self.balance_staked,)
         }
-
-     }
+    }
 }

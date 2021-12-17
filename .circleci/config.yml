@@ -1,26 +1,96 @@
-# Use the latest 2.1 version of CircleCI pipeline process engine.
-# See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
+  formatting:
     docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
+      - image: glacialengineering/solana-build:0.18.2.3
     steps:
       - checkout
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: "Format rust code"
+          command: "cargo fmt --all -- --check"
+      - run:
+          name: "Check rust code"
+          command: "cargo clippy -- -D warnings --warn clippy::all"
+  security-check:
+    docker:
+      - image: glacialengineering/solana-build:0.18.2.3
+    steps:
+      - checkout
+      - run:
+          name: "Soteria analysis"
+          command: "cd programs/reward-pool && soteria -analyzeAll ."
+      - run:
+          name: "Cargo audit"
+          command: "cargo audit"
+  test:
+    docker:
+      - image: glacialengineering/solana-build:0.18.2.3
+    steps:
+      - checkout
+      - run:
+          name: "Unit tests"
+          command: "cargo test --lib"
+      - run:
+          name: "Anchor tests"
+          command: |
+            solana-keygen new -s --no-bip39-passphrase
+            npm install
+            anchor test -- --features local-testing,test-id
+      - store_artifacts:
+          path: /root/project/.anchor/program-logs
+          destination: program-logs
+  build:
+    docker:
+      - image: glacialengineering/solana-build:0.18.2.3
+    steps:
+      - checkout
+      - run:
+          name: "Build program"
+          command: "anchor build && rm ./target/deploy/*.json"
+      - store_artifacts:
+          path: /root/project/target/deploy
+          destination: bpf-programs
+      - store_artifacts:
+          path: /root/project/target/idl
+          destination: idls
+      - store_artifacts:
+          path: /root/project/target/types
+          destination: types
+  deploy-devnet:
+    docker:
+      - image: glacialengineering/solana-build:0.18.2.3
+    steps:
+      - checkout
+      - run:
+          name: "Deploy"
+          command: |
+            echo "$SOLANA_DEV_PROGRAM_KEY" > program-key.json
+            echo "$SOLANA_DEV_AUTHORITY_KEY" > auth-key.json
+            anchor build -- --features test-id
+            export PGM=`ls ./target/deploy/*.so`
+            echo "deploying $PGM"
+            solana program deploy -u d -k ./auth-key.json --program-id ./program-key.json $PGM
 
-# Invoke jobs via workflows
-# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  dev-deploy:
+    when:
+      equal: [ dev-deploy, << pipeline.git.branch >> ]
     jobs:
-      - say-hello
+      - build
+      - approve-deploy-devnet:
+          type: approval
+          requires:
+            - build
+      - deploy-devnet:
+          requires:
+            - approve-deploy-devnet
+  build-test:
+    when:
+      not:
+        equal: [ dev-deploy, << pipeline.git.branch >> ]
+    jobs:
+      - formatting
+      - security-check
+      - test
+      - build
