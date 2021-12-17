@@ -47,7 +47,7 @@ jobs:
       - checkout
       - run:
           name: "Build program"
-          command: "anchor build && rm ./target/deploy/*.json"
+          command: "anchor build && rm ./target/deploy/*.json && cd ./target/deploy && sha256sum * > sha256.txt"
       - store_artifacts:
           path: /root/project/target/deploy
           destination: bpf-programs
