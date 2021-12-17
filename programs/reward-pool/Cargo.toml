@@ -22,4 +22,4 @@ verbose = []
 [dependencies]
 anchor-lang = "0.19.0"
 anchor-spl = "0.19.0"
-spl-math = { version = "0.1.0", features = ["no-entrypoint"] 
+spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
