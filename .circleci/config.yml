@@ -67,7 +67,7 @@ jobs:
           command: |
             echo "$SOLANA_DEV_PROGRAM_KEY" > program-key.json
             echo "$SOLANA_DEV_AUTHORITY_KEY" > auth-key.json
-            anchor build -- --features test-id
+            anchor build -- --features test-id,verbose
             export PGM=`ls ./target/deploy/*.so`
             echo "deploying $PGM"
             solana program deploy -u d -k ./auth-key.json --program-id ./program-key.json $PGM
