@@ -16,7 +16,7 @@ mod version;
 #[cfg(not(feature = "test-id"))]
 declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
 #[cfg(feature = "test-id")]
-declare_id!("ddS8eKxapy89xg5NDkQWS97GDrDxCh2ChVF2nbRoa4D");
+declare_id!("Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18");
 
 #[cfg(not(feature = "local-testing"))]
 mod constants {
