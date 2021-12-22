@@ -4,6 +4,8 @@
   <br>
 </h1>
 
+[![CircleCI](https://circleci.com/gh/step-finance/reward-pool/tree/main.svg?style=svg)](https://circleci.com/gh/step-finance/reward-pool/tree/main)
+
 # Reward Pool
 
 Program for staking and receiving rewards. 

@@ -148,7 +148,8 @@ describe('Multiuser Reward Pool', () => {
       process.exit();
     }
 
-    await funders[2].fund(1_000_000_000, 0);
+    //fund with < 1 lamport per second
+    await funders[2].fund(4, 0);
 
     expected = await user.getUserPendingRewardsFunction();
     var e = expected()
@@ -169,13 +170,21 @@ describe('Multiuser Reward Pool', () => {
     e = expected()
     console.log("Expected", e[0], e[1]);
 
-    await claimForUsers([user]);
+    let [ra,rb,a,b] = await user.claim();
+
+    console.log('ra', ra, 'rb', rb, 'a', a.toString(), 'b', b.toString());
+
+    assert.equal(ra, .000000003); //actually 3.99999999999 but floor kills this
+    assert.equal(rb, 0);
+    assert.equal(a.toString(), 25228800);
+    assert.equal(b.toString(), 0);
+
     await user.unstakeTokens(100_000);
     await user.closeUser();
     await funders[2].pausePool();
     await funders[2].closePool();
   });
-  
+
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
     let pool2 = funders[1].poolPubkey;
@@ -244,16 +253,15 @@ describe('Multiuser Reward Pool', () => {
     await users2[0].stakeTokens(250_000);
   });
 
-  it('Fails to authorize 6th funder', async () => {
+  it('Fails to authorize 5th funder', async () => {
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     let tmpAuth = anchor.web3.Keypair.generate().publicKey;
     await funders[1].authorizeFunder(tmpAuth);
     await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
-    await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
     try {
       await funders[1].authorizeFunder(anchor.web3.Keypair.generate().publicKey);
-      assert.fail("did not fail on authorizing 6th funder");
+      assert.fail("did not fail on authorizing 5th funder");
     } catch (e) { }
     //deauth a funder in the middle of the array
     await funders[1].deauthorizeFunder(tmpAuth);

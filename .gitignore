@@ -9,3 +9,6 @@ test-ledger
 debug/
 node_modules
 docker-target
+soteria-linux-develop/
+.coderrect/
+testing/

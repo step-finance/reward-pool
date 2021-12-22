@@ -1,4 +1,4 @@
-anchor_version = "0.16.2"
+anchor_version = "0.19.0"
 
 [workspace]
 members = ["programs/reward-pool"]
@@ -14,10 +14,10 @@ wallet = "~/.config/solana/id.json"
 test = "mocha -t 1000000 tests/"
 
 [programs.localnet]
-reward_pool = "TeSTKchdpa2FKNV6gYNAENpququb3aT2r1pD41tZw36"
+reward_pool = "Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18"
 
 #[programs.devnet]
-#reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"
+#reward_pool = "Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18"
 
 #[programs.testnet]
 #reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"
