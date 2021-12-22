@@ -14,10 +14,10 @@ wallet = "~/.config/solana/id.json"
 test = "mocha -t 1000000 tests/"
 
 [programs.localnet]
-reward_pool = "ddS8eKxapy89xg5NDkQWS97GDrDxCh2ChVF2nbRoa4D"
+reward_pool = "Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18"
 
 #[programs.devnet]
-#reward_pool = "ddS8eKxapy89xg5NDkQWS97GDrDxCh2ChVF2nbRoa4D"
+#reward_pool = "Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18"
 
 #[programs.testnet]
 #reward_pool = "SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH"
