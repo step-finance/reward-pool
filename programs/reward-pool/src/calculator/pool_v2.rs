@@ -115,8 +115,8 @@ impl RewardCalculator for RewardCalculatorV2 {
 
     fn user_earned_amount(
         &self,
-        pool: &anchor_lang::Account<Pool>,
-        user: &anchor_lang::Account<User>,
+        pool: &Account<Pool>,
+        user: &Account<User>,
     ) -> (u64, u64) {
         let a: u64 = (user.balance_staked as u128)
             .checked_mul(
