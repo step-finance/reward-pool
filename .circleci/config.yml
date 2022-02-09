@@ -18,9 +18,9 @@ jobs:
       - image: glacialengineering/solana-build:0.21.0.1
     steps:
       - checkout
-      - run:
-          name: "Soteria analysis"
-          command: "cd programs/`ls programs` && soteria -analyzeAll ."
+      #- run:
+      #    name: "Soteria analysis"
+      #    command: "cd programs/`ls programs` && soteria -analyzeAll ."
       - run:
           name: "Cargo audit"
           command: "cargo audit"
