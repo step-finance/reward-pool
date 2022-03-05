@@ -974,7 +974,7 @@ pub struct Pool {
     pub reward_a_mint: Pubkey,
     /// Vault to store reward A tokens.
     pub reward_a_vault: Pubkey,
-    /// Mint of the reward A token.
+    /// Mint of the reward B token.
     pub reward_b_mint: Pubkey,
     /// Vault to store reward B tokens.
     pub reward_b_vault: Pubkey,
@@ -1068,7 +1068,7 @@ impl Debug for Pool {
 }
 
 impl Debug for User {
-    /// writes a subset of pool fields for debugging
+    /// writes a subset of user fields for debugging
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         if cfg!(feature = "verbose") {
             write!(f, "reward_a_per_token_complete: {:?} reward_b_per_token_complete: {} reward_a_per_token_pending: {} reward_b_per_token_pending: {} balance_staked: {} nonce: {}",
