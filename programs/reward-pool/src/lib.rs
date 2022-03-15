@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, Token, Transfer, CloseAccount, TokenAccount};
 
 use crate::calculator::*;
 use crate::constants::*;
@@ -96,7 +96,7 @@ pub mod reward_pool {
         //xstep lockup
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_depositor.to_account_info(),
                 to: ctx.accounts.x_token_pool_vault.to_account_info(),
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
@@ -160,7 +160,7 @@ pub mod reward_pool {
         let pool_signer = &[&seeds[..]];
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_pool_vault.to_account_info(),
                 to: ctx.accounts.x_token_receiver.to_account_info(),
                 authority: ctx.accounts.pool_signer.to_account_info(),
@@ -172,7 +172,7 @@ pub mod reward_pool {
 
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            token::CloseAccount {
+            CloseAccount {
                 account: ctx.accounts.x_token_pool_vault.to_account_info(),
                 destination: ctx.accounts.authority.to_account_info(),
                 authority: ctx.accounts.pool_signer.to_account_info(),
@@ -199,7 +199,7 @@ pub mod reward_pool {
         //xstep lockup
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_depositor.to_account_info(),
                 to: ctx.accounts.x_token_pool_vault.to_account_info(),
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
@@ -239,7 +239,7 @@ pub mod reward_pool {
         {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.stake_from_account.to_account_info(),
                     to: ctx.accounts.staking_vault.to_account_info(),
                     authority: ctx.accounts.owner.to_account_info(), //todo use user account as signer
@@ -282,7 +282,7 @@ pub mod reward_pool {
 
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
                     authority: ctx.accounts.pool_signer.to_account_info(),
@@ -358,7 +358,7 @@ pub mod reward_pool {
         if amount_a > 0 {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.from_a.to_account_info(),
                     to: ctx.accounts.reward_a_vault.to_account_info(),
                     authority: ctx.accounts.funder.to_account_info(),
@@ -372,7 +372,7 @@ pub mod reward_pool {
         if amount_b > 0 {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.from_b.to_account_info(),
                     to: ctx.accounts.reward_b_vault.to_account_info(),
                     authority: ctx.accounts.funder.to_account_info(),
@@ -420,7 +420,7 @@ pub mod reward_pool {
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
+                    Transfer {
                         from: ctx.accounts.reward_a_vault.to_account_info(),
                         to: ctx.accounts.reward_a_account.to_account_info(),
                         authority: ctx.accounts.pool_signer.to_account_info(),
@@ -443,7 +443,7 @@ pub mod reward_pool {
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
+                    Transfer {
                         from: ctx.accounts.reward_b_vault.to_account_info(),
                         to: ctx.accounts.reward_b_account.to_account_info(),
                         authority: ctx.accounts.pool_signer.to_account_info(),
