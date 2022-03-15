@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, Token, Transfer, CloseAccount, TokenAccount};
 
 use crate::calculator::*;
 use crate::constants::*;
@@ -96,7 +96,7 @@ pub mod reward_pool {
         //xstep lockup
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_depositor.to_account_info(),
                 to: ctx.accounts.x_token_pool_vault.to_account_info(),
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
@@ -160,7 +160,7 @@ pub mod reward_pool {
         let pool_signer = &[&seeds[..]];
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_pool_vault.to_account_info(),
                 to: ctx.accounts.x_token_receiver.to_account_info(),
                 authority: ctx.accounts.pool_signer.to_account_info(),
@@ -172,7 +172,7 @@ pub mod reward_pool {
 
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            token::CloseAccount {
+            CloseAccount {
                 account: ctx.accounts.x_token_pool_vault.to_account_info(),
                 destination: ctx.accounts.authority.to_account_info(),
                 authority: ctx.accounts.pool_signer.to_account_info(),
@@ -199,7 +199,7 @@ pub mod reward_pool {
         //xstep lockup
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
+            Transfer {
                 from: ctx.accounts.x_token_depositor.to_account_info(),
                 to: ctx.accounts.x_token_pool_vault.to_account_info(),
                 authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
@@ -239,7 +239,7 @@ pub mod reward_pool {
         {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.stake_from_account.to_account_info(),
                     to: ctx.accounts.staking_vault.to_account_info(),
                     authority: ctx.accounts.owner.to_account_info(), //todo use user account as signer
@@ -282,7 +282,7 @@ pub mod reward_pool {
 
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
                     authority: ctx.accounts.pool_signer.to_account_info(),
@@ -358,7 +358,7 @@ pub mod reward_pool {
         if amount_a > 0 {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.from_a.to_account_info(),
                     to: ctx.accounts.reward_a_vault.to_account_info(),
                     authority: ctx.accounts.funder.to_account_info(),
@@ -372,7 +372,7 @@ pub mod reward_pool {
         if amount_b > 0 {
             let cpi_ctx = CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
+                Transfer {
                     from: ctx.accounts.from_b.to_account_info(),
                     to: ctx.accounts.reward_b_vault.to_account_info(),
                     authority: ctx.accounts.funder.to_account_info(),
@@ -420,7 +420,7 @@ pub mod reward_pool {
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
+                    Transfer {
                         from: ctx.accounts.reward_a_vault.to_account_info(),
                         to: ctx.accounts.reward_a_account.to_account_info(),
                         authority: ctx.accounts.pool_signer.to_account_info(),
@@ -443,7 +443,7 @@ pub mod reward_pool {
             if reward_amount > 0 {
                 let cpi_ctx = CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
-                    token::Transfer {
+                    Transfer {
                         from: ctx.accounts.reward_b_vault.to_account_info(),
                         to: ctx.accounts.reward_b_account.to_account_info(),
                         authority: ctx.accounts.pool_signer.to_account_info(),
@@ -477,127 +477,88 @@ pub mod reward_pool {
             pool.to_account_info().key.as_ref(),
             &[ctx.accounts.pool.nonce],
         ];
-
+        let pool_signer = &[&signer_seeds[..]];
+        let amount = ctx.accounts.staking_vault.amount;
         //instead of closing these vaults, we could technically just
         //set_authority on them. it's not very ata clean, but it'd work
         //if size of tx is an issue, thats an approach
 
         //close staking vault
-        let ix = spl_token::instruction::transfer(
-            &spl_token::ID,
-            ctx.accounts.staking_vault.to_account_info().key,
-            ctx.accounts.staking_refundee.to_account_info().key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
-            ctx.accounts.staking_vault.amount,
-        )?;
-        solana_program::program::invoke_signed(
-            &ix,
-            &[
-                ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.staking_vault.to_account_info(),
-                ctx.accounts.staking_refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-            ],
-            &[signer_seeds],
-        )?;
-        let ix = spl_token::instruction::close_account(
-            &spl_token::ID,
-            ctx.accounts.staking_vault.to_account_info().key,
-            ctx.accounts.refundee.key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
-        )?;
-        solana_program::program::invoke_signed(
-            &ix,
-            &[
-                ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.staking_vault.to_account_info(),
-                ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-            ],
-            &[signer_seeds],
-        )?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer{
+                from: ctx.accounts.staking_vault.to_account_info(),
+                to: ctx.accounts.staking_refundee.to_account_info(),
+                authority: ctx.accounts.pool_signer.to_account_info(),
+            },
+            pool_signer,
+        );
+        token::transfer(cpi_ctx, amount)?;
+
+        let close_acc_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.staking_vault.to_account_info(),
+                destination: ctx.accounts.refundee.to_account_info(),
+                authority: ctx.accounts.pool_signer.to_account_info(),
+            },
+            pool_signer,
+        );
+        token::close_account(close_acc_ctx)?;
 
         //close token a vault
-        let ix = spl_token::instruction::transfer(
-            &spl_token::ID,
-            ctx.accounts.reward_a_vault.to_account_info().key,
-            ctx.accounts.reward_a_refundee.to_account_info().key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
-            ctx.accounts.reward_a_vault.amount,
-        )?;
-        solana_program::program::invoke_signed(
-            &ix,
-            &[
-                ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.reward_a_vault.to_account_info(),
-                ctx.accounts.reward_a_refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-            ],
-            &[signer_seeds],
-        )?;
-        let ix = spl_token::instruction::close_account(
-            &spl_token::ID,
-            ctx.accounts.reward_a_vault.to_account_info().key,
-            ctx.accounts.refundee.key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
-        )?;
-        solana_program::program::invoke_signed(
-            &ix,
-            &[
-                ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.reward_a_vault.to_account_info(),
-                ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
-            ],
-            &[signer_seeds],
-        )?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer{
+                from: ctx.accounts.reward_a_vault.to_account_info(),
+                to: ctx.accounts.reward_a_refundee.to_account_info(),
+                authority: ctx.accounts.pool_signer.to_account_info(),
+            },
+            pool_signer,
+        );
+        let reward_a_amount = ctx.accounts.reward_a_vault.amount;
+        token::transfer(cpi_ctx, reward_a_amount)?;
+
+
+        let close_token_a_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.reward_a_vault.to_account_info(),
+                destination: ctx.accounts.refundee.to_account_info(),
+                authority: ctx.accounts.pool_signer.to_account_info(),
+            },
+            pool_signer,
+        );
+        token::close_account(close_token_a_ctx)?;
 
         if pool.reward_a_vault != pool.reward_b_vault {
             //close token b vault
-            let ix = spl_token::instruction::transfer(
-                &spl_token::ID,
-                ctx.accounts.reward_b_vault.to_account_info().key,
-                ctx.accounts.reward_b_refundee.to_account_info().key,
-                ctx.accounts.pool_signer.key,
-                &[ctx.accounts.pool_signer.key],
-                ctx.accounts.reward_b_vault.amount,
-            )?;
-            solana_program::program::invoke_signed(
-                &ix,
-                &[
-                    ctx.accounts.token_program.to_account_info(),
-                    ctx.accounts.reward_b_vault.to_account_info(),
-                    ctx.accounts.reward_b_refundee.to_account_info(),
-                    ctx.accounts.pool_signer.to_account_info(),
-                ],
-                &[signer_seeds],
-            )?;
-            let ix = spl_token::instruction::close_account(
-                &spl_token::ID,
-                ctx.accounts.reward_b_vault.to_account_info().key,
-                ctx.accounts.refundee.key,
-                ctx.accounts.pool_signer.key,
-                &[ctx.accounts.pool_signer.key],
-            )?;
-            solana_program::program::invoke_signed(
-                &ix,
-                &[
-                    ctx.accounts.token_program.to_account_info(),
-                    ctx.accounts.reward_b_vault.to_account_info(),
-                    ctx.accounts.refundee.to_account_info(),
-                    ctx.accounts.pool_signer.to_account_info(),
-                ],
-                &[signer_seeds],
-            )?;
-        }
+            
+            let transfer_to_b_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer{
+                    from: ctx.accounts.reward_b_vault.to_account_info(),
+                    to: ctx.accounts.reward_b_refundee.to_account_info(),
+                    authority: ctx.accounts.pool_signer.to_account_info(),
+                },
+                pool_signer,
+            );
+            let reward_b_amount = ctx.accounts.reward_b_vault.amount;
+            token::transfer(transfer_to_b_ctx, reward_b_amount)?;
 
-        msg!("Pool: {:?}", *ctx.accounts.pool);
-        Ok(())
+            let close_token_b_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.reward_b_vault.to_account_info(),
+                    destination: ctx.accounts.refundee.to_account_info(),
+                    authority: ctx.accounts.pool_signer.to_account_info(),
+                },
+                pool_signer,
+            );
+            token::close_account(close_token_b_ctx)?;
     }
+    msg!("Pool: {:?}", *ctx.accounts.pool);
+    Ok(())
 }
 
 #[derive(Accounts)]
