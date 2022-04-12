@@ -1,34 +1,45 @@
-use std::convert::Into;
-use std::convert::TryInto;
-use std::fmt::Debug;
-
-use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
-use std::str::FromStr;
-
 use crate::calculator::*;
 use crate::constants::*;
-
+use anchor_lang::prelude::*;
+use anchor_lang::solana_program::clock;
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use std::convert::Into;
+use std::convert::TryInto;
+use std::str::FromStr;
 mod calculator;
 
-#[cfg(not(feature = "test-id"))]
-declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
-#[cfg(feature = "test-id")]
 declare_id!("Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18");
 
-pub fn get_admin_address() -> Pubkey {
-    Pubkey::from_str("DHLXnJdACTY83yKwnUkeoDjqi4QBbsYGa1v8tJL76ViX").unwrap()
-}
-
-#[cfg(not(feature = "local-testing"))]
+#[cfg(not(feature = "dev"))]
 mod constants {
+    use super::*;
     pub const MIN_DURATION: u64 = 86400; // 1 day
+    pub fn validate_admin_address(pubkey: Pubkey) -> bool {
+        if pubkey == Pubkey::from_str("DHLXnJdACTY83yKwnUkeoDjqi4QBbsYGa1v8tJL76ViX").unwrap() {
+            return true;
+        }
+        return false;
+    }
+
+    pub fn validate_staking_mint(pubkey: Pubkey) -> bool {
+        if pubkey == Pubkey::from_str("MERt85fc5boKw3BW1eYdxonEuJNvXbiMbs6hvheau5K").unwrap() {
+            return true;
+        }
+        return false;
+    }
 }
 
-#[cfg(feature = "local-testing")]
+#[cfg(feature = "dev")]
 mod constants {
+    use super::*;
     pub const MIN_DURATION: u64 = 1;
+    pub fn validate_admin_address(pubkey: Pubkey) -> bool {
+        return true;
+    }
+
+    pub fn validate_staking_mint(pubkey: Pubkey) -> bool {
+        return true;
+    }
 }
 
 /// Updates the pool with the total reward per token that is due stakers
@@ -138,6 +149,7 @@ pub mod reward_pool {
             .unix_timestamp
             .try_into()
             .unwrap();
+        // msg!("current_time {}", current_time);
         if current_time < pool.reward_start_timestamp {
             return Err(ErrorCode::FarmingNotStart.into());
         }
@@ -145,7 +157,7 @@ pub mod reward_pool {
         let total_staked = ctx.accounts.staking_vault.amount;
 
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, total_staked)?;
 
         ctx.accounts.user.balance_staked = ctx
             .accounts
@@ -184,17 +196,18 @@ pub mod reward_pool {
         }
 
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, total_staked)?;
         ctx.accounts.user.balance_staked = ctx
             .accounts
             .user
             .balance_staked
             .checked_sub(spt_amount)
-            .unwrap();
+            .ok_or(ErrorCode::CannotUnstakeMoreThanBalance)?;
 
         // Transfer tokens from the pool vault to user vault.
         {
-            let seeds = &[b"pool".as_ref(), &[pool.nonce]];
+            let staking_mint = pool.staking_mint;
+            let seeds = &[b"pool".as_ref(), staking_mint.as_ref(), &[pool.nonce]];
             let pool_signer = &[&seeds[..]];
 
             let cpi_ctx = CpiContext::new_with_signer(
@@ -218,10 +231,16 @@ pub mod reward_pool {
 
         let pool = &mut ctx.accounts.pool;
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, total_staked)?;
 
-        let seeds = &[b"pool".as_ref(), &[pool.nonce]];
+        let staking_mint = pool.staking_mint;
+        let seeds = &[b"pool".as_ref(), staking_mint.as_ref(), &[pool.nonce]];
         let pool_signer = &[&seeds[..]];
+
+        // emit pending reward
+        emit!(EventPendingReward {
+            value: ctx.accounts.user.reward_per_token_pending,
+        });
 
         if ctx.accounts.user.reward_per_token_pending > 0 {
             let reward_per_token_pending = ctx.accounts.user.reward_per_token_pending;
@@ -248,6 +267,9 @@ pub mod reward_pool {
                     pool_signer,
                 );
                 token::transfer(cpi_ctx, reward_amount)?;
+                emit!(EventClaimReward {
+                    value: reward_amount,
+                });
             }
         }
 
@@ -266,7 +288,7 @@ pub mod reward_pool {
 pub struct InitializePool<'info> {
     #[account(
         init,
-        seeds = [b"pool".as_ref()], 
+        seeds = [b"pool".as_ref(), staking_mint.key().as_ref()], 
         bump,
         payer = admin,
     )]
@@ -281,6 +303,7 @@ pub struct InitializePool<'info> {
         token::authority = pool,
     )]
     pub staking_vault: Box<Account<'info, TokenAccount>>,
+    #[account(mut, constraint = validate_staking_mint(staking_mint.key()) @ ErrorCode::WrongStakingMint)]
     pub staking_mint: Box<Account<'info, Mint>>,
     pub reward_mint: Box<Account<'info, Mint>>,
     #[account(
@@ -293,7 +316,7 @@ pub struct InitializePool<'info> {
     )]
     pub reward_vault: Box<Account<'info, TokenAccount>>,
 
-    #[account(mut, constraint = admin.key() == get_admin_address())]
+    #[account(mut, constraint = validate_admin_address(admin.key()) @ ErrorCode::InvalidAdminWhenCreatingPool)]
     pub admin: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -437,10 +460,16 @@ pub struct User {
 
 #[error_code]
 pub enum ErrorCode {
+    #[msg("Staking mint is wrong")]
+    WrongStakingMint,
+    #[msg("Create pool with wrong admin")]
+    InvalidAdminWhenCreatingPool,
     #[msg("Start time cannot be smaller than current time")]
     InvalidStartDate,
     #[msg("Farming hasn't started")]
     FarmingNotStart,
+    #[msg("Cannot unstake more than staked amount")]
+    CannotUnstakeMoreThanBalance,
     #[msg("Insufficient funds to unstake.")]
     InsufficientFundUnstake,
     #[msg("Amount must be greater than zero.")]
@@ -449,4 +478,14 @@ pub enum ErrorCode {
     DurationTooShort,
     #[msg("MathOverFlow")]
     MathOverFlow,
+}
+
+#[event]
+pub struct EventPendingReward {
+    pub value: u64,
+}
+
+#[event]
+pub struct EventClaimReward {
+    pub value: u64,
 }

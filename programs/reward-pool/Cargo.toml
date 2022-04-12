@@ -11,12 +11,10 @@ name = "reward_pool"
 [features]
 no-entrypoint = []
 cpi = ["no-entrypoint"]
-
 #add to default for local testing
-#default = ["local-testing","test-id"]
-#note, can also use `anchor test -- --feature local-testing,test-id` now
-local-testing = []
-test-id = []
+#default = ["dev"]
+#note, can also use `anchor test -- --features dev` now
+dev = []
 verbose = []
 
 [dependencies]

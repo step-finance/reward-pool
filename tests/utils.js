@@ -1,9 +1,9 @@
 const anchor = require("@project-serum/anchor");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
-const { TOKEN_PROGRAM_ID, Token, MintLayout } = require("@solana/spl-token");
+const { TOKEN_PROGRAM_ID, Token, MintLayout, ASSOCIATED_TOKEN_PROGRAM_ID } = require("@solana/spl-token");
 
 async function initializeProgram(program, provider, authMintPubkey) {
-    const [ _configPubkey, _nonce] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config")], program.programId);
+    const [_configPubkey, _nonce] = await anchor.web3.PublicKey.findProgramAddress([Buffer.from("config")], program.programId);
     configPubkey = _configPubkey;
     let nonce = _nonce;
     await program.rpc.initializeProgram(
@@ -51,8 +51,8 @@ async function createMintFromPriv(
         mintAccount.publicKey,
         programId,
         provider.wallet.payer,
-      );
-  
+    );
+
     // Allocate memory for the account
     const balanceNeeded = await Token.getMinBalanceRentForExemptMint(
         provider.connection,
@@ -78,7 +78,7 @@ async function createMintFromPriv(
             freezeAuthority,
         ),
     );
-  
+
     await provider.send(transaction, [mintAccount]);
     return token;
 }
@@ -91,14 +91,14 @@ async function mintToAccount(
 ) {
     const tx = new anchor.web3.Transaction();
     tx.add(
-      Token.createMintToInstruction(
-        TOKEN_PROGRAM_ID,
-        mint,
-        destination,
-        provider.wallet.publicKey,
-        [],
-        amount
-      )
+        Token.createMintToInstruction(
+            TOKEN_PROGRAM_ID,
+            mint,
+            destination,
+            provider.wallet.publicKey,
+            [],
+            amount
+        )
     );
     await provider.send(tx);
 }
@@ -111,15 +111,55 @@ async function sendLamports(
     const tx = new anchor.web3.Transaction();
     tx.add(
         anchor.web3.SystemProgram.transfer(
-            { 
-                fromPubkey: provider.wallet.publicKey, 
-                lamports: amount, 
+            {
+                fromPubkey: provider.wallet.publicKey,
+                lamports: amount,
                 toPubkey: destination
             }
         )
     );
     await provider.send(tx);
 }
+
+async function getOrCreateAssociatedTokenAccount(
+    tokenMint,
+    owner,
+    payer,
+    provider,
+) {
+    const toAccount = await Token.getAssociatedTokenAddress(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        tokenMint,
+        owner
+    );
+    const account = await provider.connection.getAccountInfo(toAccount);
+    if (!account) {
+        const tx = new anchor.web3.Transaction().add(
+            Token.createAssociatedTokenAccountInstruction(
+                ASSOCIATED_TOKEN_PROGRAM_ID,
+                TOKEN_PROGRAM_ID,
+                tokenMint,
+                toAccount,
+                owner,
+                payer.publicKey
+            )
+        );
+
+        const signature = await provider.send(tx, [payer]);
+        await provider.connection.confirmTransaction(signature);
+
+        return Token.getAssociatedTokenAddress(
+            ASSOCIATED_TOKEN_PROGRAM_ID,
+            TOKEN_PROGRAM_ID,
+            tokenMint,
+            owner
+        );
+    }
+    return toAccount;
+};
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 module.exports = {
     mintToAccount,
@@ -128,4 +168,6 @@ module.exports = {
     createMint,
     sendLamports,
     initializeProgram,
+    getOrCreateAssociatedTokenAccount,
+    sleep,
 };
