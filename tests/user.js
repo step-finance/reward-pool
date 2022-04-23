@@ -11,10 +11,12 @@ class User {
     async init(keypair, initialLamports, stakingMint, initialMint, rewardMint) {
         this.keypair = keypair;
         this.pubkey = this.keypair.publicKey;
-        let envProvider = anchor.Provider.env();
-        envProvider.commitment = 'pending';
+        let envProvider = anchor.AnchorProvider.env();
+        // envProvider.commitment = 'pending';
+
         await utils.sendLamports(envProvider, this.pubkey, initialLamports);
-        this.provider = new anchor.Provider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
+        this.provider = new anchor.AnchorProvider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
+
         let program = anchor.workspace.RewardPool;
         this.program = new anchor.Program(program.idl, program.programId, this.provider);
 
@@ -139,18 +141,19 @@ class User {
 
     async getUserPendingRewardsFunction() {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        const result = await this.program.simulate.claim({
-            accounts: {
-                pool: this.poolPubkey,
-                stakingVault: poolObject.stakingVault,
-                rewardVault: poolObject.rewardVault,
-                user: this.userPubkey,
-                owner: this.provider.wallet.publicKey,
-                rewardAccount: this.rewardTokenAccount,
-                tokenProgram: TOKEN_PROGRAM_ID,
-            },
-            signers: [this.keypair],
-        });
+
+        const result = await this.program.methods.claim().accounts({
+            pool: this.poolPubkey,
+            stakingVault: poolObject.stakingVault,
+            rewardVault: poolObject.rewardVault,
+            user: this.userPubkey,
+            owner: this.provider.wallet.publicKey,
+            rewardAccount: this.rewardTokenAccount,
+            tokenProgram: TOKEN_PROGRAM_ID,
+        }).signers([this.keypair])
+            .simulate();
+
+        console.log("result: ", result);
 
         const event = result.events[0];
         return event.data.value;
@@ -177,8 +180,8 @@ class User {
     }
 
     async fundReward(amount) {
-        let envProvider = anchor.Provider.env();
-        envProvider.commitment = 'pending';
+        let envProvider = anchor.AnchorProvider.env();
+        // envProvider.commitment = 'pending';
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
         await this.rewardMintObject.mintTo(poolObject.rewardVault, envProvider.wallet.payer, [], amount);
     }

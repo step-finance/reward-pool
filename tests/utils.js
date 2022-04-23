@@ -79,7 +79,7 @@ async function createMintFromPriv(
         ),
     );
 
-    await provider.send(transaction, [mintAccount]);
+    await provider.sendAndConfirm(transaction, [mintAccount]);
     return token;
 }
 
@@ -100,7 +100,7 @@ async function mintToAccount(
             amount
         )
     );
-    await provider.send(tx);
+    await provider.sendAndConfirm(tx);
 }
 
 async function sendLamports(
@@ -118,7 +118,7 @@ async function sendLamports(
             }
         )
     );
-    await provider.send(tx);
+    await provider.sendAndConfirm(tx);
 }
 
 async function getOrCreateAssociatedTokenAccount(
@@ -146,7 +146,7 @@ async function getOrCreateAssociatedTokenAccount(
             )
         );
 
-        const signature = await provider.send(tx, [payer]);
+        const signature = await provider.sendAndConfirm(tx, [payer]);
         await provider.connection.confirmTransaction(signature);
 
         return Token.getAssociatedTokenAddress(
