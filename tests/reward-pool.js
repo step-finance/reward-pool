@@ -1,5 +1,6 @@
 const assert = require("assert");
 const anchor = require('@project-serum/anchor');
+// const anchor = require('./browser');
 const serumCmn = require("@project-serum/common");
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
@@ -9,14 +10,16 @@ const fs = require('fs');
 
 let program = anchor.workspace.RewardPool;
 
+
 //Read the provider from the configured environmnet.
 //represents an outside actor
 //owns mints out of any other actors control, provides initial $$ to others
-const envProvider = anchor.Provider.env();
+// const envProvider = anchor.AnchorProvider.env();
 
 //we allow this convenience var to change between default env and mock user(s)
 //initially we are the outside actor
-let provider = envProvider;
+let provider = anchor.AnchorProvider.env();
+// console.log(provider);
 //convenience method to set in anchor AND above convenience var
 //setting in anchor allows the rpc and accounts namespaces access
 //to a different wallet from env
@@ -28,7 +31,6 @@ function setProvider(p) {
 setProvider(provider);
 
 describe('Reward Pool', () => {
-
 
   var rewardDuration = new anchor.BN(10);
 

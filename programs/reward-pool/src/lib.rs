@@ -291,6 +291,7 @@ pub struct InitializePool<'info> {
         seeds = [b"pool".as_ref(), staking_mint.key().as_ref()], 
         bump,
         payer = admin,
+        space = 200 // 1 + 177 + buffer
     )]
     pub pool: Box<Account<'info, Pool>>,
 
@@ -338,7 +339,8 @@ pub struct CreateUser<'info> {
             owner.key.as_ref(),
             pool.to_account_info().key.as_ref()
         ],
-        bump,
+        bump,        
+        space = 120 // 1 + 97 + buffer
     )]
     pub user: Box<Account<'info, User>>,
     #[account(mut)]
