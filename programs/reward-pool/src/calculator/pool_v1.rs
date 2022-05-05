@@ -77,8 +77,8 @@ impl RewardCalculator for RewardCalculatorV1 {
             && reward_a_vault.amount > 0
         //yet the fault has funds
         {
-            msg!("applying fix for reward a");
             funding_amount_a = funding_amount_a.checked_add(reward_a_vault.amount).unwrap();
+            msg!("applying fix for reward a - {}", funding_amount_a);
         }
 
         if pool.reward_b_rate == 0                       //are not emitting
@@ -87,8 +87,8 @@ impl RewardCalculator for RewardCalculatorV1 {
             && pool.reward_a_mint != pool.reward_b_mint
         //not a single reward asset pool
         {
-            msg!("applying fix for reward b");
             funding_amount_b = funding_amount_b.checked_add(reward_b_vault.amount).unwrap();
+            msg!("applying fix for reward b - {}", funding_amount_b);
         }
 
         //now get the latest calc for the pool and use it
