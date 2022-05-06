@@ -1,12 +1,12 @@
 [package]
-name = "reward-pool"
+name = "single_farming"
 version = "0.2.0"
 description = "Created with Anchor"
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "reward_pool"
+name = "single_farming"
 
 [features]
 no-entrypoint = []
