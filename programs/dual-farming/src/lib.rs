@@ -13,19 +13,16 @@ use crate::version::*;
 mod calculator;
 mod version;
 
-#[cfg(not(feature = "test-id"))]
-declare_id!("SRwd1XTVscKXu9nMU8f6MfEf9cAzGPmbMe69CFmHvAH");
-#[cfg(feature = "test-id")]
-declare_id!("Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18");
+declare_id!("8Ct1Q6nDbi5Sye4B1LgKUnA6xwSWWwJm1yEekANZKJUj");
 
-#[cfg(not(feature = "local-testing"))]
+#[cfg(not(feature = "dev"))]
 mod constants {
     pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xStpgUCss9piqeFUk2iLVcvJEGhAdJxJQuwLkXP555G";
     pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 86400;
 }
 
-#[cfg(feature = "local-testing")]
+#[cfg(feature = "dev")]
 mod constants {
     pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s";
     pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;

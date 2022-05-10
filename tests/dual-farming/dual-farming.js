@@ -7,7 +7,8 @@ const utils = require("./utils");
 const { User, claimForUsers } = require("./user");
 const fs = require('fs');
 
-let program = anchor.workspace.SingleFarming;
+let program = anchor.workspace.DualFarming;
+
 
 //Read the provider from the configured environmnet.
 //represents an outside actor
@@ -55,7 +56,7 @@ describe('Multiuser Reward Pool', () => {
     console.log("Wallet: ", provider.wallet.publicKey.toString());
     //this is the xstep token
     //test xstep token hardcoded in program, mint authority is itself
-    rawdata = fs.readFileSync('tests/keys/xstep-tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s.json');
+    rawdata = fs.readFileSync('tests/dual-farming/keys/xstep-tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s.json');
     keyData = JSON.parse(rawdata);
     xMintKey = anchor.web3.Keypair.fromSecretKey(new Uint8Array(keyData));
     xMintPubkey = xMintKey.publicKey;

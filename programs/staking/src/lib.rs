@@ -1,24 +1,17 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Token, Burn, Mint, MintTo, TokenAccount, Transfer};
+use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::vault::{Vault, VaultBumps};
 
 pub mod vault;
 
-#[cfg(feature = "devnet")]
 declare_id!("CBbYHhjfhFoPwz8ZgQJjHkpq2gSu1xn26qeVsfYhWWB5");
 
-#[cfg(not(feature = "devnet"))]
-declare_id!("8SCN9inXVM8RwkS1zao5gcTfZhJuyRLW3hynsQ3bgaWT");
-
 #[program]
-mod mer_staking {
+mod staking {
     use super::*;
 
-    pub fn initialize_vault(
-        ctx: Context<InitializeVault>,
-        bumps: VaultBumps,
-    ) ->  Result<()> {
+    pub fn initialize_vault(ctx: Context<InitializeVault>, bumps: VaultBumps) -> Result<()> {
         let vault = &mut ctx.accounts.vault;
 
         vault.bumps = bumps;
@@ -38,11 +31,10 @@ mod mer_staking {
         let vault_mer_amount = ctx.accounts.vault_mer.amount;
 
         // Update MER to be transferred and LP to be minted.
-        let lp_mint_amount = ctx.accounts.vault.stake(
-            ctx.accounts.lp_mint.supply,
-            vault_mer_amount,
-            amount,
-        );
+        let lp_mint_amount =
+            ctx.accounts
+                .vault
+                .stake(ctx.accounts.lp_mint.supply, vault_mer_amount, amount);
 
         // Transfer MER from user to vault.
         token::transfer(

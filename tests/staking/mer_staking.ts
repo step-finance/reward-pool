@@ -3,12 +3,12 @@ import assert from 'assert';
 import * as anchor from '@project-serum/anchor';
 import { Program } from '@project-serum/anchor';
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { MerStaking } from "../../target/types/mer_staking";
+import { Staking } from "../../target/types/staking";
 
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 
-const program = anchor.workspace.MerStaking as Program<MerStaking>;
+const program = anchor.workspace.Staking as Program<Staking>;
 const admin = new anchor.web3.Keypair();
 const user = new anchor.web3.Keypair();
 

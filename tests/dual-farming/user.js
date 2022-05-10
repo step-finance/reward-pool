@@ -6,11 +6,11 @@ async function claimForUsers(users) {
     //some eye piercing way to claim for all users async, then print out all users balances
     //if you're reading this, all we're effectively doing here is calling "claim()" on a user.
     let r = await Promise.all(
-      users.map(a => a.claim().then(b=>[a,b]))
+        users.map(a => a.claim().then(b => [a, b]))
     );
     console.log("--- users claimed ---")
-    r.sort((a,b)=>a[0].id < b[0].id)
-        .forEach(a=>{
+    r.sort((a, b) => a[0].id < b[0].id)
+        .forEach(a => {
             a[0].currentA = a[1][0];
             a[0].currentB = a[1][1];
             console.log(a[0].id, "amtA", a[0].currentA, "amtB", a[0].currentB);
@@ -25,12 +25,12 @@ class User {
         this.keypair = new anchor.web3.Keypair();
         this.pubkey = this.keypair.publicKey;
 
-        let envProvider = anchor.Provider.env();
+        let envProvider = anchor.AnchorProvider.env();
         envProvider.commitment = 'pending';
         await utils.sendLamports(envProvider, this.pubkey, initialLamports);
 
-        this.provider = new anchor.Provider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
-        let program = anchor.workspace.RewardPool;
+        this.provider = new anchor.AnchorProvider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
+        let program = anchor.workspace.DualFarming;
         this.program = new anchor.Program(program.idl, program.programId, this.provider);
 
         this.initialLamports = initialLamports;
@@ -122,14 +122,14 @@ class User {
                 },
                 signers: [poolKeypair],
                 instructions: [
-                    await this.program.account.pool.createInstruction(poolKeypair, ),
+                    await this.program.account.pool.createInstruction(poolKeypair,),
                 ],
             }
         );
 
         //console.log("tx", tx.instructions.map(a=>a.keys));
 
-        //await this.provider.send(tx);
+        //await this.provider.sendAndConfirm(tx);
 
     }
 
@@ -338,7 +338,7 @@ class User {
     async getUserPendingRewardsFunction() {
         return await User.getPendingRewardsFunction(this.program, this.poolPubkey);
     }
-    
+
     // *returns a function* that when called returns an array of 2 values, the pending rewardA and rewardB
     // this function is accurate forever (even after pool ends), unless the pool is changed through
     // funding, or anyone staking/unstaking.
@@ -399,7 +399,7 @@ class User {
                 b = balanceStaked.mul(rwds[1]).sub(completeB).div(U64_MAX).add(pendingB).toNumber();
             }
             return [a, b];
-            
+
         }
 
         return currentPending;
@@ -441,10 +441,10 @@ class User {
         let amtB = await this.provider.connection.getTokenAccountBalance(this.mintBPubkey);
 
         return [
-            amtA.value.uiAmount, 
-            this.mintAPubkey != this.mintBPubkey ? amtB.value.uiAmount : 0, 
-            poolObject.rewardARate, 
-            this.mintAPubkey != this.mintBPubkey ? poolObject.rewardBRate : new anchor.BN(0, 10), 
+            amtA.value.uiAmount,
+            this.mintAPubkey != this.mintBPubkey ? amtB.value.uiAmount : 0,
+            poolObject.rewardARate,
+            this.mintAPubkey != this.mintBPubkey ? poolObject.rewardBRate : new anchor.BN(0, 10),
         ];
     }
 
@@ -500,7 +500,7 @@ class User {
                 tokenProgram: TOKEN_PROGRAM_ID,
             },
         });
-        
+
         await this.program.rpc.unstake(
             new anchor.BN(amount),
             {
@@ -546,9 +546,9 @@ class User {
     async closePool() {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
 
-        const [ configPubkey, ___nonce] = 
+        const [configPubkey, ___nonce] =
             await anchor.web3.PublicKey.findProgramAddress(
-                [Buffer.from("config")], 
+                [Buffer.from("config")],
                 this.program.programId
             );
 

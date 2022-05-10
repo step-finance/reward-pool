@@ -17,7 +17,7 @@ class User {
         await utils.sendLamports(envProvider, this.pubkey, initialLamports);
         this.provider = new anchor.AnchorProvider(envProvider.connection, new anchor.Wallet(this.keypair), envProvider.opts);
 
-        let program = anchor.workspace.RewardPool;
+        let program = anchor.workspace.SingleFarming;
         this.program = new anchor.Program(program.idl, program.programId, this.provider);
 
 
