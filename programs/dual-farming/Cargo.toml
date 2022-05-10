@@ -1,20 +1,23 @@
 [package]
-name = "reward-pool"
+name = "dual_farming"
 version = "0.2.0"
 description = "Created with Anchor"
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "reward_pool"
+name = "dual_farming"
 
 [features]
 no-entrypoint = []
 cpi = ["no-entrypoint"]
-#add to default for local testing
-#default = ["dev"]
-#note, can also use `anchor test -- --features dev` now
 dev = []
+
+#add to default for local testing
+#default = ["local-testing","test-id"]
+#note, can also use `anchor test -- --feature local-testing,test-id` now
+local-testing = []
+test-id = []
 verbose = []
 
 [dependencies]

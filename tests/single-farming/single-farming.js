@@ -8,7 +8,7 @@ const utils = require("./utils");
 const { User } = require("./user");
 const fs = require('fs');
 
-let program = anchor.workspace.RewardPool;
+let program = anchor.workspace.SingleFarming;
 
 
 //Read the provider from the configured environmnet.

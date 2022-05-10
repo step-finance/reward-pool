@@ -1,11 +1,3 @@
-<h1 align="center">
-  <br>
-   <img width="400" src="https://github.com/step-finance/reward-pool/blob/main/logo.svg?raw=true" alt="step logo"/>
-  <br>
-</h1>
-
-[![CircleCI](https://circleci.com/gh/step-finance/reward-pool/tree/main.svg?style=svg)](https://circleci.com/gh/step-finance/reward-pool/tree/main)
-
 # Reward Pool
 
 Program for staking and receiving rewards. 
@@ -19,6 +11,12 @@ Program for staking and receiving rewards.
 ## Note
 
 - **This code is unaudited. Use at your own risk.**
+
+## Programs
+This repository contains 3 main programs:
+- Staking: Stake MER earn xMER
+- Single farming: Stake xMER farm other token
+- Dual farming: Deposit LP tokens to get single or dual rewards
 
 ## Developing
 
@@ -39,7 +37,7 @@ can be deterministically generated with docker.
 When testing locally, be sure to build with feature "local-testing" to enable the testing IDs.  You can do this by editing `programs/step-staking/Cargo.toml` and uncommenting the default feature set line.
 
 ```
-anchor test
+anchor test -- --features dev
 ```
 
 ### Verify

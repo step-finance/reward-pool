@@ -80,7 +80,7 @@ fn last_time_reward_applicable(reward_end_timestamp: u64) -> u64 {
 }
 
 #[program]
-pub mod reward_pool {
+pub mod single_farming {
     use super::*;
 
     /// Initializes a new pool

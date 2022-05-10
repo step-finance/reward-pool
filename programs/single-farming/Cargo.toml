@@ -1,0 +1,25 @@
+[package]
+name = "single_farming"
+version = "0.2.0"
+description = "Created with Anchor"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "single_farming"
+
+[features]
+no-entrypoint = []
+cpi = ["no-entrypoint"]
+#add to default for local testing
+#default = ["dev"]
+#note, can also use `anchor test -- --features dev` now
+dev = []
+verbose = []
+
+[dependencies]
+anchor-lang = "0.24.2"
+anchor-spl = "0.24.2"
+spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
+spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
+solana-program = "1.9.17"
