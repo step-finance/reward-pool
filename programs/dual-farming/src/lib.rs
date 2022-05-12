@@ -574,7 +574,7 @@ pub mod dual_farming {
 #[derive(Accounts)]
 #[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: authority
     authority: UncheckedAccount<'info>,
 
     #[account(
@@ -629,7 +629,7 @@ pub struct InitializePool<'info> {
         bump = pool_nonce,
     )]
 
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
 
     #[account(zero)]
@@ -689,7 +689,7 @@ pub struct Pause<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -723,7 +723,7 @@ pub struct Unpause<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -765,7 +765,7 @@ pub struct Stake<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -817,7 +817,7 @@ pub struct Fund<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -866,7 +866,7 @@ pub struct ClaimReward<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -898,7 +898,7 @@ pub struct CloseUser<'info> {
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
     #[account(mut)]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: refundee
     refundee: UncheckedAccount<'info>,
     #[account(mut)]
     staking_refundee: Box<Account<'info, TokenAccount>>,
@@ -934,7 +934,7 @@ pub struct ClosePool<'info> {
         ],
         bump = pool.nonce,
     )]
-    /// CHECK: someone created it tell me the reason, i'm just refactor
+    /// CHECK: pool_signer
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
