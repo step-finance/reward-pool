@@ -339,7 +339,7 @@ pub struct CreateUser<'info> {
             owner.key.as_ref(),
             pool.to_account_info().key.as_ref()
         ],
-        bump,        
+        bump,
         space = 120 // 1 + 97 + buffer
     )]
     pub user: Box<Account<'info, User>>,

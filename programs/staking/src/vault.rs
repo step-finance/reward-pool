@@ -59,7 +59,11 @@ mod tests {
             vault_mer: Pubkey::new_unique(),
             lp_mint: Pubkey::new_unique(),
             admin: Pubkey::new_unique(),
-            bumps: VaultBumps { vault: 0, vault_mer: 0, lp_mint: 0 }
+            bumps: VaultBumps {
+                vault: 0,
+                vault_mer: 0,
+                lp_mint: 0,
+            },
         };
 
         let mut lp_supply = 0;
