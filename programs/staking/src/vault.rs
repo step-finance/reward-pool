@@ -1,52 +1,111 @@
 use anchor_lang::prelude::*;
 use num_traits::ToPrimitive;
 
+pub const LOCKED_REWARD_DEGRATION_DENUMERATOR: u128 = 1_000_000_000_000;
+
 #[account]
 #[derive(Default)]
 pub struct Vault {
-    pub vault_mer: Pubkey,
+    pub token_mint: Pubkey,
+    pub token_vault: Pubkey,
     pub lp_mint: Pubkey,
+    pub base: Pubkey,
     pub admin: Pubkey,
-    pub bumps: VaultBumps,
+    pub vault_bump: u8,
+    pub total_amount: u64,
+    pub locked_reward_tracker: LockedRewardTracker,
+}
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]
+pub struct LockedRewardTracker {
+    pub last_updated_locked_reward: u64,
+    pub last_report: u64,
+    pub locked_reward_degradation: u64,
+}
+
+impl Default for LockedRewardTracker {
+    fn default() -> Self {
+        return LockedRewardTracker {
+            last_updated_locked_reward: 0,
+            last_report: 0,
+            locked_reward_degradation: u64::try_from(LOCKED_REWARD_DEGRATION_DENUMERATOR).unwrap()
+                / (3600 * 24 * 7), // locked profit is fully dripped in 7 days
+        };
+    }
+}
+impl LockedRewardTracker {
+    pub fn calculate_locked_reward(&self, current_time: u64) -> Option<u64> {
+        let duration = u128::from(current_time.checked_sub(self.last_report)?);
+        let locked_reward_degradation = u128::from(self.locked_reward_degradation);
+        let locked_fund_ratio = duration * locked_reward_degradation;
+
+        if locked_fund_ratio > LOCKED_REWARD_DEGRATION_DENUMERATOR {
+            return Some(0);
+        }
+        let locked_reward = u128::from(self.last_updated_locked_reward);
+
+        let locked_reward = (locked_reward
+            .checked_mul(LOCKED_REWARD_DEGRATION_DENUMERATOR - locked_fund_ratio)?)
+        .checked_div(LOCKED_REWARD_DEGRATION_DENUMERATOR)?;
+        let locked_reward = u64::try_from(locked_reward).ok()?;
+        return Some(locked_reward);
+    }
+
+    pub fn update_locked_reward(&mut self, current_time: u64, reward: u64) -> Option<()> {
+        let last_updated_locked_reward = self.calculate_locked_reward(current_time)?;
+        self.last_updated_locked_reward = last_updated_locked_reward.checked_add(reward)?;
+        self.last_report = current_time;
+        Some(())
+    }
 }
 
 impl Vault {
-    pub fn stake(&mut self, lp_supply: u64, total_mer: u64, mer_amount: u64) -> u64 {
-        // When total MER in the vault is 0, 1 MER will be converted to 1 LP.
-        if total_mer == 0 {
-            return mer_amount;
+    pub fn get_unlocked_amount(&self, current_time: u64) -> Option<u64> {
+        self.total_amount.checked_sub(
+            self.locked_reward_tracker
+                .calculate_locked_reward(current_time)?,
+        )
+    }
+
+    pub fn stake(&mut self, current_time: u64, token_amount: u64, lp_supply: u64) -> Option<u64> {
+        let total_amount = self.get_unlocked_amount(current_time)?;
+        if total_amount == 0 {
+            self.total_amount = token_amount;
+            return Some(token_amount);
         }
 
-        let new_lp_token = (mer_amount as u128)
-            .checked_mul(lp_supply as u128)
-            .unwrap()
-            .checked_div(total_mer as u128)
-            .unwrap()
-            .to_u64()
-            .unwrap();
+        let new_lp_token = (token_amount as u128)
+            .checked_mul(lp_supply as u128)?
+            .checked_div(total_amount as u128)?
+            .to_u64()?;
+        self.total_amount = self.total_amount.checked_add(token_amount)?;
 
-        new_lp_token
+        Some(new_lp_token)
     }
 
-    pub fn withdraw(&mut self, lp_supply: u64, total_mer: u64, lp_amount: u64) -> u64 {
-        let mer_amount: u64 = (lp_amount as u128)
-            .checked_mul(total_mer as u128)
-            .unwrap()
-            .checked_div(lp_supply as u128)
-            .unwrap()
-            .to_u64()
-            .unwrap();
-
-        mer_amount
+    pub fn unstake(
+        &mut self,
+        current_time: u64,
+        unmint_amount: u64,
+        lp_supply: u64,
+    ) -> Option<u64> {
+        let total_amount = self.get_unlocked_amount(current_time)?;
+        let withdraw_amount = u64::try_from(
+            u128::from(unmint_amount)
+                .checked_mul(u128::from(total_amount))?
+                .checked_div(u128::from(lp_supply))?,
+        )
+        .ok();
+        self.total_amount = self.total_amount.checked_sub(withdraw_amount?)?;
+        return withdraw_amount;
     }
-}
 
-// The bumps used to derive the vault account, vault's MER token account and LP mint account.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Default)]
-pub struct VaultBumps {
-    pub vault: u8,
-    pub vault_mer: u8,
-    pub lp_mint: u8,
+    pub fn update_locked_reward(&mut self, current_time: u64, reward: u64) -> Option<()> {
+        self.total_amount = self.total_amount.checked_add(reward)?;
+        self.locked_reward_tracker
+            .update_locked_reward(current_time, reward);
+        Some(())
+    }
 }
 
 #[cfg(test)]
@@ -56,19 +115,19 @@ mod tests {
     #[test]
     fn test_stake_and_withdraw() {
         let mut vault = Vault {
-            vault_mer: Pubkey::new_unique(),
+            token_mint: Pubkey::new_unique(),
+            token_vault: Pubkey::new_unique(),
             lp_mint: Pubkey::new_unique(),
+            base: Pubkey::new_unique(),
             admin: Pubkey::new_unique(),
-            bumps: VaultBumps {
-                vault: 0,
-                vault_mer: 0,
-                lp_mint: 0,
-            },
+            vault_bump: 0,
+            total_amount: 0,
+            locked_reward_tracker: LockedRewardTracker::default(),
         };
 
         let mut lp_supply = 0;
         let mut total_mer = 0;
-        let lp_token = vault.stake(0, 0, 1_000_000_000_000);
+        let lp_token = vault.stake(0, 0, 1_000_000_000_000).unwrap();
         lp_supply += lp_token;
         total_mer += 1_000_000_000_000;
 
@@ -76,7 +135,7 @@ mod tests {
         total_mer += 1_000_000;
 
         // Withdraw 10 ui amount lp tokens
-        let amount = vault.withdraw(lp_supply, total_mer, 10_000_000);
-        println!("{}", amount);
+        let amount = vault.unstake(lp_supply, total_mer, 10_000_000);
+        println!("{}", amount.unwrap());
     }
 }
