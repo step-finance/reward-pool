@@ -1,0 +1,38 @@
+name: Rust
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: projectserum/build:v0.24.2
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: List rustup toolchains
+        run: rustup toolchain list
+      - name: Set default toolchain
+        run: rustup default stable
+      - name: List rustup toolchains
+        run: rustup toolchain list
+      - name: Generate new keygen
+        run: solana-keygen new
+      - name: Set solana target cluster to local
+        run: solana config set --url http:localhost:8899
+      - name: Check solana config
+        run: solana config get
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16.15.0
+      - name: Install node dependencies
+        run: npm install
+      - name: Cargo fmt
+        run: cargo fmt
+      - name: Cargo test
+        run: cargo test
+      - name: Anchor tests
+        run: anchor test -- --features dev
