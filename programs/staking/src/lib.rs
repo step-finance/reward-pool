@@ -244,7 +244,7 @@ pub struct Stake<'info> {
         has_one = token_vault,
         has_one = lp_mint,
     )]
-    pub vault: Account<'info, Vault>,
+    pub vault: Box<Account<'info, Vault>>,
 
     #[account(mut)]
     pub token_vault: Account<'info, TokenAccount>,

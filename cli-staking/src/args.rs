@@ -1,0 +1,103 @@
+use anchor_client::solana_sdk::pubkey::Pubkey;
+use anchor_client::Cluster;
+use clap::*;
+
+#[derive(Parser, Debug)]
+pub struct ConfigOverride {
+    /// Cluster override
+    ///
+    /// Values = mainnet, testnet, devnet, localnet.
+    /// Default: devnet
+    #[clap(global = true, short, long, default_value_t = Cluster::Devnet)]
+    pub cluster: Cluster,
+    /// Wallet override
+    ///
+    /// Example: /path/to/wallet/keypair.json
+    /// Default: ~/.config/solana/id.json
+    #[clap(
+        global = true,
+        short,
+        long,
+        default_value_t = String::from(shellexpand::tilde("~/.config/solana/id.json"))
+    )]
+    pub wallet_path: String,
+
+    #[clap(
+        global = true,
+        short,
+        long,
+        default_value_t = staking::id().to_string()
+    )]
+    pub program_id: String,
+}
+
+#[derive(Parser, Debug)]
+pub struct VaultArgs {
+    #[clap(long)]
+    /// Base keypair file required to initialize the vault
+    ///
+    /// /path/to/base/keypair.json
+    pub base: String,
+    #[clap(long)]
+    /// Token mint of the vault
+    ///
+    /// Eg: 9NGDi2tZtNmCCp8SVLKNuGjuWAVwNF3Vap5tT8km5er9
+    pub token_mint: Pubkey,
+}
+
+#[derive(Parser, Debug)]
+pub enum CliCommand {
+    /// Initialize vault
+    Init {
+        #[clap(flatten)]
+        vault_args: VaultArgs,
+    },
+    /// Transfer admin
+    TransferAdmin {
+        #[clap(long)]
+        new_admin: Pubkey,
+        #[clap(long)]
+        token_mint: Pubkey,
+    },
+    /// Show vault info
+    ShowInfo {
+        #[clap(long)]
+        token_mint: Pubkey,
+    },
+    /// Stake
+    Stake {
+        #[clap(long)]
+        token_mint: Pubkey,
+        /// Amount to stake
+        amount: u64,
+    },
+    /// Add reward to the vault
+    Reward {
+        #[clap(long)]
+        token_mint: Pubkey,
+        /// Amount to stake
+        amount: u64,
+    },
+    /// Unstake
+    Unstake {
+        #[clap(long)]
+        token_mint: Pubkey,
+        /// Amount to stake
+        unmint_amount: u64,
+    },
+    /// Update locked reward degradation
+    UpdateLockedRewardDegradation {
+        #[clap(long)]
+        token_mint: Pubkey,
+        locked_reward_degradation: u64,
+    },
+}
+
+#[derive(Parser, Debug)]
+#[clap(version, about, author)]
+pub struct Opts {
+    #[clap(flatten)]
+    pub config_override: ConfigOverride,
+    #[clap(subcommand)]
+    pub command: CliCommand,
+}

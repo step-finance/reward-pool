@@ -4,7 +4,7 @@ use num_traits::ToPrimitive;
 pub const LOCKED_REWARD_DEGRATION_DENUMERATOR: u128 = 1_000_000_000_000;
 
 #[account]
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Vault {
     pub token_mint: Pubkey,
     pub token_vault: Pubkey,
