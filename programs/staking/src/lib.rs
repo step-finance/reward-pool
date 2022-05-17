@@ -190,24 +190,10 @@ mod staking {
         Ok(())
     }
 
-    pub fn change_funder(ctx: Context<FunderChange>, funder: Pubkey) -> Result<()> {
+    pub fn change_funder(ctx: Context<FunderChange>) -> Result<()> {
         let vault = &mut ctx.accounts.vault;
-        if funder == vault.funder.key() {
-            return Err(VaultError::FunderAlreadyAuthorized.into());
-        }
+        let funder = *ctx.accounts.funder.key;
         vault.funder = funder;
-        Ok(())
-    }
-
-    pub fn deauthorized_funder(ctx: Context<FunderChange>, funder: Pubkey) -> Result<()> {
-        let vault = &mut ctx.accounts.vault;
-        if funder != vault.admin.key() {
-            return Err(VaultError::CannotDeauthorizeAdmin.into());
-        }
-        if funder != vault.funder.key() {
-            return Err(VaultError::CannotDeauthorizeMissingFunder.into());
-        }
-        vault.funder = vault.admin;
         Ok(())
     }
 }
@@ -327,11 +313,14 @@ pub struct TransferAdmin<'info> {
 #[derive(Accounts)]
 pub struct FunderChange<'info> {
     #[account(
-    mut,
-    has_one = admin,
+        mut,
+        has_one = admin,
     )]
-    vault: Box<Account<'info, Vault>>,
-    admin: Signer<'info>,
+    pub vault: Box<Account<'info, Vault>>,
+    pub admin: Signer<'info>,
+    #[account(constraint = funder.key() != vault.funder.key())]
+    /// CHECK funder
+    pub funder: AccountInfo<'info>
 }
 
 #[error_code]
@@ -348,10 +337,6 @@ pub enum VaultError {
     InvalidLockedRewardDegradation,
     #[msg("Provided funder is already authorized to fund.")]
     FunderAlreadyAuthorized,
-    #[msg("Cannot deauthorize the admin vault.")]
-    CannotDeauthorizeAdmin,
-    #[msg("Funder not found")]
-    CannotDeauthorizeMissingFunder
 }
 
 #[event]
