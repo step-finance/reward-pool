@@ -272,9 +272,41 @@ describe("staking", () => {
     assert.strictEqual(0, userLpTokenAccount.amount.toNumber());
   });
 
-  it("Transfer admin", async () => {
-    // TODO implement
-  });
+  it("Change funder", async() => {
+    let newFunder = new anchor.web3.Keypair();
+    var tx = await program.rpc.changeFunder (
+        {
+          accounts: {
+            vault,
+            admin: admin.publicKey,
+            funder: newFunder.publicKey
+          },
+          signers: [admin]
+        }
+    )
+    let vaultAccount = await program.account.vault.fetch(
+        vault
+    );
+    assert.strictEqual(newFunder.publicKey.toString(), vaultAccount.funder.toBase58());
+  })
+
+    it('Transfer admin', async () => {
+        let newAdmin = new anchor.web3.Keypair();
+        var tx = await program.rpc.transferAdmin (
+            {
+                accounts: {
+                    vault,
+                    admin: admin.publicKey,
+                    newAdmin: newAdmin.publicKey
+                },
+                signers: [admin]
+            }
+        )
+        let vaultAccount = await program.account.vault.fetch(
+            vault
+        );
+        assert.strictEqual(newAdmin.publicKey.toString(), vaultAccount.admin.toBase58());
+    });
 });
 
 async function wait(seconds) {
