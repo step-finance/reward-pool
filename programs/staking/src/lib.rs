@@ -189,6 +189,27 @@ mod staking {
 
         Ok(())
     }
+
+    pub fn change_funder(ctx: Context<FunderChange>, funder: Pubkey) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        if funder == vault.funder.key() {
+            return Err(VaultError::FunderAlreadyAuthorized.into());
+        }
+        vault.funder = funder;
+        Ok(())
+    }
+
+    pub fn deauthorized_funder(ctx: Context<FunderChange>, funder: Pubkey) -> Result<()> {
+        let vault = &mut ctx.accounts.vault;
+        if funder != vault.admin.key() {
+            return Err(VaultError::CannotDeauthorizeAdmin.into());
+        }
+        if funder != vault.funder.key() {
+            return Err(VaultError::CannotDeauthorizeMissingFunder.into());
+        }
+        vault.funder = vault.admin;
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -277,7 +298,10 @@ pub struct Reward<'info> {
 
     #[account(mut)]
     pub user_token: Account<'info, TokenAccount>,
-
+    #[account(
+    //require signed funder auth - otherwise constant micro fund could hold funds hostage
+    constraint = user_transfer_authority.key() == vault.admin || user_transfer_authority.key() == vault.funder,
+    )]
     pub user_transfer_authority: Signer<'info>,
 
     pub token_program: Program<'info, Token>,
@@ -300,6 +324,16 @@ pub struct TransferAdmin<'info> {
     pub new_admin: AccountInfo<'info>,
 }
 
+#[derive(Accounts)]
+pub struct FunderChange<'info> {
+    #[account(
+    mut,
+    has_one = admin,
+    )]
+    vault: Box<Account<'info, Vault>>,
+    admin: Signer<'info>,
+}
+
 #[error_code]
 pub enum VaultError {
     #[msg("Stake amount cannot be zero")]
@@ -312,6 +346,12 @@ pub enum VaultError {
     MathOverflow,
     #[msg("LockedRewardDegradation is invalid")]
     InvalidLockedRewardDegradation,
+    #[msg("Provided funder is already authorized to fund.")]
+    FunderAlreadyAuthorized,
+    #[msg("Cannot deauthorize the admin vault.")]
+    CannotDeauthorizeAdmin,
+    #[msg("Funder not found")]
+    CannotDeauthorizeMissingFunder
 }
 
 #[event]

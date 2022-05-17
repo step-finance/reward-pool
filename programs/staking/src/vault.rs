@@ -14,6 +14,7 @@ pub struct Vault {
     pub vault_bump: u8,
     pub total_amount: u64,
     pub locked_reward_tracker: LockedRewardTracker,
+    pub funder: Pubkey
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]
@@ -120,6 +121,7 @@ mod tests {
             lp_mint: Pubkey::new_unique(),
             base: Pubkey::new_unique(),
             admin: Pubkey::new_unique(),
+            funder: Pubkey::new_unique(),
             vault_bump: 0,
             total_amount: 0,
             locked_reward_tracker: LockedRewardTracker::default(),
