@@ -29,16 +29,9 @@ function setProvider(p) {
 setProvider(provider);
 
 describe('Multiuser Reward Pool', () => {
-
-  let EXPECTED_POOL_CREATE_COST = 12_546_920;
-
   const rewardDuration = new anchor.BN(10);
   const rewardDuration2 = new anchor.BN(30);
   const rewardDuration3 = new anchor.BN(5);
-
-  let xMintKey;
-  let xMintObject;
-  let xMintPubkey;
   let users;
   let users2;
   let funders;
@@ -54,13 +47,6 @@ describe('Multiuser Reward Pool', () => {
   it("Initialize mints", async () => {
     console.log("Program ID: ", program.programId.toString());
     console.log("Wallet: ", provider.wallet.publicKey.toString());
-    //this is the xstep token
-    //test xstep token hardcoded in program, mint authority is itself
-    rawdata = fs.readFileSync('tests/dual-farming/keys/xstep-tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s.json');
-    keyData = JSON.parse(rawdata);
-    xMintKey = anchor.web3.Keypair.fromSecretKey(new Uint8Array(keyData));
-    xMintPubkey = xMintKey.publicKey;
-    xMintObject = await utils.createMintFromPriv(xMintKey, provider, provider.wallet.publicKey, null, 9, TOKEN_PROGRAM_ID);
     setProvider(envProvider);
     //these mints are ecosystem mints not owned
     //by funder or user
@@ -76,9 +62,9 @@ describe('Multiuser Reward Pool', () => {
     users = [1, 2, 3, 4, 5].map(a => new User(a));
     users2 = [11, 12].map(a => new User(a));
     await Promise.all(
-      users.map(a => a.init(10_000_000_000, xMintPubkey, 0, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
+      users.map(a => a.init(10_000_000_000, 0, stakingMint.publicKey, 5_000_000_000, mintA.publicKey, 0, mintB.publicKey, 0))
         .concat(
-          users2.map(a => a.init(10_000_000_000, xMintPubkey, 0, stakingMint2.publicKey, 500_000, mintB.publicKey, 0, mintC.publicKey, 0))
+          users2.map(a => a.init(10_000_000_000, 0, stakingMint2.publicKey, 500_000, mintB.publicKey, 0, mintC.publicKey, 0))
         )
     );
   })
@@ -86,9 +72,9 @@ describe('Multiuser Reward Pool', () => {
   it("Initialize funders", async () => {
     funders = [0, 10, 20].map(a => new User(a));
     await Promise.all([
-      funders[0].init(10_000_000_000, xMintPubkey, 9_999_999_999_999, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
-      funders[1].init(10_000_000_000, xMintPubkey, 10_000_000_000_000, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
-      funders[2].init(10_000_000_000, xMintPubkey, 10_000_000_000_000, stakingMint3.publicKey, 0, mintB.publicKey, 10_000_000_000, mintB.publicKey, 0),
+      funders[0].init(10_000_000_000, 9_999_999_999_999, stakingMint.publicKey, 0, mintA.publicKey, 100_000_000_000, mintB.publicKey, 200_000_000_000),
+      funders[1].init(10_000_000_000, 10_000_000_000_000, stakingMint2.publicKey, 0, mintB.publicKey, 10_000_000_000, mintC.publicKey, 10_000),
+      funders[2].init(10_000_000_000, 10_000_000_000_000, stakingMint3.publicKey, 0, mintB.publicKey, 10_000_000_000, mintB.publicKey, 0),
     ]);
   });
 
@@ -96,14 +82,7 @@ describe('Multiuser Reward Pool', () => {
   let costInLamports;
 
   it("Creates a pool", async () => {
-    try {
-      await funders[0].initializePool(poolKeypair, rewardDuration, false);
-      assert.fail("did not fail for lack of xSTEP");
-    } catch (e) { }
-
     //give just ONE more xSTEP
-    xMintObject.mintTo(funders[0].xTokenPubkey, envProvider.wallet.payer, [], 1);
-
     await funders[0].initializePool(poolKeypair, rewardDuration, false);
 
     //second funder tries to create with same pubkey
@@ -113,26 +92,16 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
 
     //track cost of creating a pool
-    let startLamports = (await provider.connection.getBalance(funders[1].pubkey));
-
     await funders[1].initializePool(poolKeypair2, rewardDuration2, false);
-
-    //validate cost
-    let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
-    costInLamports = startLamports - endLamports;
-    console.log("Cost of creating a pool", (costInLamports / 1_000_000_000));
-    assert.equal(costInLamports, EXPECTED_POOL_CREATE_COST + 5_000); //5k tx fee
-
     await funders[2].initializePool(poolKeypair3, rewardDuration3, true);
   });
 
   it('User does some single staking', async () => {
-
     //we test all this in greater detail later, but this is a flow for single reward staking
 
     let pool = funders[2].poolPubkey;
     let user = new User(99);
-    await user.init(10_000_000_000, xMintPubkey, 0, stakingMint3.publicKey, 500_000, mintB.publicKey, 0, mintB.publicKey, 0);
+    await user.init(10_000_000_000, 0, stakingMint3.publicKey, 500_000, mintB.publicKey, 0, mintB.publicKey, 0);
     await user.createUserStakingAccount(pool);
     await user.stakeTokens(100_000);
 
@@ -186,6 +155,7 @@ describe('Multiuser Reward Pool', () => {
     await funders[2].closePool();
   });
 
+
   it('Users create staking accounts', async () => {
     let pool = funders[0].poolPubkey;
     let pool2 = funders[1].poolPubkey;
@@ -204,6 +174,7 @@ describe('Multiuser Reward Pool', () => {
     } catch (e) { }
   });
 
+
   it('Users closes staking account', async () => {
     await users[0].closeUser();
   });
@@ -221,7 +192,7 @@ describe('Multiuser Reward Pool', () => {
       users[2].stakeTokens(500_000_000),
     ]);
   });
-
+  // return;
   it('Users tries to close staking account', async () => {
     try {
       await users[0].closeUser();
@@ -290,7 +261,7 @@ describe('Multiuser Reward Pool', () => {
     acct = await program.account.pool.fetch(funders[1].poolPubkey);
     assert.equal(acct.funders[2].toString(), anchor.web3.PublicKey.default.toString());
   });
-
+  // return;
   //now is pool 1 users stakes: 2_000_000_000, 2_000_000_000, 500_000_000, 0, 0
   //now is pool 2 users stakes: 250_000, 0
   it('Funder funds the pool', async () => {
@@ -320,6 +291,7 @@ describe('Multiuser Reward Pool', () => {
     assert(0 < (await provider.connection.getTokenAccountBalance(users[1].mintAPubkey)).value.uiAmount);
     assert(0 < (await provider.connection.getTokenAccountBalance(users[1].mintBPubkey)).value.uiAmount);
   });
+  // return;
 
   it('waits and watches', async () => {
     var expectedFn = await users[0].getUserPendingRewardsFunction();
@@ -405,6 +377,7 @@ describe('Multiuser Reward Pool', () => {
   it('waits', async () => {
     await wait(7); //pool 1 @ -2, pool 2 @ 0
   });
+  // return;
 
   let newValA;
   let newValB;
@@ -525,10 +498,7 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('Funder pauses the pool', async () => {
-    assert.strictEqual(0, await getTokenBalance(funders[0].xTokenPubkey));
     await funders[0].pausePool(null);
-    //assert xtoken refunded
-    assert.strictEqual(10_000, await getTokenBalance(funders[0].xTokenPubkey));
   });
 
   it('Funder pauses the paused pool', async () => {
@@ -564,10 +534,7 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it('Funder unpauses the pool', async () => {
-    assert.strictEqual(10_000, await getTokenBalance(funders[0].xTokenPubkey));
     await funders[0].unpausePool(null);
-    //assert xtoken spent
-    assert.strictEqual(0, await getTokenBalance(funders[0].xTokenPubkey));
   });
 
   it('Funder unpauses the unpaused pool', async () => {
@@ -597,29 +564,14 @@ describe('Multiuser Reward Pool', () => {
   });
 
   it("Pool 2 closes", async () => {
-    try {
-      await funders[1].closePool();
-      assert.fail("funder was able to close pool without pausing first?!");
-    } catch { }
-
     //track refund on teardown
-    let startLamports = (await provider.connection.getBalance(funders[1].pubkey));
-
+    // let startLamports = (await provider.connection.getBalance(funders[1].pubkey));
     await funders[1].pausePool();
     await funders[1].closePool();
-
-    //validate cost
-    let endLamports = (await provider.connection.getBalance(funders[1].pubkey));
-    let refundInLamports = endLamports - startLamports;
-    console.log("Refund when destroying a pool", (refundInLamports / 1_000_000_000));
-    assert.equal(refundInLamports, EXPECTED_POOL_CREATE_COST - 15_000); //15k in tx fees during close, unclear why not 10k
-
-
     let pool = await provider.connection.getAccountInfo(funders[1].admin.poolKeypair.publicKey);
     let sv = await provider.connection.getAccountInfo(funders[1].admin.stakingMintVault);
     let av = await provider.connection.getAccountInfo(funders[1].admin.mintAVault);
     let bv = await provider.connection.getAccountInfo(funders[1].admin.mintBVault);
-
     assert.strictEqual(pool, null);
     assert.strictEqual(sv, null);
     assert.strictEqual(av, null);

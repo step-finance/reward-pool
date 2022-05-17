@@ -6,26 +6,22 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-use crate::calculator::*;
 use crate::constants::*;
+use crate::pool::*;
 use crate::version::*;
 
-mod calculator;
+mod pool;
 mod version;
 
 declare_id!("8Ct1Q6nDbi5Sye4B1LgKUnA6xwSWWwJm1yEekANZKJUj");
 
 #[cfg(not(feature = "dev"))]
 mod constants {
-    pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "xStpgUCss9piqeFUk2iLVcvJEGhAdJxJQuwLkXP555G";
-    pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 86400;
 }
 
 #[cfg(feature = "dev")]
 mod constants {
-    pub const X_STEP_TOKEN_MINT_PUBKEY: &str = "tEsTL8G8drugWztoCKrPpEAXV21qEajfHg4q45KYs6s";
-    pub const X_STEP_DEPOSIT_REQUIREMENT: u64 = 10_000_000_000_000;
     pub const MIN_DURATION: u64 = 1;
 }
 
@@ -45,9 +41,7 @@ pub fn update_rewards(
 ) -> Result<()> {
     let last_time_reward_applicable = last_time_reward_applicable(pool.reward_duration_end);
 
-    let calc = get_calculator();
-    let (reward_a, reward_b) =
-        calc.reward_per_token(pool, total_staked, last_time_reward_applicable);
+    let (reward_a, reward_b) = reward_per_token(pool, total_staked, last_time_reward_applicable);
 
     pool.reward_a_per_token_stored = reward_a;
     if pool.reward_a_vault != pool.reward_b_vault {
@@ -57,7 +51,7 @@ pub fn update_rewards(
     pool.last_update_time = last_time_reward_applicable;
 
     if let Some(u) = user {
-        let (a, b) = calc.user_earned_amount(pool, u);
+        let (a, b) = user_earned_amount(pool, u);
 
         u.reward_a_per_token_pending = a;
         u.reward_a_per_token_complete = pool.reward_a_per_token_stored;
@@ -89,24 +83,10 @@ pub mod dual_farming {
         if reward_duration < MIN_DURATION {
             return Err(ErrorCode::DurationTooShort.into());
         }
-
-        //xstep lockup
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
-                from: ctx.accounts.x_token_depositor.to_account_info(),
-                to: ctx.accounts.x_token_pool_vault.to_account_info(),
-                authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
-            },
-        );
-        token::transfer(cpi_ctx, constants::X_STEP_DEPOSIT_REQUIREMENT)?;
-
         let pool = &mut ctx.accounts.pool;
-
         pool.authority = ctx.accounts.authority.key();
         pool.nonce = pool_nonce;
         pool.paused = false;
-        pool.x_token_pool_vault = ctx.accounts.x_token_pool_vault.key();
         pool.staking_mint = ctx.accounts.staking_mint.key();
         pool.staking_vault = ctx.accounts.staking_vault.key();
         pool.reward_a_mint = ctx.accounts.reward_a_mint.key();
@@ -142,60 +122,19 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// Pauses the pool and refunds the xSTEP deposit.
+    /// Pauses
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = true;
 
-        //xstep refund
-        let seeds = &[pool.to_account_info().key.as_ref(), &[pool.nonce]];
-        let pool_signer = &[&seeds[..]];
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
-                from: ctx.accounts.x_token_pool_vault.to_account_info(),
-                to: ctx.accounts.x_token_receiver.to_account_info(),
-                authority: ctx.accounts.pool_signer.to_account_info(),
-            },
-            pool_signer,
-        );
-
-        token::transfer(cpi_ctx, ctx.accounts.x_token_pool_vault.amount)?;
-
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            token::CloseAccount {
-                account: ctx.accounts.x_token_pool_vault.to_account_info(),
-                destination: ctx.accounts.authority.to_account_info(),
-                authority: ctx.accounts.pool_signer.to_account_info(),
-            },
-            pool_signer,
-        );
-        token::close_account(cpi_ctx)?;
-
-        pool.x_token_pool_vault = Pubkey::default();
         Ok(())
     }
 
-    /// Unpauses a previously paused pool, taking a xSTEP deposit again and
+    /// Unpauses a previously paused pool
     /// allowing for funding
     pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = false;
-
-        //the prior token vault was closed when pausing
-        pool.x_token_pool_vault = ctx.accounts.x_token_pool_vault.key();
-
-        //xstep lockup
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.token_program.to_account_info(),
-            token::Transfer {
-                from: ctx.accounts.x_token_depositor.to_account_info(),
-                to: ctx.accounts.x_token_pool_vault.to_account_info(),
-                authority: ctx.accounts.x_token_deposit_authority.to_account_info(),
-            },
-        );
-        token::transfer(cpi_ctx, X_STEP_DEPOSIT_REQUIREMENT)?;
         Ok(())
     }
 
@@ -204,15 +143,11 @@ pub mod dual_farming {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
-
         let pool = &mut ctx.accounts.pool;
-
         if pool.paused {
             return Err(ErrorCode::PoolPaused.into());
         }
-
         let total_staked = ctx.accounts.staking_vault.amount;
-
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(pool, user_opt, total_staked).unwrap();
 
@@ -323,14 +258,7 @@ pub mod dual_farming {
         let total_staked = ctx.accounts.staking_vault.amount;
         update_rewards(pool, None, total_staked).unwrap();
 
-        let calc = get_calculator();
-        let (reward_a_rate, reward_b_rate) = calc.rate_after_funding(
-            pool,
-            &ctx.accounts.reward_a_vault,
-            &ctx.accounts.reward_b_vault,
-            amount_a,
-            amount_b,
-        )?;
+        let (reward_a_rate, reward_b_rate) = rate_after_funding(pool, amount_a, amount_b)?;
         pool.reward_a_rate = reward_a_rate;
         pool.reward_b_rate = reward_b_rate;
 
@@ -575,23 +503,7 @@ pub mod dual_farming {
 #[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
     /// CHECK: authority
-    authority: UncheckedAccount<'info>,
-
-    #[account(
-        mut,
-        constraint = x_token_pool_vault.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap(),
-        constraint = x_token_pool_vault.owner == pool_signer.key(),
-        constraint = x_token_pool_vault.amount == 0,
-    )]
-    x_token_pool_vault: Box<Account<'info, TokenAccount>>,
-
-    #[account(
-        mut,
-        constraint = x_token_depositor.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap()
-    )]
-    x_token_depositor: Box<Account<'info, TokenAccount>>,
-    x_token_deposit_authority: Signer<'info>,
-
+    authority: Signer<'info>,
     staking_mint: Box<Account<'info, Mint>>,
 
     #[account(
@@ -634,8 +546,6 @@ pub struct InitializePool<'info> {
 
     #[account(zero)]
     pool: Box<Account<'info, Pool>>,
-
-    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -667,48 +577,19 @@ pub struct CreateUser<'info> {
 
 #[derive(Accounts)]
 pub struct Pause<'info> {
-    #[account(mut)]
-    x_token_pool_vault: Box<Account<'info, TokenAccount>>,
-    #[account(mut)]
-    x_token_receiver: Box<Account<'info, TokenAccount>>,
-
     #[account(
         mut,
         has_one = authority,
-        has_one = x_token_pool_vault,
         constraint = !pool.paused,
         constraint = pool.reward_duration_end < clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap(),
-        //constraint = pool.reward_duration_end > 0,
+        constraint = pool.reward_duration_end > 0,
     )]
     pool: Box<Account<'info, Pool>>,
     authority: Signer<'info>,
-
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
 pub struct Unpause<'info> {
-    #[account(
-        mut,
-        constraint = x_token_pool_vault.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap(),
-        constraint = x_token_pool_vault.owner == pool_signer.key(),
-    )]
-    x_token_pool_vault: Box<Account<'info, TokenAccount>>,
-    #[account(
-        mut,
-        constraint = x_token_depositor.mint == X_STEP_TOKEN_MINT_PUBKEY.parse::<Pubkey>().unwrap()
-    )]
-    x_token_depositor: Box<Account<'info, TokenAccount>>,
-    x_token_deposit_authority: Signer<'info>,
-
     #[account(
         mut,
         has_one = authority,
@@ -716,16 +597,6 @@ pub struct Unpause<'info> {
     )]
     pool: Box<Account<'info, Pool>>,
     authority: Signer<'info>,
-
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-    token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -809,17 +680,6 @@ pub struct Fund<'info> {
     from_a: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     from_b: Box<Account<'info, TokenAccount>>,
-
-    // Program signers.
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-
     // Misc.
     token_program: Program<'info, Token>,
 }
@@ -947,8 +807,6 @@ pub struct Pool {
     pub nonce: u8,
     /// Paused state of the program
     pub paused: bool,
-    /// The vault holding users' xSTEP
-    pub x_token_pool_vault: Pubkey,
     /// Mint of the token that can be staked.
     pub staking_mint: Pubkey,
     /// Vault to store staked tokens.
