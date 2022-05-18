@@ -32,25 +32,11 @@ pub struct ConfigOverride {
 }
 
 #[derive(Parser, Debug)]
-pub struct VaultArgs {
-    #[clap(long)]
-    /// Base keypair file required to initialize the vault
-    ///
-    /// /path/to/base/keypair.json
-    pub base: String,
-    #[clap(long)]
-    /// Token mint of the vault
-    ///
-    /// Eg: 9NGDi2tZtNmCCp8SVLKNuGjuWAVwNF3Vap5tT8km5er9
-    pub token_mint: Pubkey,
-}
-
-#[derive(Parser, Debug)]
 pub enum CliCommand {
     /// Initialize vault
     Init {
-        #[clap(flatten)]
-        vault_args: VaultArgs,
+        #[clap(long)]
+        token_mint: Pubkey,
     },
     /// Transfer admin
     TransferAdmin {

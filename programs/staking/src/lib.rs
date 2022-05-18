@@ -5,7 +5,7 @@ use crate::vault::{LockedRewardTracker, Vault, LOCKED_REWARD_DEGRATION_DENUMERAT
 
 pub mod vault;
 
-declare_id!("CBbYHhjfhFoPwz8ZgQJjHkpq2gSu1xn26qeVsfYhWWB5");
+declare_id!("FFkqjHsFZS3MaUELNrz4TMNo1pz5nE3sBShjuMiSy1Pz");
 
 #[program]
 mod staking {
