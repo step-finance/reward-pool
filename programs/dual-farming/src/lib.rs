@@ -75,17 +75,12 @@ pub mod dual_farming {
     use super::*;
 
     /// Initializes a new pool
-    pub fn initialize_pool(
-        ctx: Context<InitializePool>,
-        pool_nonce: u8,
-        reward_duration: u64,
-    ) -> Result<()> {
+    pub fn initialize_pool(ctx: Context<InitializePool>, reward_duration: u64) -> Result<()> {
         if reward_duration < MIN_DURATION {
             return Err(ErrorCode::DurationTooShort.into());
         }
         let pool = &mut ctx.accounts.pool;
         pool.authority = ctx.accounts.authority.key();
-        pool.nonce = pool_nonce;
         pool.paused = false;
         pool.staking_mint = ctx.accounts.staking_mint.key();
         pool.staking_vault = ctx.accounts.staking_vault.key();
@@ -102,11 +97,14 @@ pub mod dual_farming {
         pool.reward_b_per_token_stored = 0;
         pool.user_stake_count = 0;
         pool.version = PoolVersion::V2;
+        pool.base_key = ctx.accounts.base.key();
+        // Unwrap here is safe as long as the key matches the account in the context
+        pool.pool_bump = *ctx.bumps.get("pool").unwrap();
         Ok(())
     }
 
     /// Initialize a user staking account
-    pub fn create_user(ctx: Context<CreateUser>, nonce: u8) -> Result<()> {
+    pub fn create_user(ctx: Context<CreateUser>) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
         user.owner = *ctx.accounts.owner.key;
@@ -115,7 +113,7 @@ pub mod dual_farming {
         user.reward_a_per_token_pending = 0;
         user.reward_b_per_token_pending = 0;
         user.balance_staked = 0;
-        user.nonce = nonce;
+        user.nonce = *ctx.bumps.get("user").unwrap();
 
         let pool = &mut ctx.accounts.pool;
         pool.user_stake_count = pool.user_stake_count.checked_add(1).unwrap();
@@ -169,6 +167,8 @@ pub mod dual_farming {
                 },
             );
             token::transfer(cpi_ctx, amount)?;
+
+            emit!(EventStake { amount });
         }
         Ok(())
     }
@@ -197,7 +197,11 @@ pub mod dual_farming {
 
         // Transfer tokens from the pool vault to user vault.
         {
-            let seeds = &[pool.to_account_info().key.as_ref(), &[pool.nonce]];
+            let seeds = &[
+                ctx.accounts.pool.base_key.as_ref(),
+                ctx.accounts.pool.staking_mint.as_ref(),
+                &[ctx.accounts.pool.pool_bump],
+            ];
             let pool_signer = &[&seeds[..]];
 
             let cpi_ctx = CpiContext::new_with_signer(
@@ -205,11 +209,13 @@ pub mod dual_farming {
                 token::Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
-                    authority: ctx.accounts.pool_signer.to_account_info(),
+                    authority: ctx.accounts.pool.to_account_info(),
                 },
                 pool_signer,
             );
             token::transfer(cpi_ctx, spt_amount)?;
+
+            emit!(EventUnstake { amount: spt_amount });
         }
         Ok(())
     }
@@ -226,6 +232,9 @@ pub mod dual_farming {
         let default_pubkey = Pubkey::default();
         if let Some(idx) = funders.iter().position(|x| *x == default_pubkey) {
             funders[idx] = funder_to_add;
+            emit!(EventAuthorizeFunder {
+                new_funder: funder_to_add
+            });
         } else {
             return Err(ErrorCode::MaxFunders.into());
         }
@@ -240,6 +249,9 @@ pub mod dual_farming {
         let funders = &mut ctx.accounts.pool.funders;
         if let Some(idx) = funders.iter().position(|x| *x == funder_to_remove) {
             funders[idx] = Pubkey::default();
+            emit!(EventUnauthorizeFunder {
+                funder: funder_to_remove
+            });
         } else {
             return Err(ErrorCode::CannotDeauthorizeMissingAuthority.into());
         }
@@ -297,6 +309,8 @@ pub mod dual_farming {
             .unwrap();
         pool.last_update_time = current_time;
         pool.reward_duration_end = current_time.checked_add(pool.reward_duration).unwrap();
+
+        emit!(EventFund { amount_a, amount_b });
         Ok(())
     }
 
@@ -309,10 +323,14 @@ pub mod dual_farming {
         update_rewards(pool, user_opt, total_staked).unwrap();
 
         let seeds = &[
-            ctx.accounts.pool.to_account_info().key.as_ref(),
-            &[ctx.accounts.pool.nonce],
+            ctx.accounts.pool.base_key.as_ref(),
+            ctx.accounts.pool.staking_mint.as_ref(),
+            &[ctx.accounts.pool.pool_bump],
         ];
         let pool_signer = &[&seeds[..]];
+
+        let mut claimed_reward_a: u64 = 0;
+        let mut claimed_reward_b: u64 = 0;
 
         if ctx.accounts.user.reward_a_per_token_pending > 0 {
             let mut reward_amount = ctx.accounts.user.reward_a_per_token_pending;
@@ -329,11 +347,12 @@ pub mod dual_farming {
                     token::Transfer {
                         from: ctx.accounts.reward_a_vault.to_account_info(),
                         to: ctx.accounts.reward_a_account.to_account_info(),
-                        authority: ctx.accounts.pool_signer.to_account_info(),
+                        authority: ctx.accounts.pool.to_account_info(),
                     },
                     pool_signer,
                 );
                 token::transfer(cpi_ctx, reward_amount)?;
+                claimed_reward_a = reward_amount;
             }
         }
 
@@ -352,13 +371,19 @@ pub mod dual_farming {
                     token::Transfer {
                         from: ctx.accounts.reward_b_vault.to_account_info(),
                         to: ctx.accounts.reward_b_account.to_account_info(),
-                        authority: ctx.accounts.pool_signer.to_account_info(),
+                        authority: ctx.accounts.pool.to_account_info(),
                     },
                     pool_signer,
                 );
                 token::transfer(cpi_ctx, reward_amount)?;
+                claimed_reward_b = reward_amount;
             }
         }
+
+        emit!(EventClaim {
+            amount_a: claimed_reward_a,
+            amount_b: claimed_reward_b
+        });
         Ok(())
     }
 
@@ -375,8 +400,9 @@ pub mod dual_farming {
         let pool = &ctx.accounts.pool;
 
         let signer_seeds = &[
-            pool.to_account_info().key.as_ref(),
-            &[ctx.accounts.pool.nonce],
+            ctx.accounts.pool.base_key.as_ref(),
+            ctx.accounts.pool.staking_mint.as_ref(),
+            &[ctx.accounts.pool.pool_bump],
         ];
 
         //instead of closing these vaults, we could technically just
@@ -388,8 +414,8 @@ pub mod dual_farming {
             &spl_token::ID,
             ctx.accounts.staking_vault.to_account_info().key,
             ctx.accounts.staking_refundee.to_account_info().key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
+            &ctx.accounts.pool.key(),
+            &[&ctx.accounts.pool.key()],
             ctx.accounts.staking_vault.amount,
         )?;
         solana_program::program::invoke_signed(
@@ -398,7 +424,7 @@ pub mod dual_farming {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
                 ctx.accounts.staking_refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.pool.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -406,8 +432,8 @@ pub mod dual_farming {
             &spl_token::ID,
             ctx.accounts.staking_vault.to_account_info().key,
             ctx.accounts.refundee.key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
+            &ctx.accounts.pool.key(),
+            &[&ctx.accounts.pool.key()],
         )?;
         solana_program::program::invoke_signed(
             &ix,
@@ -415,7 +441,7 @@ pub mod dual_farming {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.staking_vault.to_account_info(),
                 ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.pool.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -425,8 +451,8 @@ pub mod dual_farming {
             &spl_token::ID,
             ctx.accounts.reward_a_vault.to_account_info().key,
             ctx.accounts.reward_a_refundee.to_account_info().key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
+            &ctx.accounts.pool.key(),
+            &[&ctx.accounts.pool.key()],
             ctx.accounts.reward_a_vault.amount,
         )?;
         solana_program::program::invoke_signed(
@@ -435,7 +461,7 @@ pub mod dual_farming {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
                 ctx.accounts.reward_a_refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.pool.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -443,8 +469,8 @@ pub mod dual_farming {
             &spl_token::ID,
             ctx.accounts.reward_a_vault.to_account_info().key,
             ctx.accounts.refundee.key,
-            ctx.accounts.pool_signer.key,
-            &[ctx.accounts.pool_signer.key],
+            &ctx.accounts.pool.key(),
+            &[&ctx.accounts.pool.key()],
         )?;
         solana_program::program::invoke_signed(
             &ix,
@@ -452,7 +478,7 @@ pub mod dual_farming {
                 ctx.accounts.token_program.to_account_info(),
                 ctx.accounts.reward_a_vault.to_account_info(),
                 ctx.accounts.refundee.to_account_info(),
-                ctx.accounts.pool_signer.to_account_info(),
+                ctx.accounts.pool.to_account_info(),
             ],
             &[signer_seeds],
         )?;
@@ -463,8 +489,8 @@ pub mod dual_farming {
                 &spl_token::ID,
                 ctx.accounts.reward_b_vault.to_account_info().key,
                 ctx.accounts.reward_b_refundee.to_account_info().key,
-                ctx.accounts.pool_signer.key,
-                &[ctx.accounts.pool_signer.key],
+                &ctx.accounts.pool.key(),
+                &[&ctx.accounts.pool.key()],
                 ctx.accounts.reward_b_vault.amount,
             )?;
             solana_program::program::invoke_signed(
@@ -473,7 +499,7 @@ pub mod dual_farming {
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.reward_b_vault.to_account_info(),
                     ctx.accounts.reward_b_refundee.to_account_info(),
-                    ctx.accounts.pool_signer.to_account_info(),
+                    ctx.accounts.pool.to_account_info(),
                 ],
                 &[signer_seeds],
             )?;
@@ -481,8 +507,8 @@ pub mod dual_farming {
                 &spl_token::ID,
                 ctx.accounts.reward_b_vault.to_account_info().key,
                 ctx.accounts.refundee.key,
-                ctx.accounts.pool_signer.key,
-                &[ctx.accounts.pool_signer.key],
+                &ctx.accounts.pool.key(),
+                &[&ctx.accounts.pool.key()],
             )?;
             solana_program::program::invoke_signed(
                 &ix,
@@ -490,7 +516,7 @@ pub mod dual_farming {
                     ctx.accounts.token_program.to_account_info(),
                     ctx.accounts.reward_b_vault.to_account_info(),
                     ctx.accounts.refundee.to_account_info(),
-                    ctx.accounts.pool_signer.to_account_info(),
+                    ctx.accounts.pool.to_account_info(),
                 ],
                 &[signer_seeds],
             )?;
@@ -500,56 +526,74 @@ pub mod dual_farming {
 }
 
 #[derive(Accounts)]
-#[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
-    /// CHECK: authority
-    authority: Signer<'info>,
+    #[account(
+        init,
+        seeds = [
+            base.key().as_ref(),
+            staking_mint.key().as_ref()
+        ],
+        payer = authority,
+        bump,
+        space = 8 + 494 // discriminator + content + buffer
+    )]
+    pool: Box<Account<'info, Pool>>,
+
     staking_mint: Box<Account<'info, Mint>>,
 
     #[account(
-        constraint = staking_vault.mint == staking_mint.key(),
-        constraint = staking_vault.owner == pool_signer.key(),
-        //strangely, spl maintains this on owner reassignment for non-native accounts
-        //we don't want to be given an account that someone else could close when empty
-        //because in our "pool close" operation we want to assert it is still open
-        constraint = staking_vault.close_authority == COption::None,
+        init,
+        seeds = [
+            b"staking",
+            pool.key().as_ref(),
+        ],
+        bump,
+        payer = authority,
+        token::mint = staking_mint,
+        token::authority = pool
     )]
     staking_vault: Box<Account<'info, TokenAccount>>,
 
     reward_a_mint: Box<Account<'info, Mint>>,
 
     #[account(
-        constraint = reward_a_vault.mint == reward_a_mint.key(),
-        constraint = reward_a_vault.owner == pool_signer.key(),
-        constraint = reward_a_vault.close_authority == COption::None,
+        init,
+        seeds = [
+            b"reward_a",
+            pool.key().as_ref(),
+        ],
+        bump,
+        payer = authority,
+        token::mint = reward_a_mint,
+        token::authority = pool
     )]
     reward_a_vault: Box<Account<'info, TokenAccount>>,
 
     reward_b_mint: Box<Account<'info, Mint>>,
 
     #[account(
-        constraint = reward_b_vault.mint == reward_b_mint.key(),
-        constraint = reward_b_vault.owner == pool_signer.key(),
-        constraint = reward_b_vault.close_authority == COption::None,
+        init,
+        seeds = [
+            b"reward_b",
+            pool.key().as_ref(),
+        ],
+        bump,
+        payer = authority,
+        token::mint = reward_b_mint,
+        token::authority = pool
     )]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
 
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool_nonce,
-    )]
+    #[account(mut)]
+    authority: Signer<'info>,
 
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-
-    #[account(zero)]
-    pool: Box<Account<'info, Pool>>,
+    base: Signer<'info>,
+    system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
+    rent: Sysvar<'info, Rent>,
 }
 
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
 pub struct CreateUser<'info> {
     // Stake instance.
     #[account(
@@ -607,10 +651,7 @@ pub struct Stake<'info> {
         has_one = staking_vault,
     )]
     pool: Box<Account<'info, Pool>>,
-    #[account(
-        mut,
-        constraint = staking_vault.owner == *pool_signer.key,
-    )]
+    #[account(mut)]
     staking_vault: Box<Account<'info, TokenAccount>>,
 
     // User.
@@ -628,17 +669,6 @@ pub struct Stake<'info> {
     owner: Signer<'info>,
     #[account(mut)]
     stake_from_account: Box<Account<'info, TokenAccount>>,
-
-    // Program signers.
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-
     // Misc.
     token_program: Program<'info, Token>,
 }
@@ -718,17 +748,6 @@ pub struct ClaimReward<'info> {
     reward_a_account: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     reward_b_account: Box<Account<'info, TokenAccount>>,
-
-    // Program signers.
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
-
     // Misc.
     token_program: Program<'info, Token>,
 }
@@ -752,6 +771,8 @@ pub struct CloseUser<'info> {
         constraint = user.reward_b_per_token_pending == 0,
     )]
     user: Account<'info, User>,
+    // To receive lamports when close the user account
+    #[account(mut)]
     owner: Signer<'info>,
 }
 
@@ -788,61 +809,55 @@ pub struct ClosePool<'info> {
     reward_a_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
-    #[account(
-        seeds = [
-            pool.to_account_info().key.as_ref()
-        ],
-        bump = pool.nonce,
-    )]
-    /// CHECK: pool_signer
-    pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
 
 #[account]
 pub struct Pool {
     /// Priviledged account.
-    pub authority: Pubkey,
-    /// Nonce to derive the program-derived address owning the vaults.
-    pub nonce: u8,
+    pub authority: Pubkey, // 32
     /// Paused state of the program
-    pub paused: bool,
+    pub paused: bool, // 1
     /// Mint of the token that can be staked.
-    pub staking_mint: Pubkey,
+    pub staking_mint: Pubkey, // 32
     /// Vault to store staked tokens.
-    pub staking_vault: Pubkey,
+    pub staking_vault: Pubkey, // 32
     /// Mint of the reward A token.
-    pub reward_a_mint: Pubkey,
+    pub reward_a_mint: Pubkey, // 32
     /// Vault to store reward A tokens.
-    pub reward_a_vault: Pubkey,
+    pub reward_a_vault: Pubkey, // 32
     /// Mint of the reward B token.
-    pub reward_b_mint: Pubkey,
+    pub reward_b_mint: Pubkey, // 32
     /// Vault to store reward B tokens.
-    pub reward_b_vault: Pubkey,
+    pub reward_b_vault: Pubkey, // 32
+    /// Base key
+    pub base_key: Pubkey, // 32
     /// The period which rewards are linearly distributed.
-    pub reward_duration: u64,
+    pub reward_duration: u64, // 8
     /// The timestamp at which the current reward period ends.
-    pub reward_duration_end: u64,
+    pub reward_duration_end: u64, // 8
     /// The last time reward states were updated.
-    pub last_update_time: u64,
+    pub last_update_time: u64, // 8
     /// Rate of reward A distribution.
-    pub reward_a_rate: u64,
+    pub reward_a_rate: u64, // 8
     /// Rate of reward B distribution.
-    pub reward_b_rate: u64,
+    pub reward_b_rate: u64, // 8
     /// Last calculated reward A per pool token.
-    pub reward_a_per_token_stored: u128,
+    pub reward_a_per_token_stored: u128, // 16
     /// Last calculated reward B per pool token.
-    pub reward_b_per_token_stored: u128,
+    pub reward_b_per_token_stored: u128, // 16
     /// Users staked
-    pub user_stake_count: u32,
+    pub user_stake_count: u32, // 4
     /// authorized funders
     /// [] because short size, fixed account size, and ease of use on
     /// client due to auto generated account size property
-    pub funders: [Pubkey; 4],
+    pub funders: [Pubkey; 4], // 32 * 4 = 128
     //the version of the pool
-    pub version: PoolVersion,
+    pub version: PoolVersion, // 1
+    // Pool bump
+    pub pool_bump: u8, // 1
     //trailer for future use
-    pub trailer: [u8; 31],
+    pub trailer: [u8; 31], // 31
 }
 
 #[account]
@@ -864,6 +879,38 @@ pub struct User {
     pub balance_staked: u64,
     /// Signer nonce.
     pub nonce: u8,
+}
+
+#[event]
+pub struct EventStake {
+    amount: u64,
+}
+
+#[event]
+pub struct EventUnstake {
+    amount: u64,
+}
+
+#[event]
+pub struct EventFund {
+    amount_a: u64,
+    amount_b: u64,
+}
+
+#[event]
+pub struct EventClaim {
+    amount_a: u64,
+    amount_b: u64,
+}
+
+#[event]
+pub struct EventAuthorizeFunder {
+    new_funder: Pubkey,
+}
+
+#[event]
+pub struct EventUnauthorizeFunder {
+    funder: Pubkey,
 }
 
 #[error_code]
