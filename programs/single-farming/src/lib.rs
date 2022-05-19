@@ -1,4 +1,3 @@
-use crate::calculator::*;
 use crate::constants::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::clock;
@@ -6,7 +5,8 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
 use std::str::FromStr;
-mod calculator;
+mod state;
+use crate::state::*;
 
 declare_id!("Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18");
 
@@ -54,29 +54,23 @@ pub fn update_rewards(
     user: Option<&mut Box<Account<User>>>,
     total_staked: u64,
 ) -> Result<()> {
-    let last_time_reward_applicable = last_time_reward_applicable(pool.reward_end_timestamp);
+    let last_time_reward_applicable = pool.last_time_reward_applicable();
 
-    let reward = reward_per_token(pool, total_staked, last_time_reward_applicable)
+    let reward = pool
+        .reward_per_token(total_staked, last_time_reward_applicable)
         .ok_or(ErrorCode::MathOverFlow)?;
 
     pool.reward_per_token_stored = reward;
     pool.last_update_time = last_time_reward_applicable;
 
     if let Some(u) = user {
-        let amount = user_earned_amount(pool, u).ok_or(ErrorCode::MathOverFlow)?;
+        let amount = pool.user_earned_amount(u).ok_or(ErrorCode::MathOverFlow)?;
 
         u.reward_per_token_pending = amount;
         u.reward_per_token_complete = pool.reward_per_token_stored;
     }
 
     Ok(())
-}
-
-/// The min of current time and reward duration end, such that after the pool reward
-/// period ends, this always returns the pool end time
-fn last_time_reward_applicable(reward_end_timestamp: u64) -> u64 {
-    let c = clock::Clock::get().unwrap();
-    std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_end_timestamp)
 }
 
 #[program]
@@ -241,7 +235,6 @@ pub mod single_farming {
         emit!(EventPendingReward {
             value: ctx.accounts.user.reward_per_token_pending,
         });
-
         if ctx.accounts.user.reward_per_token_pending > 0 {
             let reward_per_token_pending = ctx.accounts.user.reward_per_token_pending;
             let vault_balance = ctx.accounts.reward_vault.amount;
@@ -250,8 +243,7 @@ pub mod single_farming {
                 vault_balance
             } else {
                 reward_per_token_pending
-            };
-
+            };     
             if reward_amount > 0 {
                 ctx.accounts.user.reward_per_token_pending = reward_per_token_pending
                     .checked_sub(reward_amount)
@@ -416,48 +408,6 @@ pub struct CloseUser<'info> {
     )]
     pub user: Account<'info, User>,
     pub owner: Signer<'info>,
-}
-
-#[account]
-#[derive(Default)]
-pub struct Pool {
-    /// Nonce to derive the program-derived address owning the vaults.
-    pub nonce: u8,
-    /// Mint of the token that can be staked.
-    pub staking_mint: Pubkey,
-    /// Vault to store staked tokens.
-    pub staking_vault: Pubkey,
-    /// Mint of the reward A token.
-    pub reward_mint: Pubkey,
-    /// Vault to store reward A tokens.
-    pub reward_vault: Pubkey,
-    /// The timestamp at which the current reward period ends.
-    pub reward_start_timestamp: u64,
-    /// The timestamp at which the current reward period ends.
-    pub reward_end_timestamp: u64,
-    /// The last time reward states were updated.
-    pub last_update_time: u64,
-    /// Rate of reward A distribution.
-    pub reward_rate: u64,
-    /// Last calculated reward A per pool token.
-    pub reward_per_token_stored: u128,
-}
-
-#[account]
-#[derive(Default)]
-pub struct User {
-    /// Pool the this user belongs to.
-    pub pool: Pubkey,
-    /// The owner of this account.
-    pub owner: Pubkey,
-    /// The amount of token A claimed.
-    pub reward_per_token_complete: u128,
-    /// The amount of token A pending claim.
-    pub reward_per_token_pending: u64,
-    /// The amount staked.
-    pub balance_staked: u64,
-    /// Signer nonce.
-    pub nonce: u8,
 }
 
 #[error_code]

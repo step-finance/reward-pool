@@ -18,7 +18,6 @@ let program = anchor.workspace.SingleFarming;
 //we allow this convenience var to change between default env and mock user(s)
 //initially we are the outside actor
 let provider = anchor.AnchorProvider.env();
-// console.log(provider);
 //convenience method to set in anchor AND above convenience var
 //setting in anchor allows the rpc and accounts namespaces access
 //to a different wallet from env
@@ -46,25 +45,11 @@ describe('Reward Pool', () => {
   it("Initialize mints", async () => {
     console.log("Program ID: ", program.programId.toString());
     console.log("Wallet: ", provider.wallet.publicKey.toString());
-
-    // stakingKeyPair = anchor.web3.Keypair.generate();
-    // await utils.createMintFromPriv(stakingKeyPair, provider, provider.wallet.publicKey, null, 9, TOKEN_PROGRAM_ID);
-    // stakingMint = stakingKeyPair.publicKey;
-    // rewardKeypair = anchor.web3.Keypair.generate();
-    // await utils.createMintFromPriv(rewardKeypair, provider, provider.wallet.publicKey, null, 9, TOKEN_PROGRAM_ID);
-    // rewardMint = rewardKeypair.publicKey;
     let mintData = await initializeMint();
     stakingKeyPair = mintData.stakingKeyPair;
     stakingMint = mintData.stakingMint;
     rewardKeypair = mintData.rewardKeypair;
     rewardMint = mintData.rewardMint;
-    // {
-    //   stakingKeyPair,
-    //     stakingMint,
-    //     rewardKeypair,
-    //     rewardMint,
-    // } = await initializeMint();
-
   });
 
   it("Initialize admins", async () => {
@@ -94,12 +79,6 @@ describe('Reward Pool', () => {
       await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
       assert.fail("did not fail to create dupe pool");
     } catch (e) { }
-
-    //create pool by non admin
-    // try {
-    //   await nonAdmin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
-    //   assert.fail("Cannot create pool with non admin");
-    // } catch (e) { }
   });
 
   it('User does some staking', async () => {
@@ -139,7 +118,7 @@ describe('Reward Pool', () => {
     assert.equal(claimedReward, 0);
 
     // fund reward account
-    user.fundReward(100_000);
+    user.fundReward(10_000_000_000);
 
 
     // Can calaim reward
