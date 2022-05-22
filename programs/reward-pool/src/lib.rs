@@ -586,6 +586,7 @@ pub mod reward_pool {
 #[derive(Accounts)]
 #[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
+    /// CHECK: grr anchor
     authority: UncheckedAccount<'info>,
 
     #[account(
@@ -639,6 +640,7 @@ pub struct InitializePool<'info> {
         ],
         bump = pool_nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
 
     #[account(zero)]
@@ -659,14 +661,16 @@ pub struct CreateUser<'info> {
     // Member.
     #[account(
         init,
+        space = User::LEN + 8,
         payer = owner,
         seeds = [
             owner.key.as_ref(),
             pool.to_account_info().key.as_ref()
         ],
-        bump = nonce,
+        bump,
     )]
     user: Box<Account<'info, User>>,
+    #[account(mut)]
     owner: Signer<'info>,
     // Misc.
     system_program: Program<'info, System>,
@@ -696,6 +700,7 @@ pub struct Pause<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -729,6 +734,7 @@ pub struct Unpause<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -770,6 +776,7 @@ pub struct Stake<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -821,6 +828,7 @@ pub struct Fund<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -869,6 +877,7 @@ pub struct ClaimReward<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
 
     // Misc.
@@ -900,6 +909,7 @@ pub struct CloseUser<'info> {
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
     #[account(mut)]
+    /// CHECK: grr anchor
     refundee: UncheckedAccount<'info>,
     #[account(mut)]
     staking_refundee: Box<Account<'info, TokenAccount>>,
@@ -935,6 +945,7 @@ pub struct ClosePool<'info> {
         ],
         bump = pool.nonce,
     )]
+    /// CHECK: grr anchor
     pool_signer: UncheckedAccount<'info>,
     token_program: Program<'info, Token>,
 }
@@ -1006,6 +1017,10 @@ pub struct User {
     pub balance_staked: u64,
     /// Signer nonce.
     pub nonce: u8,
+}
+
+impl User {
+    pub const LEN: usize = 32 + 32 + 16 + 16 + 8 + 8 + 8 + 1;
 }
 
 #[error]
