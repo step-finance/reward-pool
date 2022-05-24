@@ -3,17 +3,17 @@ use std::convert::TryInto;
 use std::fmt::Debug;
 
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::{clock, program_option::COption, sysvar};
+use anchor_lang::solana_program::{clock, sysvar};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
 use crate::constants::*;
 use crate::pool::*;
 use crate::version::*;
 
-mod pool;
+pub mod pool;
 mod version;
 
-declare_id!("8Ct1Q6nDbi5Sye4B1LgKUnA6xwSWWwJm1yEekANZKJUj");
+declare_id!("AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH");
 
 #[cfg(not(feature = "dev"))]
 mod constants {

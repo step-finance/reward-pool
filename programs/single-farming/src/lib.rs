@@ -243,7 +243,7 @@ pub mod single_farming {
                 vault_balance
             } else {
                 reward_per_token_pending
-            };     
+            };
             if reward_amount > 0 {
                 ctx.accounts.user.reward_per_token_pending = reward_per_token_pending
                     .checked_sub(reward_amount)

@@ -951,6 +951,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "dual-farming-cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "clap 3.1.18",
+ "dual_farming",
+ "shellexpand",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token",
+]
+
+[[package]]
 name = "dual_farming"
 version = "0.2.0"
 dependencies = [

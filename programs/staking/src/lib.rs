@@ -320,7 +320,7 @@ pub struct FunderChange<'info> {
     pub admin: Signer<'info>,
     #[account(constraint = funder.key() != vault.funder.key())]
     /// CHECK funder
-    pub funder: AccountInfo<'info>
+    pub funder: AccountInfo<'info>,
 }
 
 #[error_code]

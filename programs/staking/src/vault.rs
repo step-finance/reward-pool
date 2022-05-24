@@ -14,7 +14,7 @@ pub struct Vault {
     pub vault_bump: u8,
     pub total_amount: u64,
     pub locked_reward_tracker: LockedRewardTracker,
-    pub funder: Pubkey
+    pub funder: Pubkey,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug)]

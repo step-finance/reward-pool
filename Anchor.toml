@@ -13,4 +13,4 @@ wallet = "~/.config/solana/id.json"
 [programs.localnet]
 staking = "FFkqjHsFZS3MaUELNrz4TMNo1pz5nE3sBShjuMiSy1Pz"
 single_farming = "Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18"
-dual_farming = "8Ct1Q6nDbi5Sye4B1LgKUnA6xwSWWwJm1yEekANZKJUj"
+dual_farming = "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"

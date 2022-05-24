@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "programs/*",
-    "cli-staking"
+    "cli-staking",
+    "dual-farming-cli"
 ]
