@@ -935,7 +935,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dual-farming"
+name = "dual-farming-cli"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
