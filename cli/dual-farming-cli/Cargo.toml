@@ -1,5 +1,5 @@
 [package]
-name = "dual-farming-cli"
+name = "dual-farming"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "3.1.8", features = ["derive"] }
-dual_farming = { path = "../programs/dual-farming" }
+dual_farming = { path = "../../programs/dual-farming" }
 shellexpand = "2.1.0"
 anchor-lang = "0.24.2"
 anchor-spl = {version = "0.24.2"}

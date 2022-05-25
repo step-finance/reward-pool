@@ -9,9 +9,9 @@ anchor == 0.24.2
 ### Install
 ```bash
 git clone git@github.com:mercurial-finance/reward-pool.git
-cd dual-farming-cli
+cd cli/dual-farming-cli
 cargo build --release
-cd ../target/release
+cd ../../target/release
 ```
 ### Usage
 ```bash

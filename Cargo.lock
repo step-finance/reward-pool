@@ -677,22 +677,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli-staking"
-version = "0.1.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "clap 3.1.18",
- "shellexpand",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
- "staking",
-]
-
-[[package]]
 name = "console"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -951,7 +935,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dual-farming-cli"
+name = "dual-farming"
 version = "0.1.0"
 dependencies = [
  "anchor-client",
@@ -3197,6 +3181,22 @@ dependencies = [
  "anchor-spl",
  "num-traits",
  "spl-math",
+]
+
+[[package]]
+name = "staking-cli"
+version = "0.1.0"
+dependencies = [
+ "anchor-client",
+ "anchor-lang",
+ "anchor-spl",
+ "anyhow",
+ "clap 3.1.18",
+ "shellexpand",
+ "solana-program",
+ "spl-associated-token-account",
+ "spl-token",
+ "staking",
 ]
 
 [[package]]
