@@ -5,10 +5,10 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
 use std::str::FromStr;
-mod state;
+pub mod state;
 use crate::state::*;
 
-declare_id!("Dev9TukuTHwNmYm2NUcXQ9iuNL8UrP3TnZCj1Y7UjV18");
+declare_id!("EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd");
 
 #[cfg(not(feature = "dev"))]
 mod constants {

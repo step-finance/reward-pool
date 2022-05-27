@@ -1,0 +1,18 @@
+[package]
+name = "single-farming-cli"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "3.1.8", features = ["derive"] }
+single_farming = { path = "../../programs/single-farming", features= ["dev"]}
+shellexpand = "2.1.0"
+anchor-lang = "0.24.2"
+anchor-spl = {version = "0.24.2"}
+anchor-client = "0.24.2"
+anyhow = "1.0.57"
+solana-program = "1.8.16"
+spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
+spl-associated-token-account = { version = "1.0.3", features = ["no-entrypoint"] }
