@@ -307,7 +307,7 @@ pub struct TransferAdmin<'info> {
     pub admin: Signer<'info>,
     /// CHECK: New vault admin
     #[account(constraint = new_admin.key() != admin.key())]
-    pub new_admin: AccountInfo<'info>,
+    pub new_admin: Signer<'info>,
 }
 
 #[derive(Accounts)]

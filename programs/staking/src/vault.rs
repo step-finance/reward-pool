@@ -69,12 +69,11 @@ impl Vault {
     }
 
     pub fn stake(&mut self, current_time: u64, token_amount: u64, lp_supply: u64) -> Option<u64> {
-        let total_amount = self.get_unlocked_amount(current_time)?;
-        if total_amount == 0 {
+        if self.total_amount == 0 {
             self.total_amount = token_amount;
             return Some(token_amount);
         }
-
+        let total_amount = self.get_unlocked_amount(current_time)?;
         let new_lp_token = (token_amount as u128)
             .checked_mul(lp_supply as u128)?
             .checked_div(total_amount as u128)?

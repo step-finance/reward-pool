@@ -8,10 +8,8 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
 use crate::constants::*;
 use crate::pool::*;
-use crate::version::*;
 
 pub mod pool;
-mod version;
 
 declare_id!("AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH");
 
@@ -96,7 +94,6 @@ pub mod dual_farming {
         pool.reward_a_per_token_stored = 0;
         pool.reward_b_per_token_stored = 0;
         pool.user_stake_count = 0;
-        pool.version = PoolVersion::V2;
         pool.base_key = ctx.accounts.base.key();
         // Unwrap here is safe as long as the key matches the account in the context
         pool.pool_bump = *ctx.bumps.get("pool").unwrap();
@@ -852,12 +849,8 @@ pub struct Pool {
     /// [] because short size, fixed account size, and ease of use on
     /// client due to auto generated account size property
     pub funders: [Pubkey; 4], // 32 * 4 = 128
-    //the version of the pool
-    pub version: PoolVersion, // 1
     // Pool bump
     pub pool_bump: u8, // 1
-    //trailer for future use
-    pub trailer: [u8; 31], // 31
 }
 
 #[account]
@@ -938,20 +931,15 @@ pub enum ErrorCode {
 impl Debug for Pool {
     /// writes a subset of pool fields for debugging
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        if cfg!(feature = "verbose") {
-            write!(f, "version: {:?} paused: {} reward_duration: {} reward_duration_end: {} reward_a_rate: {} reward_b_rate: {} reward_a_per_token_stored {} reward_b_per_token_stored {}",
-                self.version,
-                self.paused,
-                self.reward_duration,
-                self.reward_duration_end,
-                self.reward_a_rate,
-                self.reward_b_rate,
-                self.reward_a_per_token_stored,
-                self.reward_b_per_token_stored,
-            )
-        } else {
-            write!(f, "version: {:?}", self.version,)
-        }
+        write!(f, "paused: {} reward_duration: {} reward_duration_end: {} reward_a_rate: {} reward_b_rate: {} reward_a_per_token_stored {} reward_b_per_token_stored {}",                
+        self.paused,
+        self.reward_duration,
+        self.reward_duration_end,
+        self.reward_a_rate,
+        self.reward_b_rate,
+        self.reward_a_per_token_stored,
+        self.reward_b_per_token_stored,
+    )
     }
 }
 

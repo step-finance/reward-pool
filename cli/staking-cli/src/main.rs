@@ -39,8 +39,10 @@ fn main() -> Result<()> {
         }
         CliCommand::TransferAdmin {
             token_mint,
-            new_admin,
+            new_admin_path,
         } => {
+            let new_admin =
+                read_keypair_file(new_admin_path).expect("Wallet keypair file not found");
             transfer_admin(&program, &token_mint, &payer, &new_admin)?;
         }
         CliCommand::ShowInfo { token_mint } => {
@@ -236,7 +238,7 @@ fn transfer_admin(
     program: &Program,
     token_mint: &Pubkey,
     admin: &Keypair,
-    new_admin: &Pubkey,
+    new_admin: &Keypair,
 ) -> Result<()> {
     let base_pubkey = Pubkey::from_str(BASE_KEY)?;
     let VaultPdas {
@@ -251,11 +253,12 @@ fn transfer_admin(
         .request()
         .accounts(staking::accounts::TransferAdmin {
             admin: admin.pubkey(),
-            new_admin: *new_admin,
+            new_admin: new_admin.pubkey(),
             vault: vault_pubkey,
         })
         .args(staking::instruction::TransferAdmin {})
-        .signer(admin);
+        .signer(admin)
+        .signer(new_admin);
 
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

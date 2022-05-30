@@ -41,7 +41,7 @@ pub enum CliCommand {
     /// Transfer admin
     TransferAdmin {
         #[clap(long)]
-        new_admin: Pubkey,
+        new_admin_path: String, // path that stores new_admin keypair
         #[clap(long)]
         token_mint: Pubkey,
     },

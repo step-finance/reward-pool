@@ -299,7 +299,7 @@ describe("staking", () => {
                     admin: admin.publicKey,
                     newAdmin: newAdmin.publicKey
                 },
-                signers: [admin]
+                signers: [admin, newAdmin]
             }
         )
         let vaultAccount = await program.account.vault.fetch(
