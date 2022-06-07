@@ -1,31 +1,41 @@
+//! Single farming program
+#![deny(rustdoc::all)]
+#![allow(rustdoc::missing_doc_code_examples)]
+#![warn(clippy::unwrap_used)]
+#![warn(clippy::integer_arithmetic)]
+#![warn(missing_docs)]
+
 use crate::constants::*;
+use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::clock;
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use std::convert::Into;
 use std::convert::TryInto;
 use std::str::FromStr;
+
+/// Export for pool implementation
 pub mod state;
-use crate::state::*;
 
 declare_id!("EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd");
 
 #[cfg(not(feature = "dev"))]
 mod constants {
     use super::*;
-    pub const MIN_DURATION: u64 = 86400; // 1 day
+    pub const MIN_DURATION: u64 = 86400;
+    // 1 day
     pub fn validate_admin_address(pubkey: Pubkey) -> bool {
         if pubkey == Pubkey::from_str("DHLXnJdACTY83yKwnUkeoDjqi4QBbsYGa1v8tJL76ViX").unwrap() {
             return true;
         }
-        return false;
+        false
     }
 
     pub fn validate_staking_mint(pubkey: Pubkey) -> bool {
         if pubkey == Pubkey::from_str("MERt85fc5boKw3BW1eYdxonEuJNvXbiMbs6hvheau5K").unwrap() {
             return true;
         }
-        return false;
+        false
     }
 }
 
@@ -73,6 +83,7 @@ pub fn update_rewards(
     Ok(())
 }
 
+/// Single farming program
 #[program]
 pub mod single_farming {
     use super::*;
@@ -270,14 +281,16 @@ pub mod single_farming {
 
     /// Closes a users stake account. Validation is done to ensure this is only allowed when
     /// the user has nothing staked and no rewards pending.
-    pub fn close_user(ctx: Context<CloseUser>) -> Result<()> {
+    pub fn close_user(_ctx: Context<CloseUser>) -> Result<()> {
         Ok(())
     }
 }
 
+/// Accounts for [InitializePool](/single_farming/instruction/struct.InitializePool.html) instruction
 #[derive(Accounts)]
 #[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
+    /// The farming pool PDA.
     #[account(
         init,
         seeds = [b"pool".as_ref(), staking_mint.key().as_ref()], 
@@ -287,6 +300,7 @@ pub struct InitializePool<'info> {
     )]
     pub pool: Box<Account<'info, Pool>>,
 
+    /// The staking vault PDA.
     #[account(
         init,
         seeds = [b"staking_vault".as_ref(), pool.key().as_ref()],
@@ -296,9 +310,12 @@ pub struct InitializePool<'info> {
         token::authority = pool,
     )]
     pub staking_vault: Box<Account<'info, TokenAccount>>,
+    /// The staking Mint.
     #[account(mut, constraint = validate_staking_mint(staking_mint.key()) @ ErrorCode::WrongStakingMint)]
     pub staking_mint: Box<Account<'info, Mint>>,
+    /// The reward Mint.
     pub reward_mint: Box<Account<'info, Mint>>,
+    /// The reward Vault PDA.
     #[account(
         init,
         seeds = [b"reward_vault".as_ref(), pool.key().as_ref()],
@@ -309,21 +326,25 @@ pub struct InitializePool<'info> {
     )]
     pub reward_vault: Box<Account<'info, TokenAccount>>,
 
+    /// The authority of the pool
     #[account(mut, constraint = validate_admin_address(admin.key()) @ ErrorCode::InvalidAdminWhenCreatingPool)]
     pub admin: Signer<'info>,
 
+    /// Token Program
     pub token_program: Program<'info, Token>,
-    /// CHECK: Rent
-    pub rent: UncheckedAccount<'info>,
-    /// CHECK: System program
-    pub system_program: UncheckedAccount<'info>,
+    /// Rent
+    pub rent: Sysvar<'info, Rent>,
+    /// System program
+    pub system_program: Program<'info, System>,
 }
 
+/// Accounts for [CreateUser](/single_farming/instruction/struct.CreateUser.html) instruction
 #[derive(Accounts)]
 #[instruction(nonce: u8)]
 pub struct CreateUser<'info> {
+    /// The farming pool PDA.
     pub pool: Box<Account<'info, Pool>>,
-    // Member.
+    /// User staking PDA.
     #[account(
         init,
         payer = owner,
@@ -335,68 +356,80 @@ pub struct CreateUser<'info> {
         space = 120 // 1 + 97 + buffer
     )]
     pub user: Box<Account<'info, User>>,
+    /// The authority of user
     #[account(mut)]
     pub owner: Signer<'info>,
-    // Misc.
+    /// System Program
     pub system_program: Program<'info, System>,
 }
 
+/// Accounts for [Stake](/single_farming/instruction/struct.Stake.html) instruction and [UnStake](/single_farming/instruction/struct.Unstake.html) instruction
 #[derive(Accounts)]
 pub struct Stake<'info> {
-    // Global accounts for the staking instance.
+    /// The farming pool PDA.
     #[account(
         mut,
         has_one = staking_vault,
     )]
     pub pool: Box<Account<'info, Pool>>,
+    /// The staking vault PDA.
     #[account(mut)]
     pub staking_vault: Box<Account<'info, TokenAccount>>,
 
-    // User.
+    /// User staking PDA.
     #[account(
         mut,
         has_one = owner,
         has_one = pool,
     )]
     pub user: Box<Account<'info, User>>,
+    /// The authority of user
     pub owner: Signer<'info>,
+    /// The user ATA
     #[account(mut)]
     pub stake_from_account: Box<Account<'info, TokenAccount>>,
 
-    // Misc.
+    /// Token program
     pub token_program: Program<'info, Token>,
 }
 
+/// Accounts for [Claim](/single_farming/instruction/struct.Claim.html) instruction
 #[derive(Accounts)]
 pub struct ClaimReward<'info> {
-    // Global accounts for the staking instance.
+    /// The farming pool PDA.
     #[account(
         mut,
         has_one = staking_vault,
         has_one = reward_vault,
     )]
     pub pool: Box<Account<'info, Pool>>,
+    /// The staking vault PDA.
     pub staking_vault: Box<Account<'info, TokenAccount>>,
+    /// Vault of the pool, which store the reward to be distributed
     #[account(mut)]
     pub reward_vault: Box<Account<'info, TokenAccount>>,
 
-    // User.
+    /// User staking PDA.
     #[account(
         mut,
         has_one = owner,
         has_one = pool,
     )]
     pub user: Box<Account<'info, User>>,
+    /// The authority of user
     pub owner: Signer<'info>,
+    /// User token account to receive farming reward
     #[account(mut)]
     pub reward_account: Box<Account<'info, TokenAccount>>,
 
-    // Misc.
+    /// Token program
     pub token_program: Program<'info, Token>,
 }
 
+/// Accounts for [CloseUser](/single_farming/instruction/struct.CloseUser.html) instruction
 #[derive(Accounts)]
 pub struct CloseUser<'info> {
+    /// The farming pool PDA.
     pub pool: Box<Account<'info, Pool>>,
     #[account(
         mut,
@@ -406,38 +439,54 @@ pub struct CloseUser<'info> {
         constraint = user.balance_staked == 0,
         constraint = user.reward_per_token_pending == 0,
     )]
+    /// User account to be close
     pub user: Account<'info, User>,
+    /// Owner of the user account
     pub owner: Signer<'info>,
 }
 
+/// Contains error code from the program
 #[error_code]
 pub enum ErrorCode {
+    /// Staking mint is wrong
     #[msg("Staking mint is wrong")]
     WrongStakingMint,
+    /// Create pool with wrong admin
     #[msg("Create pool with wrong admin")]
     InvalidAdminWhenCreatingPool,
+    /// Start time cannot be smaller than current time
     #[msg("Start time cannot be smaller than current time")]
     InvalidStartDate,
+    /// Farming hasn't started
     #[msg("Farming hasn't started")]
     FarmingNotStart,
+    /// Cannot unstake more than staked amount
     #[msg("Cannot unstake more than staked amount")]
     CannotUnstakeMoreThanBalance,
+    /// Insufficient funds to unstake.
     #[msg("Insufficient funds to unstake.")]
     InsufficientFundUnstake,
+    /// Amount must be greater than zero.
     #[msg("Amount must be greater than zero.")]
     AmountMustBeGreaterThanZero,
+    /// Duration cannot be shorter than one day.
     #[msg("Duration cannot be shorter than one day.")]
     DurationTooShort,
+    /// MathOverFlow
     #[msg("MathOverFlow")]
     MathOverFlow,
 }
 
+/// EventPendingReward
 #[event]
 pub struct EventPendingReward {
+    /// Pending reward amount
     pub value: u64,
 }
 
+/// EventClaimReward
 #[event]
 pub struct EventClaimReward {
+    /// Claim reward amount
     pub value: u64,
 }

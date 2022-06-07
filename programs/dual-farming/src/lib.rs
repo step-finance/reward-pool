@@ -1,3 +1,10 @@
+//! Dual farming program
+#![deny(rustdoc::all)]
+#![allow(rustdoc::missing_doc_code_examples)]
+#![warn(clippy::unwrap_used)]
+#![warn(clippy::integer_arithmetic)]
+#![warn(missing_docs)]
+
 use std::convert::Into;
 use std::convert::TryInto;
 use std::fmt::Debug;
@@ -9,6 +16,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use crate::constants::*;
 use crate::pool::*;
 
+/// Export for pool implementation
 pub mod pool;
 
 declare_id!("AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH");
@@ -68,11 +76,12 @@ fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
     std::cmp::min(c.unix_timestamp.try_into().unwrap(), reward_duration_end)
 }
 
+/// Dual farming program
 #[program]
 pub mod dual_farming {
     use super::*;
 
-    /// Initializes a new pool
+    /// Initializes a new pool. Able to create pool with single reward by passing the same Mint account for reward_a_mint and reward_a_mint
     pub fn initialize_pool(ctx: Context<InitializePool>, reward_duration: u64) -> Result<()> {
         if reward_duration < MIN_DURATION {
             return Err(ErrorCode::DurationTooShort.into());
@@ -117,7 +126,7 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// Pauses
+    /// Pause the pool
     pub fn pause(ctx: Context<Pause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = true;
@@ -125,15 +134,14 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// Unpauses a previously paused pool
-    /// allowing for funding
+    /// Unpauses a previously paused pool. Allowing for funding.
     pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.paused = false;
         Ok(())
     }
 
-    /// A user stakes tokens in the pool.
+    /// User stakes tokens in the pool.
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
@@ -170,7 +178,7 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// A user unstakes tokens in the pool.
+    /// User unstakes tokens in the pool.
     pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
         if spt_amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
@@ -255,15 +263,16 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// Fund the pool with rewards.  This resets the clock on the end date, pushing it out to the set duration
-    /// And linearly redistributes remaining rewards.
+    /// Fund the pool with rewards.  This resets the clock on the end date, pushing it out to the set duration. And, linearly redistributes remaining rewards.
     pub fn fund(ctx: Context<Fund>, amount_a: u64, amount_b: u64) -> Result<()> {
-        //if vault a and b are the same, we just use a
-        if amount_b > 0 && ctx.accounts.reward_a_vault.key() == ctx.accounts.reward_b_vault.key() {
+        let pool = &mut ctx.accounts.pool;
+
+        //can't compare using reward_vault because it is PDA. The PDA seed contain different prefix
+        //if mint are the same, we just use a
+        if amount_b > 0 && ctx.accounts.reward_a_vault.mint == ctx.accounts.reward_b_vault.mint {
             return Err(ErrorCode::SingleStakeTokenBCannotBeFunded.into());
         }
 
-        let pool = &mut ctx.accounts.pool;
         let total_staked = ctx.accounts.staking_vault.amount;
         update_rewards(pool, None, total_staked).unwrap();
 
@@ -311,7 +320,7 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// A user claiming rewards
+    /// User claim rewards
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
         let total_staked = ctx.accounts.staking_vault.amount;
 
@@ -384,8 +393,7 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// Closes a users stake account. Validation is done to ensure this is only allowed when
-    /// the user has nothing staked and no rewards pending.
+    /// Closes a users stake account. Validation is done to ensure this is only allowed when the user has nothing staked and no rewards pending.
     pub fn close_user(ctx: Context<CloseUser>) -> Result<()> {
         let pool = &mut ctx.accounts.pool;
         pool.user_stake_count = pool.user_stake_count.checked_sub(1).unwrap();
@@ -522,8 +530,10 @@ pub mod dual_farming {
     }
 }
 
+/// Accounts for [InitializePool](/dual_farming/instruction/struct.InitializePool.html) instruction
 #[derive(Accounts)]
 pub struct InitializePool<'info> {
+    /// Global accounts for the staking instance.
     #[account(
         init,
         seeds = [
@@ -535,9 +545,10 @@ pub struct InitializePool<'info> {
         space = 8 + 494 // discriminator + content + buffer
     )]
     pool: Box<Account<'info, Pool>>,
-
+    /// Staking mint
     staking_mint: Box<Account<'info, Mint>>,
 
+    /// Staking vault PDA
     #[account(
         init,
         seeds = [
@@ -551,8 +562,10 @@ pub struct InitializePool<'info> {
     )]
     staking_vault: Box<Account<'info, TokenAccount>>,
 
+    /// Reward A mint
     reward_a_mint: Box<Account<'info, Mint>>,
 
+    /// Reward A vault PDA
     #[account(
         init,
         seeds = [
@@ -566,8 +579,10 @@ pub struct InitializePool<'info> {
     )]
     reward_a_vault: Box<Account<'info, TokenAccount>>,
 
+    /// Reward B mint
     reward_b_mint: Box<Account<'info, Mint>>,
 
+    /// Reward B vault PDA
     #[account(
         init,
         seeds = [
@@ -581,24 +596,30 @@ pub struct InitializePool<'info> {
     )]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
 
+    /// Authority of the pool
     #[account(mut)]
     authority: Signer<'info>,
 
+    /// Base
     base: Signer<'info>,
+    /// System program
     system_program: Program<'info, System>,
+    /// SPL Token program
     token_program: Program<'info, Token>,
+    /// Rent
     rent: Sysvar<'info, Rent>,
 }
 
+/// Accounts for [CreateUser](/dual_farming/instruction/struct.CreateUser.html) instruction
 #[derive(Accounts)]
 pub struct CreateUser<'info> {
-    // Stake instance.
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         constraint = !pool.paused,
     )]
     pool: Box<Account<'info, Pool>>,
-    // Member.
+    /// User
     #[account(
         init,
         payer = owner,
@@ -610,14 +631,17 @@ pub struct CreateUser<'info> {
         space = 200, //8 + 32 + 32 + 16 + 16 + 8 + 8 + 8 + 1 + buffer
     )]
     user: Box<Account<'info, User>>,
+    /// Authority of user account
     #[account(mut)]
     owner: Signer<'info>,
-    // Misc.
+    /// Misc.
     system_program: Program<'info, System>,
 }
 
+/// Accounts for [Pause](/dual_farming/instruction/struct.Pause.html) instruction
 #[derive(Accounts)]
 pub struct Pause<'info> {
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = authority,
@@ -626,32 +650,38 @@ pub struct Pause<'info> {
         constraint = pool.reward_duration_end > 0,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Authority of the pool
     authority: Signer<'info>,
 }
 
+/// Accounts for [Unpause](/dual_farming/instruction/struct.Unpause.html) instruction
 #[derive(Accounts)]
 pub struct Unpause<'info> {
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = authority,
         constraint = pool.paused,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Authority of the pool
     authority: Signer<'info>,
 }
 
+/// Accounts for [Stake](/dual_farming/instruction/struct.Stake.html) and [Unstake](/dual_farming/instruction/struct.Unstake.html) instructions.
 #[derive(Accounts)]
 pub struct Stake<'info> {
-    // Global accounts for the staking instance.
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = staking_vault,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Staking vault PDA.
     #[account(mut)]
     staking_vault: Box<Account<'info, TokenAccount>>,
 
-    // User.
+    /// User.
     #[account(
         mut,
         has_one = owner,
@@ -663,27 +693,33 @@ pub struct Stake<'info> {
         bump = user.nonce,
     )]
     user: Box<Account<'info, User>>,
+    /// Authority of user
     owner: Signer<'info>,
+    /// User staking ATA
     #[account(mut)]
     stake_from_account: Box<Account<'info, TokenAccount>>,
-    // Misc.
+    /// Misc.
     token_program: Program<'info, Token>,
 }
 
+/// Accounts for
+/// and  instructions.
 #[derive(Accounts)]
 pub struct FunderChange<'info> {
-    // Global accounts for the staking instance.
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = authority,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Authority of the pool
     authority: Signer<'info>,
 }
 
+/// Accounts for [Fund](/dual_farming/instruction/struct.Fund.html) instruction.
 #[derive(Accounts)]
 pub struct Fund<'info> {
-    // Global accounts for the staking instance.
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = staking_vault,
@@ -692,28 +728,35 @@ pub struct Fund<'info> {
         constraint = !pool.paused,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Staking vault PDA
     #[account(mut)]
     staking_vault: Box<Account<'info, TokenAccount>>,
+    /// Reward A Vault PDA
     #[account(mut)]
     reward_a_vault: Box<Account<'info, TokenAccount>>,
+    /// Reward B Vault PDA
     #[account(mut)]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
+    /// Funder
     #[account(
         //require signed funder auth - otherwise constant micro fund could hold funds hostage
         constraint = funder.key() == pool.authority || pool.funders.iter().any(|x| *x == funder.key()),
     )]
     funder: Signer<'info>,
+    /// Funder reward A ATA
     #[account(mut)]
     from_a: Box<Account<'info, TokenAccount>>,
+    /// Funder reward B ATA
     #[account(mut)]
     from_b: Box<Account<'info, TokenAccount>>,
-    // Misc.
+    /// Misc.
     token_program: Program<'info, Token>,
 }
 
+/// Accounts for [Claim](/dual_farming/instruction/struct.Claim.html) instruction.
 #[derive(Accounts)]
 pub struct ClaimReward<'info> {
-    // Global accounts for the staking instance.
+    /// Global accounts for the staking instance.
     #[account(
         mut,
         has_one = staking_vault,
@@ -721,14 +764,17 @@ pub struct ClaimReward<'info> {
         has_one = reward_b_vault,
     )]
     pool: Box<Account<'info, Pool>>,
+    /// Staking vault PDA.
     #[account(mut)]
     staking_vault: Box<Account<'info, TokenAccount>>,
+    /// Reward A Vault PDA
     #[account(mut)]
     reward_a_vault: Box<Account<'info, TokenAccount>>,
+    /// Reward B Vault PDA
     #[account(mut)]
     reward_b_vault: Box<Account<'info, TokenAccount>>,
 
-    // User.
+    /// User.
     #[account(
         mut,
         has_one = owner,
@@ -740,15 +786,18 @@ pub struct ClaimReward<'info> {
         bump = user.nonce,
     )]
     user: Box<Account<'info, User>>,
+    /// Authority of user
     owner: Signer<'info>,
+    /// User's Reward A ATA
     #[account(mut)]
     reward_a_account: Box<Account<'info, TokenAccount>>,
+    /// User's Reward B ATA
     #[account(mut)]
     reward_b_account: Box<Account<'info, TokenAccount>>,
     // Misc.
     token_program: Program<'info, Token>,
 }
-
+/// Accounts for [CloseUser](/dual_farming/instruction/struct.CloseUser.html) instruction
 #[derive(Accounts)]
 pub struct CloseUser<'info> {
     #[account(mut)]
@@ -772,7 +821,7 @@ pub struct CloseUser<'info> {
     #[account(mut)]
     owner: Signer<'info>,
 }
-
+/// Accounts for [ClosePool](/dual_farming/instruction/struct.ClosePool.html) instruction
 #[derive(Accounts)]
 pub struct ClosePool<'info> {
     #[account(mut)]
@@ -809,6 +858,7 @@ pub struct ClosePool<'info> {
     token_program: Program<'info, Token>,
 }
 
+/// Pool account wrapper
 #[account]
 pub struct Pool {
     /// Priviledged account.
@@ -849,10 +899,11 @@ pub struct Pool {
     /// [] because short size, fixed account size, and ease of use on
     /// client due to auto generated account size property
     pub funders: [Pubkey; 4], // 32 * 4 = 128
-    // Pool bump
+    /// Pool bump
     pub pool_bump: u8, // 1
 }
 
+/// Farming user account
 #[account]
 #[derive(Default)]
 pub struct User {
@@ -874,56 +925,72 @@ pub struct User {
     pub nonce: u8,
 }
 
+/// Stake-event
 #[event]
 pub struct EventStake {
     amount: u64,
 }
 
+/// Un-stake event
 #[event]
 pub struct EventUnstake {
     amount: u64,
 }
 
+/// Fund event
 #[event]
 pub struct EventFund {
     amount_a: u64,
     amount_b: u64,
 }
 
+/// Claim event
 #[event]
 pub struct EventClaim {
     amount_a: u64,
     amount_b: u64,
 }
 
+/// Authorized funder event
 #[event]
 pub struct EventAuthorizeFunder {
     new_funder: Pubkey,
 }
 
+/// Un-authorized funder event
 #[event]
 pub struct EventUnauthorizeFunder {
     funder: Pubkey,
 }
 
+/// Program error codes
 #[error_code]
 pub enum ErrorCode {
+    /// Insufficient funds to unstake.
     #[msg("Insufficient funds to unstake.")]
     InsufficientFundUnstake,
+    /// Amount must be greater than zero.
     #[msg("Amount must be greater than zero.")]
     AmountMustBeGreaterThanZero,
+    /// Reward B cannot be funded - pool is single stake.
     #[msg("Reward B cannot be funded - pool is single stake.")]
     SingleStakeTokenBCannotBeFunded,
+    /// Pool is paused.
     #[msg("Pool is paused.")]
     PoolPaused,
+    /// Duration cannot be shorter than one day.
     #[msg("Duration cannot be shorter than one day.")]
     DurationTooShort,
+    /// Provided funder is already authorized to fund.
     #[msg("Provided funder is already authorized to fund.")]
     FunderAlreadyAuthorized,
+    /// Maximum funders already authorized.
     #[msg("Maximum funders already authorized.")]
     MaxFunders,
+    /// Cannot deauthorize the primary pool authority.
     #[msg("Cannot deauthorize the primary pool authority.")]
     CannotDeauthorizePoolAuthority,
+    /// Authority not found for deauthorization.
     #[msg("Authority not found for deauthorization.")]
     CannotDeauthorizeMissingAuthority,
 }

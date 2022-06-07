@@ -9,6 +9,7 @@ const PRECISION: u128 = 1_000_000_000;
 
 #[account]
 #[derive(Default)]
+/// Pool account wrapper
 pub struct Pool {
     /// Nonce to derive the program-derived address owning the vaults.
     pub nonce: u8,
@@ -33,6 +34,7 @@ pub struct Pool {
 }
 
 impl Pool {
+    /// Calculate reward base on staked token.
     pub fn reward_per_token(
         &self,
         total_staked: u64,
@@ -47,7 +49,7 @@ impl Pool {
 
         let time_diff_numerator = self
             .reward_end_timestamp
-            .checked_sub(last_time_reward_applicable.into())?
+            .checked_sub(last_time_reward_applicable)?
             .checked_add(
                 self.reward_end_timestamp
                     .checked_sub(self.last_update_time)?,
@@ -59,8 +61,8 @@ impl Pool {
         let emit_rewards: u128 = time_period
             .checked_mul(self.reward_rate.into())?
             .checked_mul(time_diff_numerator.into())?
-            .checked_mul(PRECISION.into())?
-            .checked_div(RATE_PRECISION.into())?
+            .checked_mul(PRECISION)?
+            .checked_div(RATE_PRECISION)?
             .checked_div(time_diff_denumerator.into())?
             .checked_div(total_staked.into())?
             .try_into()
@@ -82,10 +84,11 @@ impl Pool {
         )
     }
 
+    /// Calculate reward for user
     pub fn user_earned_amount(&self, user: &Account<User>) -> Option<u64> {
         let amount: u64 = u128::from(user.balance_staked)
             .checked_mul(
-                (u128::from(self.reward_per_token_stored))
+                self.reward_per_token_stored
                     .checked_sub(user.reward_per_token_complete as u128)?,
             )?
             .checked_div(PRECISION)?
@@ -97,6 +100,7 @@ impl Pool {
     }
 }
 
+/// User account in pool
 #[account]
 #[derive(Default)]
 pub struct User {
@@ -114,6 +118,7 @@ pub struct User {
     pub nonce: u8,
 }
 
+/// Rate by funding
 pub fn rate_by_funding(funding_amount: u64, reward_duration: u64) -> Option<u64> {
     let funding_amount: u128 = funding_amount.into();
     let reward_duration: u128 = reward_duration.into();

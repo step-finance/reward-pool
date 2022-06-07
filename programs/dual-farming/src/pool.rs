@@ -3,6 +3,7 @@ use spl_math::uint::U192;
 
 const SECONDS_IN_YEAR: u64 = 365 * 24 * 60 * 60;
 
+/// Calculate reward per token
 pub fn reward_per_token(
     pool: &Account<Pool>,
     total_staked: u64,
@@ -55,6 +56,7 @@ pub fn reward_per_token(
     (a, b)
 }
 
+/// Farming rate after funding
 pub fn rate_after_funding(
     pool: &mut Account<Pool>,
     funding_amount_a: u64,
@@ -106,6 +108,7 @@ pub fn rate_after_funding(
     Ok((a, b))
 }
 
+/// Calculate earned reward amount of staking user
 pub fn user_earned_amount(pool: &Account<Pool>, user: &Account<User>) -> (u64, u64) {
     let a: u64 = (user.balance_staked as u128)
         .checked_mul(
