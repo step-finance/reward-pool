@@ -1,15 +1,16 @@
-import assert from "assert";
-
 import * as anchor from "@project-serum/anchor";
-import { Program } from "@project-serum/anchor";
-import { Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { DualFarming } from "../../target/types/dual_farming";
-import { LAMPORTS_PER_SOL } from "@solana/web3.js";
+import {Program} from "@project-serum/anchor";
+import {Token, TOKEN_PROGRAM_ID} from "@solana/spl-token";
+import {LAMPORTS_PER_SOL} from "@solana/web3.js";
+import {DualFarming} from "../../target/types/dual_farming";
+import {getPoolPda, getRewardAVaultPda, getRewardBVaultPda, getStakingVaultPda, getUserPda,} from "./utils";
 
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 
 const program = anchor.workspace.DualFarming as Program<DualFarming>;
+
+
 const BASE_KEYPAIR = anchor.web3.Keypair.generate();
 const ADMIN_KEYPAIR = anchor.web3.Keypair.generate();
 const USER_KEYPAIR = anchor.web3.Keypair.generate();
@@ -17,47 +18,6 @@ const FUNDER_KEYPAIR = anchor.web3.Keypair.generate();
 const REWARD_DURATION = new anchor.BN(5);
 const TOKEN_DECIMAL = 3;
 const TOKEN_MULTIPLIER = 10 ** TOKEN_DECIMAL;
-
-async function getPoolPda(stakingMint: anchor.web3.PublicKey) {
-  return anchor.web3.PublicKey.findProgramAddress(
-    [BASE_KEYPAIR.publicKey.toBuffer(), stakingMint.toBuffer()],
-    program.programId
-  );
-}
-
-async function getStakingVaultPda(stakingMint: anchor.web3.PublicKey) {
-  const [poolAddress, _] = await getPoolPda(stakingMint);
-  return anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("staking"), poolAddress.toBuffer()],
-    program.programId
-  );
-}
-
-async function getRewardAVaultPda(stakingMint: anchor.web3.PublicKey) {
-  const [poolAddress, _] = await getPoolPda(stakingMint);
-  return anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("reward_a"), poolAddress.toBuffer()],
-    program.programId
-  );
-}
-
-async function getRewardBVaultPda(stakingMint: anchor.web3.PublicKey) {
-  const [poolAddress, _] = await getPoolPda(stakingMint);
-  return anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("reward_b"), poolAddress.toBuffer()],
-    program.programId
-  );
-}
-
-async function getUserPda(
-  poolAddress: anchor.web3.PublicKey,
-  userAddress: anchor.web3.PublicKey
-) {
-  return anchor.web3.PublicKey.findProgramAddress(
-    [userAddress.toBuffer(), poolAddress.toBuffer()],
-    program.programId
-  );
-}
 
 function sleep(ms: number) {
   return new Promise((res) => {
@@ -149,16 +109,16 @@ describe("dual-farming", () => {
 
   it("should initialize dual-farming pool", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
     const [stakingVaultAddress, _stakingVaultBump] = await getStakingVaultPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
     const [rewardAVaultAddress, _rewardAVaultBump] = await getRewardAVaultPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
     const [rewardBVaultAddress, _rewardBVaultBump] = await getRewardBVaultPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
     await program.methods
       .initializePool(REWARD_DURATION)
@@ -182,9 +142,10 @@ describe("dual-farming", () => {
 
   it("should create new user", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
       farmingPoolAddress,
       USER_KEYPAIR.publicKey
     );
@@ -212,10 +173,11 @@ describe("dual-farming", () => {
     );
 
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
       farmingPoolAddress,
       USER_KEYPAIR.publicKey
     );
@@ -240,7 +202,7 @@ describe("dual-farming", () => {
     const FUND_AMOUNT = new anchor.BN(10_000 * TOKEN_MULTIPLIER);
 
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     const poolAccount = await program.account.pool.fetch(farmingPoolAddress);
@@ -280,7 +242,7 @@ describe("dual-farming", () => {
     // Wait pool reward period end
     await sleep(10_000);
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     await program.methods
@@ -295,7 +257,7 @@ describe("dual-farming", () => {
 
   it("should un-pause the pool", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     await program.methods
@@ -311,10 +273,11 @@ describe("dual-farming", () => {
   it("should claim reward from the pool", async () => {
     await sleep(1000);
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
       farmingPoolAddress,
       USER_KEYPAIR.publicKey
     );
@@ -342,10 +305,11 @@ describe("dual-farming", () => {
     const UNSTAKE_AMOUNT = new anchor.BN(500 * TOKEN_MULTIPLIER);
 
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
       farmingPoolAddress,
       USER_KEYPAIR.publicKey
     );
@@ -368,10 +332,11 @@ describe("dual-farming", () => {
 
   it("should close user account", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
       farmingPoolAddress,
       USER_KEYPAIR.publicKey
     );
@@ -389,7 +354,7 @@ describe("dual-farming", () => {
 
   it("should authorize funder", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     await program.methods
@@ -404,7 +369,7 @@ describe("dual-farming", () => {
 
   it("should deauthorize funder", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     await program.methods
@@ -419,7 +384,7 @@ describe("dual-farming", () => {
 
   it("should close pool", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
-      stakingMint
+      program, stakingMint, BASE_KEYPAIR.publicKey
     );
 
     // Pause before close
