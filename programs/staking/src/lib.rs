@@ -11,7 +11,7 @@ use crate::vault::{LockedRewardTracker, Vault, LOCKED_REWARD_DEGRADATION_DENOMIN
 
 pub mod vault;
 
-declare_id!("FFkqjHsFZS3MaUELNrz4TMNo1pz5nE3sBShjuMiSy1Pz");
+declare_id!("DNTDdX18wZCfRWzB6auDDi8CqX3TQTLSZGd8LwTpusNL");
 
 /// Staking program
 #[program]

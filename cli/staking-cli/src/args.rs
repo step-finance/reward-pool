@@ -37,6 +37,8 @@ pub enum CliCommand {
     Init {
         #[clap(long)]
         token_mint: Pubkey,
+        #[clap(long)]
+        base_key_location: String,
     },
     /// Transfer admin
     TransferAdmin {

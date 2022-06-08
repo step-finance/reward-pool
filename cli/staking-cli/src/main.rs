@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 use clap::*;
 
-const BASE_KEY: &str = "DWVizirAPjRKffP1V3r9CjveD9KZb47zCDbu9zrnpitv";
+const BASE_KEY: &str = "HWzXGcGHy4tcpYfaRDCyLNzXqBTv3E6BttpCH2vJxArv";
 
 fn main() -> Result<()> {
     let opts = Opts::parse();
@@ -34,8 +34,11 @@ fn main() -> Result<()> {
     );
     let program = client.program(program_id);
     match opts.command {
-        CliCommand::Init { token_mint } => {
-            initialize_vault(&program, &payer, &token_mint)?;
+        CliCommand::Init {
+            token_mint,
+            base_key_location,
+        } => {
+            initialize_vault(&program, &payer, &token_mint, base_key_location)?;
         }
         CliCommand::TransferAdmin {
             token_mint,
@@ -266,8 +269,15 @@ fn transfer_admin(
     Ok(())
 }
 
-fn initialize_vault(program: &Program, admin: &Keypair, token_mint: &Pubkey) -> Result<()> {
-    let base_keypair = Keypair::new(); // throwable keypair
+fn initialize_vault(
+    program: &Program,
+    admin: &Keypair,
+    token_mint: &Pubkey,
+    base_key_location: String,
+) -> Result<()> {
+    let base_keypair = read_keypair_file(&*shellexpand::tilde(&base_key_location))
+        .expect("Cannot read a keypair file");
+
     let base_pubkey = base_keypair.pubkey();
     println!("base pubkey {}", base_pubkey);
 
