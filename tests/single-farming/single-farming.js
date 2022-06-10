@@ -223,6 +223,31 @@ describe('Reward Pool', () => {
     let claimedAmount = await user.claim();
     console.log("Claim amount ", claimedAmount);
   })
+
+  it("User do full staking", async () => {
+    let userKeyPair = anchor.web3.Keypair.generate();
+    let user = new User(7);
+    const mintAmount = 100_000;
+    await user.init(
+      userKeyPair,
+      10_000_000_000,
+      stakingMint,
+      mintAmount,
+      rewardMint
+    );
+    let beforeBalance =
+      await user.program.provider.connection.getTokenAccountBalance(
+        user.stakingTokenAccount
+      );
+    assert.strictEqual(beforeBalance.value.amount, String(mintAmount));
+    await user.createUserStakingAccount(pool);
+    await user.stakeTokensFull();
+    let afterBalance =
+      await user.program.provider.connection.getTokenAccountBalance(
+        user.stakingTokenAccount
+      );
+    assert.strictEqual(afterBalance.value.amount, String(0));
+  });
 });
 
 

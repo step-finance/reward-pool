@@ -20,7 +20,6 @@ class User {
         let program = anchor.workspace.SingleFarming;
         this.program = new anchor.Program(program.idl, program.programId, this.provider);
 
-
         this.initialLamports = initialLamports;
         this.stakingMintObject = new Token(this.provider.connection, stakingMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
         this.rewardMintObject = new Token(this.provider.connection, rewardMint, TOKEN_PROGRAM_ID, this.provider.wallet.payer);
@@ -118,6 +117,24 @@ class User {
     }
     async getPoolInfo() {
         return await this.program.account.pool.fetch(this.poolPubkey);
+    }
+    
+    async stakeTokensFull() {
+        let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
+        await this.program.rpc.stakeFull(
+            {
+                accounts: {
+                    // Stake instance.
+                    pool: this.poolPubkey,
+                    stakingVault: poolObject.stakingVault,
+                    // User.
+                    user: this.userPubkey,
+                    owner: this.provider.wallet.publicKey,
+                    stakeFromAccount: this.stakingTokenAccount,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                },
+            }
+        );
     }
 
     async stakeTokens(amount) {

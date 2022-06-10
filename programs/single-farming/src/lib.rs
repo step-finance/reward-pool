@@ -147,6 +147,12 @@ pub mod single_farming {
         Ok(())
     }
 
+    /// A user stakes all tokens into the pool.
+    pub fn stake_full(ctx: Context<Stake>) -> Result<()> {
+        let full_amount = ctx.accounts.stake_from_account.amount;
+        stake(ctx, full_amount)
+    }
+
     /// A user stakes tokens in the pool.
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
         if amount == 0 {
