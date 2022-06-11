@@ -21,8 +21,8 @@ pub struct Pool {
     pub reward_mint: Pubkey,
     /// Vault to store reward tokens.
     pub reward_vault: Pubkey,
-    /// The timestamp at which the farming starts
-    pub reward_start_timestamp: u64,
+    /// duration of farming
+    pub reward_duration: u64,
     /// The timestamp at which the farming ends
     pub reward_end_timestamp: u64,
     /// The last time reward states were updated.
@@ -31,6 +31,8 @@ pub struct Pool {
     pub reward_rate: u64,
     /// Last calculated reward A per pool token.
     pub reward_per_token_stored: u128,
+    /// Admin can active farming
+    pub admin: Pubkey,
 }
 
 impl Pool {
@@ -54,10 +56,7 @@ impl Pool {
                 self.reward_end_timestamp
                     .checked_sub(self.last_update_time)?,
             )?;
-        let time_diff_denumerator = self
-            .reward_end_timestamp
-            .checked_sub(self.reward_start_timestamp)?;
-
+        let time_diff_denumerator = self.reward_duration;
         let emit_rewards: u128 = time_period
             .checked_mul(self.reward_rate.into())?
             .checked_mul(time_diff_numerator.into())?
@@ -136,9 +135,10 @@ mod calculator_test {
     fn test_reward_per_token() {
         let mut pool = Pool::default();
         let duration = 3600 * 24 * 356 * 2; // 2 years duration
-        pool.reward_start_timestamp = 1652758289;
+        pool.reward_duration = duration;
         pool.reward_end_timestamp = 1652758289 + duration; // 2 years duration
-        pool.last_update_time = pool.reward_start_timestamp;
+        let reward_start_timestamp = pool.reward_end_timestamp - duration;
+        pool.last_update_time = reward_start_timestamp;
         let funding_amount = 100_000_000;
         pool.reward_rate = rate_by_funding(funding_amount, duration).unwrap();
         // assert_eq!(pool.reward_rate, 1_625_572); // rewards every second
@@ -147,29 +147,23 @@ mod calculator_test {
         let total_staked = 100;
 
         let rewards_per_token = pool
-            .reward_per_token(total_staked, pool.reward_start_timestamp)
+            .reward_per_token(total_staked, reward_start_timestamp)
             .unwrap();
         assert_eq!(rewards_per_token, 0);
         let rewards_per_token = pool
-            .reward_per_token(total_staked, pool.reward_start_timestamp + duration / 10)
+            .reward_per_token(total_staked, reward_start_timestamp + duration / 10)
             .unwrap();
         assert_eq!(rewards_per_token / PRECISION, 189_999); // on the constant rate it is 100_000 (funding_amount / total_staked / 10)
         let rewards_per_token = pool
-            .reward_per_token(
-                total_staked,
-                pool.reward_start_timestamp + duration * 2 / 10,
-            )
+            .reward_per_token(total_staked, reward_start_timestamp + duration * 2 / 10)
             .unwrap();
         assert_eq!(rewards_per_token / PRECISION, 359_999); // on the constant rate it is 200_000 (funding_amount * 2 / total_staked / 10)
         let rewards_per_token = pool
-            .reward_per_token(
-                total_staked,
-                pool.reward_start_timestamp + duration * 3 / 10,
-            )
+            .reward_per_token(total_staked, reward_start_timestamp + duration * 3 / 10)
             .unwrap();
         assert_eq!(rewards_per_token / PRECISION, 509_999); // on the constant rate it is 300_000 (funding_amount * 3 / total_staked / 10)
         let rewards_per_token = pool
-            .reward_per_token(total_staked, pool.reward_start_timestamp + duration)
+            .reward_per_token(total_staked, reward_start_timestamp + duration)
             .unwrap();
         assert_eq!(rewards_per_token / PRECISION, 999_999); // Is this is fine to leave some wei in the pool?
     }

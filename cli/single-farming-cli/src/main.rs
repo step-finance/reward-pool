@@ -35,7 +35,6 @@ fn main() -> Result<()> {
         CliCommand::Init {
             staking_mint,
             reward_mint,
-            reward_start_timestamp,
             reward_duration,
             funding_amount,
         } => {
@@ -44,10 +43,12 @@ fn main() -> Result<()> {
                 &payer,
                 &staking_mint,
                 &reward_mint,
-                reward_start_timestamp,
                 reward_duration,
                 funding_amount,
             )?;
+        }
+        CliCommand::ActivateFarming { staking_mint } => {
+            activate_farming(&program, &payer, &staking_mint)?;
         }
         CliCommand::CreateUser { staking_mint } => {
             create_user(&program, &payer, &staking_mint)?;
@@ -85,7 +86,6 @@ fn initialize_pool(
     admin: &Keypair,
     staking_mint: &Pubkey,
     reward_mint: &Pubkey,
-    reward_start_timestamp: u64,
     reward_duration: u64,
     funding_amount: u64,
 ) -> Result<()> {
@@ -113,10 +113,24 @@ fn initialize_pool(
         })
         .args(single_farming::instruction::InitializePool {
             pool_nonce: pool_pda.bump,
-            reward_start_timestamp,
             reward_duration,
             funding_amount,
         })
+        .signer(admin);
+    let signature = builder.send()?;
+    println!("Signature {:?}", signature);
+    Ok(())
+}
+
+pub fn activate_farming(program: &Program, admin: &Keypair, staking_mint: &Pubkey) -> Result<()> {
+    let pool_pda = get_pool_pda(&program, &staking_mint)?;
+    let builder = program
+        .request()
+        .accounts(single_farming::accounts::ActivateFarming {
+            pool: pool_pda.pubkey,
+            admin: admin.pubkey(),
+        })
+        .args(single_farming::instruction::ActivateFarming {})
         .signer(admin);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

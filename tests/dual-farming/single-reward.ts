@@ -271,6 +271,6 @@ describe.only("dual-farming with single reward", () => {
       userRewardATA
     );
     // 1/5 * 20_000 * TOKEN_MULTIPLIER
-    assert.strictEqual(Number(balance.value.amount), 4000000000);
+    assert.strictEqual(Number(balance.value.amount), 8000000000);
   });
 });

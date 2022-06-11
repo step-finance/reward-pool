@@ -1,10 +1,6 @@
 use anchor_client::solana_client::rpc_response::RpcSimulateTransactionResult;
 use anchor_client::RequestBuilder;
-use anchor_client::{
-    solana_client::rpc_response::Response,
-    solana_sdk::{pubkey::Pubkey, signature::Signer, transaction::Transaction},
-    Program,
-};
+use anchor_client::{solana_sdk::pubkey::Pubkey, Program};
 use anyhow::Result;
 use spl_associated_token_account::{create_associated_token_account, get_associated_token_address};
 

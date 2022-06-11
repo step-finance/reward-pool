@@ -92,21 +92,11 @@ pub mod single_farming {
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
         pool_nonce: u8,
-        reward_start_timestamp: u64,
         reward_duration: u64,
         funding_amount: u64,
     ) -> Result<()> {
         if reward_duration < MIN_DURATION {
             return Err(ErrorCode::DurationTooShort.into());
-        }
-        // validate current time
-        let current_time: u64 = clock::Clock::get()
-            .unwrap()
-            .unix_timestamp
-            .try_into()
-            .unwrap();
-        if reward_start_timestamp < current_time {
-            return Err(ErrorCode::InvalidStartDate.into());
         }
 
         let pool = &mut ctx.accounts.pool;
@@ -115,16 +105,30 @@ pub mod single_farming {
         pool.staking_vault = ctx.accounts.staking_vault.key();
         pool.reward_mint = ctx.accounts.reward_mint.key();
         pool.reward_vault = ctx.accounts.reward_vault.key();
-        pool.reward_start_timestamp = reward_start_timestamp;
-
-        pool.reward_end_timestamp = reward_start_timestamp
-            .checked_add(reward_duration)
-            .ok_or(ErrorCode::MathOverFlow)?;
-
-        pool.last_update_time = reward_start_timestamp;
+        pool.reward_duration = reward_duration;
+        pool.last_update_time = 0;
+        pool.reward_end_timestamp = 0;
+        pool.admin = ctx.accounts.admin.key();
         pool.reward_rate =
             rate_by_funding(funding_amount, reward_duration).ok_or(ErrorCode::MathOverFlow)?;
         pool.reward_per_token_stored = 0;
+        Ok(())
+    }
+
+    /// Admin activates farming
+    pub fn activate_farming<'a, 'b, 'c, 'info>(
+        ctx: Context<'a, 'b, 'c, 'info, ActivateFarming<'info>>,
+    ) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        let current_time = clock::Clock::get()
+            .unwrap()
+            .unix_timestamp
+            .try_into()
+            .unwrap();
+        pool.last_update_time = current_time;
+        pool.reward_end_timestamp = current_time
+            .checked_add(pool.reward_duration)
+            .ok_or(ErrorCode::MathOverFlow)?;
         Ok(())
     }
 
@@ -149,28 +153,15 @@ pub mod single_farming {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
         let pool = &mut ctx.accounts.pool;
-        let current_time: u64 = clock::Clock::get()
-            .unwrap()
-            .unix_timestamp
-            .try_into()
-            .unwrap();
-        // msg!("current_time {}", current_time);
-        if current_time < pool.reward_start_timestamp {
-            return Err(ErrorCode::FarmingNotStart.into());
-        }
-
         let total_staked = ctx.accounts.staking_vault.amount;
-
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(pool, user_opt, total_staked)?;
-
         ctx.accounts.user.balance_staked = ctx
             .accounts
             .user
             .balance_staked
             .checked_add(amount)
             .unwrap();
-
         // Transfer tokens into the stake vault.
         {
             let cpi_ctx = CpiContext::new(
@@ -183,7 +174,6 @@ pub mod single_farming {
             );
             token::transfer(cpi_ctx, amount)?;
         }
-
         Ok(())
     }
 
@@ -296,7 +286,7 @@ pub struct InitializePool<'info> {
         seeds = [b"pool".as_ref(), staking_mint.key().as_ref()], 
         bump,
         payer = admin,
-        space = 200 // 1 + 177 + buffer
+        space = 250 // 1 + 177 + buffer
     )]
     pub pool: Box<Account<'info, Pool>>,
 
@@ -336,6 +326,17 @@ pub struct InitializePool<'info> {
     pub rent: Sysvar<'info, Rent>,
     /// System program
     pub system_program: Program<'info, System>,
+}
+
+/// Accounts for [ActivateFarming](/single_farming/instruction/struct.ActivateFarming.html) instruction
+#[derive(Accounts)]
+pub struct ActivateFarming<'info> {
+    #[account(
+        mut,
+        has_one = admin,
+    )]
+    pub pool: Box<Account<'info, Pool>>,
+    pub admin: Signer<'info>,
 }
 
 /// Accounts for [CreateUser](/single_farming/instruction/struct.CreateUser.html) instruction
@@ -457,9 +458,6 @@ pub enum ErrorCode {
     /// Start time cannot be smaller than current time
     #[msg("Start time cannot be smaller than current time")]
     InvalidStartDate,
-    /// Farming hasn't started
-    #[msg("Farming hasn't started")]
-    FarmingNotStart,
     /// Cannot unstake more than staked amount
     #[msg("Cannot unstake more than staked amount")]
     CannotUnstakeMoreThanBalance,

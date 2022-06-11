@@ -40,11 +40,13 @@ pub enum CliCommand {
         #[clap(long)]
         reward_mint: Pubkey,
         #[clap(long)]
-        reward_start_timestamp: u64,
-        #[clap(long)]
         reward_duration: u64,
         #[clap(long)]
         funding_amount: u64,
+    },
+    ActivateFarming {
+        #[clap(long)]
+        staking_mint: Pubkey,
     },
     /// User enables staking
     CreateUser {

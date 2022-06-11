@@ -33,7 +33,7 @@ class User {
         this.rewardTokenAccount = await utils.getOrCreateAssociatedTokenAccount(rewardMint, this.pubkey, this.keypair, this.provider);
     }
 
-    async initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount) {
+    async initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount) {
         const [
             pool,
             poolNonce,
@@ -59,7 +59,6 @@ class User {
         );
         await this.program.rpc.initializePool(
             poolNonce,
-            rewardStartTimestamp,
             rewardDuration,
             fundingAmount,
             {
@@ -78,6 +77,18 @@ class User {
             }
         );
         return pool
+    }
+
+    async activateFarming(poolPubkey) {
+        await this.program.rpc.activateFarming(
+            {
+                accounts: {
+                    pool: poolPubkey,
+                    admin: this.provider.wallet.publicKey,
+                },
+                signers: [this.keypair],
+            }
+        );
     }
 
     async createUserStakingAccount(poolPubkey) {
@@ -100,6 +111,13 @@ class User {
                 systemProgram: anchor.web3.SystemProgram.programId,
             },
         });
+    }
+
+    async getUserStakingInfo() {
+        return await this.program.account.user.fetch(this.userPubkey);
+    }
+    async getPoolInfo() {
+        return await this.program.account.pool.fetch(this.poolPubkey);
     }
 
     async stakeTokens(amount) {

@@ -72,16 +72,47 @@ describe('Reward Pool', () => {
       await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
       assert.fail("cannot create pool if rewardStartTimestamp is smaller than the current time");
     } catch (e) { }
-    rewardStartTimestamp = new anchor.BN(Math.floor(Date.now() / 1000))
-    pool = await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
+    pool = await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
     //re create the duplicate pool 
     try {
-      await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
+      await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
       assert.fail("did not fail to create dupe pool");
     } catch (e) { }
   });
 
-  it('User does some staking', async () => {
+  it("User does some staking before admin activate farming", async () => {
+    let mintData = await initializeMint();
+    stakingKeyPair = mintData.stakingKeyPair;
+    stakingMint = mintData.stakingMint;
+    rewardKeypair = mintData.rewardKeypair;
+    rewardMint = mintData.rewardMint;
+
+    adminKey = anchor.web3.Keypair.generate();
+    admin = new User(2);
+    await admin.init(adminKey, 10_000_000_000, stakingMint, 0, rewardMint);
+
+    pool = await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
+
+
+    let userKeyPair = anchor.web3.Keypair.generate();
+    let user = new User(3);
+    await user.init(userKeyPair, 10_000_000_000, stakingMint, 100_000, rewardMint);
+    await user.createUserStakingAccount(pool);
+
+    // user can stake
+    await user.stakeTokens(50_000);
+
+    await utils.sleep(2 * 1000);
+
+    await user.stakeTokens(50_000);
+
+    // check user pending rewards
+    let userObject = await user.getUserStakingInfo();
+    assert.equal(userObject.rewardPerTokenPending, 0);
+  })
+
+  it('User does some staking after admin active farming', async () => {
+    await admin.activateFarming(pool);
     //we test all this in greater detail later, but this is a flow for single reward staking
     let userKeyPair = anchor.web3.Keypair.generate();
     let user = new User(1);
@@ -153,37 +184,6 @@ describe('Reward Pool', () => {
     // Can close user account because stake_amount = 0 and pending reward = 0
     await user.closeUser();
   });
-
-  it('User does some staking before start date', async () => {
-    let mintData = await initializeMint();
-    stakingKeyPair = mintData.stakingKeyPair;
-    stakingMint = mintData.stakingMint;
-    rewardKeypair = mintData.rewardKeypair;
-    rewardMint = mintData.rewardMint;
-
-    adminKey = anchor.web3.Keypair.generate();
-    admin = new User(2);
-    await admin.init(adminKey, 10_000_000_000, stakingMint, 0, rewardMint);
-
-    rewardStartTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) + 5)
-    pool = await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
-
-
-    let userKeyPair = anchor.web3.Keypair.generate();
-    let user = new User(3);
-    await user.init(userKeyPair, 10_000_000_000, stakingMint, 100_000, rewardMint);
-    await user.createUserStakingAccount(pool);
-
-
-    try {
-      await user.stakeTokens(100_000);
-      assert.fail("fail because farming hasn't happened");
-    } catch (e) { }
-
-    await utils.sleep(5 * 1000);
-    // can staking when time is over rewardStartTimestamp
-    await user.stakeTokens(100_000);
-  })
 
   it('User does some staking after end date', async () => {
     let mintData = await initializeMint();
