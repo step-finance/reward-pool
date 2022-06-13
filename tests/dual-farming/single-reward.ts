@@ -229,8 +229,8 @@ describe.only("dual-farming with single reward", () => {
         tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([ADMIN_KEYPAIR])
-      .rpc()
-      .catch(console.log);
+      .rpc();
+
     let poolRewardABalance = await provider.connection.getTokenAccountBalance(
       poolAccount.rewardAVault
     );
@@ -251,6 +251,10 @@ describe.only("dual-farming with single reward", () => {
       USER_KEYPAIR.publicKey
     );
 
+    const beforeBalance = await provider.connection.getTokenAccountBalance(
+      userRewardATA
+    );
+
     const poolAccount = await program.account.pool.fetch(farmingPoolAddress);
     await program.methods
       .claim()
@@ -267,10 +271,15 @@ describe.only("dual-farming with single reward", () => {
       })
       .signers([USER_KEYPAIR])
       .rpc();
-    let balance = await provider.connection.getTokenAccountBalance(
+
+    const afterBalance = await provider.connection.getTokenAccountBalance(
       userRewardATA
     );
-    // 1/5 * 20_000 * TOKEN_MULTIPLIER
-    assert.strictEqual(Number(balance.value.amount), 8000000000);
+
+    const isRewardClaimed = new anchor.BN(afterBalance.value.amount).gt(
+      new anchor.BN(beforeBalance.value.amount)
+    );
+
+    assert.deepStrictEqual(isRewardClaimed, true);
   });
 });
