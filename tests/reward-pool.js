@@ -9,7 +9,7 @@ const fs = require('fs');
 
 let program = anchor.workspace.RewardPool;
 
-//Read the provider from the configured environmnet.
+//Read the provider from the configured environment.
 //represents an outside actor
 //owns mints out of any other actors control, provides initial $$ to others
 const envProvider = anchor.Provider.env();
