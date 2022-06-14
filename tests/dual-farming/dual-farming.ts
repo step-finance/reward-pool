@@ -31,7 +31,7 @@ const TOKEN_DECIMAL = 3;
 const TOKEN_MULTIPLIER = new anchor.BN(10 ** TOKEN_DECIMAL);
 const MINT_AMOUNT = new anchor.BN(100_000).mul(TOKEN_MULTIPLIER);
 const FUND_AMOUNT = new anchor.BN(10_000).mul(TOKEN_MULTIPLIER);
-const STAKE_AMOUNT = new anchor.BN(500).mul(TOKEN_MULTIPLIER);
+const DEPOSIT_AMOUNT = new anchor.BN(500).mul(TOKEN_MULTIPLIER);
 const UNSTAKE_AMOUNT = new anchor.BN(500).mul(TOKEN_MULTIPLIER);
 
 function sleep(ms: number) {
@@ -388,7 +388,7 @@ describe("dual-farming", () => {
     assert.deepStrictEqual(poolState.rewardDurationEnd.toString(), "0");
 
     await program.methods
-      .stake(STAKE_AMOUNT)
+      .deposit(DEPOSIT_AMOUNT)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,
@@ -411,11 +411,11 @@ describe("dual-farming", () => {
 
     assert.deepStrictEqual(
       userState.balanceStaked.toString(),
-      STAKE_AMOUNT.toString()
+      DEPOSIT_AMOUNT.toString()
     );
     assert.deepStrictEqual(
       stakingVaultBalance.value.amount,
-      STAKE_AMOUNT.toString()
+      DEPOSIT_AMOUNT.toString()
     );
   });
 
@@ -435,7 +435,7 @@ describe("dual-farming", () => {
     let poolState = await program.account.pool.fetch(farmingPoolAddress);
 
     await program.methods
-      .unstake(STAKE_AMOUNT)
+      .withdraw(DEPOSIT_AMOUNT)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,
@@ -459,9 +459,9 @@ describe("dual-farming", () => {
     assert.deepStrictEqual(userState.balanceStaked.toString(), "0");
     assert.deepStrictEqual(stakingVaultBalance.value.amount, "0");
 
-    // Stake back the unstaked amount for further testing
+    // Deposit back the withdrawn amount for further testing
     await program.methods
-      .stake(STAKE_AMOUNT)
+      .deposit(DEPOSIT_AMOUNT)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,
@@ -628,10 +628,10 @@ describe("dual-farming", () => {
         program.provider.connection.getTokenAccountBalance(userStakingATA),
         program.account.user.fetch(userStakingAddress),
       ]);
-    const unstakeHalfAmount = UNSTAKE_AMOUNT.div(new anchor.BN(2));
+    const withdrawHalfAmount = UNSTAKE_AMOUNT.div(new anchor.BN(2));
 
     await program.methods
-      .unstake(unstakeHalfAmount)
+      .withdraw(withdrawHalfAmount)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,
@@ -918,7 +918,7 @@ describe("dual-farming", () => {
       ]);
 
     await program.methods
-      .unstake(beforeUserState.balanceStaked)
+      .withdraw(beforeUserState.balanceStaked)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,

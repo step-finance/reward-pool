@@ -1,5 +1,5 @@
 extends = ["../Test.base.toml"]
 
 [scripts]
-test = "yarn run mocha -t 1000000 tests/single-farming"
+test = "yarn run mocha -t 1000000 tests/single-farming/single-farming.js"
 

@@ -19,9 +19,9 @@ mod staking {
     use super::*;
 
     /// Initialize a new vault.
-    pub fn initialize_vault(ctx: Context<InitializeVault>, vault_bump: u8) -> Result<()> {
+    pub fn initialize_vault(ctx: Context<InitializeVault>) -> Result<()> {
         let vault = &mut ctx.accounts.vault;
-        vault.vault_bump = vault_bump;
+        vault.vault_bump = *ctx.bumps.get("vault").unwrap();
         vault.token_mint = ctx.accounts.token_mint.key();
         vault.token_vault = ctx.accounts.token_vault.key();
         vault.lp_mint = ctx.accounts.lp_mint.key();
@@ -149,6 +149,11 @@ mod staking {
             return Err(VaultError::ZeroWithdrawAmount.into());
         }
 
+        // Return InsufficientLpAmount if user input unmint_amount > lp_mint.supply, which leads to MathOverflow (misleading)
+        if unmint_amount > ctx.accounts.user_lp.amount {
+            return Err(VaultError::InsufficientLpAmount.into());
+        }
+
         let current_time = u64::try_from(Clock::get()?.unix_timestamp)
             .ok()
             .ok_or(VaultError::MathOverflow)?;
@@ -261,7 +266,7 @@ pub struct InitializeVault<'info> {
     /// Token program
     pub token_program: Program<'info, Token>,
 
-    /// Sytem program
+    /// System program
     pub system_program: Program<'info, System>,
 
     /// Rent account
@@ -392,6 +397,9 @@ pub enum VaultError {
     #[msg("Provided funder is already authorized to fund")]
     /// Provided funder is already authorized to fund
     FunderAlreadyAuthorized,
+    /// Insufficient lp amount
+    #[msg("Insufficient lp amount")]
+    InsufficientLpAmount,
 }
 
 /// Event stake

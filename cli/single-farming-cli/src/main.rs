@@ -166,7 +166,7 @@ pub fn stake(program: &Program, owner: &Keypair, staking_mint: &Pubkey, amount: 
 
     let builder = program
         .request()
-        .accounts(single_farming::accounts::Stake {
+        .accounts(single_farming::accounts::Deposit {
             pool: pool_pda.pubkey,
             staking_vault: pool.staking_vault,
             stake_from_account,
@@ -174,7 +174,7 @@ pub fn stake(program: &Program, owner: &Keypair, staking_mint: &Pubkey, amount: 
             owner: owner.pubkey(),
             token_program: spl_token::ID,
         })
-        .args(single_farming::instruction::Stake { amount })
+        .args(single_farming::instruction::Deposit { amount })
         .signer(owner);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);
@@ -196,7 +196,7 @@ pub fn unstake(
 
     let builder = program
         .request()
-        .accounts(single_farming::accounts::Stake {
+        .accounts(single_farming::accounts::Deposit {
             pool: pool_pda.pubkey,
             staking_vault: pool.staking_vault,
             user: user_pubkey,
@@ -204,7 +204,7 @@ pub fn unstake(
             owner: owner.pubkey(),
             token_program: spl_token::ID,
         })
-        .args(single_farming::instruction::Unstake { spt_amount })
+        .args(single_farming::instruction::Withdraw { spt_amount })
         .signer(owner);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

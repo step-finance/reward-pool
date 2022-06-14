@@ -1,12 +1,12 @@
 const assert = require("assert");
-const anchor = require('@project-serum/anchor');
+const anchor = require("@project-serum/anchor");
 // const anchor = require('./browser');
 const serumCmn = require("@project-serum/common");
 const { TOKEN_PROGRAM_ID, Token } = require("@solana/spl-token");
 const TokenInstructions = require("@project-serum/serum").TokenInstructions;
 const utils = require("./utils");
 const { User } = require("./user");
-const fs = require('fs');
+const fs = require("fs");
 
 let program = anchor.workspace.SingleFarming;
 
@@ -25,14 +25,12 @@ function setProvider(p) {
   provider = p;
   anchor.setProvider(p);
   program = new anchor.Program(program.idl, program.programId, p);
-};
+}
 setProvider(provider);
-
 
 console.log("program id ", program.programId.toString());
 
-describe('Reward Pool', () => {
-
+describe("Reward Pool", () => {
   var rewardDuration = new anchor.BN(10);
 
   var admin;
@@ -64,20 +62,44 @@ describe('Reward Pool', () => {
   it("Creates a pool", async () => {
     //create pool by zero duration
     try {
-      await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, new anchor.BN(0), fundingAmount);
+      await admin.initializePool(
+        stakingMint,
+        rewardMint,
+        rewardStartTimestamp,
+        new anchor.BN(0),
+        fundingAmount
+      );
       assert.fail("cannot create pool by zero duration");
-    } catch (e) { }
+    } catch (e) {}
 
     try {
-      await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
-      assert.fail("cannot create pool if rewardStartTimestamp is smaller than the current time");
-    } catch (e) { }
-    pool = await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
-    //re create the duplicate pool 
+      await admin.initializePool(
+        stakingMint,
+        rewardMint,
+        rewardStartTimestamp,
+        rewardDuration,
+        fundingAmount
+      );
+      assert.fail(
+        "cannot create pool if rewardStartTimestamp is smaller than the current time"
+      );
+    } catch (e) {}
+    pool = await admin.initializePool(
+      stakingMint,
+      rewardMint,
+      rewardDuration,
+      fundingAmount
+    );
+    //re create the duplicate pool
     try {
-      await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
+      await admin.initializePool(
+        stakingMint,
+        rewardMint,
+        rewardDuration,
+        fundingAmount
+      );
       assert.fail("did not fail to create dupe pool");
-    } catch (e) { }
+    } catch (e) {}
   });
 
   it("User does some staking before admin activate farming", async () => {
@@ -91,58 +113,73 @@ describe('Reward Pool', () => {
     admin = new User(2);
     await admin.init(adminKey, 10_000_000_000, stakingMint, 0, rewardMint);
 
-    pool = await admin.initializePool(stakingMint, rewardMint, rewardDuration, fundingAmount);
-
+    pool = await admin.initializePool(
+      stakingMint,
+      rewardMint,
+      rewardDuration,
+      fundingAmount
+    );
 
     let userKeyPair = anchor.web3.Keypair.generate();
     let user = new User(3);
-    await user.init(userKeyPair, 10_000_000_000, stakingMint, 100_000, rewardMint);
+    await user.init(
+      userKeyPair,
+      10_000_000_000,
+      stakingMint,
+      100_000,
+      rewardMint
+    );
     await user.createUserStakingAccount(pool);
 
     // user can stake
-    await user.stakeTokens(50_000);
+    await user.depositTokens(50_000);
 
     await utils.sleep(2 * 1000);
 
-    await user.stakeTokens(50_000);
+    await user.depositTokens(50_000);
 
     // check user pending rewards
     let userObject = await user.getUserStakingInfo();
     assert.equal(userObject.rewardPerTokenPending, 0);
-  })
+  });
 
-  it('User does some staking after admin active farming', async () => {
+  it("User does some staking after admin active farming", async () => {
     await admin.activateFarming(pool);
     //we test all this in greater detail later, but this is a flow for single reward staking
     let userKeyPair = anchor.web3.Keypair.generate();
     let user = new User(1);
-    await user.init(userKeyPair, 10_000_000_000, stakingMint, 100_000, rewardMint);
+    await user.init(
+      userKeyPair,
+      10_000_000_000,
+      stakingMint,
+      100_000,
+      rewardMint
+    );
     await user.createUserStakingAccount(pool);
 
     try {
       await user.createUserStakingAccount(pool);
       assert.fail("did not fail to create dupe user");
-    } catch (e) { }
+    } catch (e) {}
 
-    await user.stakeTokens(100_000);
+    await user.depositTokens(100_000);
 
     try {
       var pendingReward = await user.getUserPendingRewardsFunction();
       assert.equal(pendingReward, 0);
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
 
-    await utils.sleep(2 * 1000)
+    await utils.sleep(2 * 1000);
 
     var pendingReward = 0;
     try {
       pendingReward = await user.getUserPendingRewardsFunction();
       console.log("Pending Reward after 2 seconds", pendingReward.toString());
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
-
 
     // claim reward zero because no amount in reward account
     var claimedReward = await user.claim();
@@ -151,33 +188,31 @@ describe('Reward Pool', () => {
     // fund reward account
     user.fundReward(10_000_000_000);
 
-
     // Can calaim reward
     var claimedReward = await user.claim();
     assert(claimedReward >= pendingReward.toString());
 
     // User unstake 1/2
-    await user.unstakeTokens(50_000);
+    await user.withdrawTokens(50_000);
     try {
       var pendingReward = await user.getUserPendingRewardsFunction();
       console.log("Pending Reward ", pendingReward.toString());
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
 
-
-    // Cannot close user account 
+    // Cannot close user account
     try {
       await user.closeUser();
       assert.fail("did not fail closing active staking account");
-    } catch (e) { }
+    } catch (e) {}
 
-    await utils.sleep(1 * 1000)
-    await user.unstakeTokens(50_000);
+    await utils.sleep(1 * 1000);
+    await user.withdrawTokens(50_000);
     try {
       await user.closeUser();
       assert.fail("did not fail closing active staking account");
-    } catch (e) { }
+    } catch (e) {}
     // claim all pending rewards
     await user.claim();
 
@@ -185,7 +220,7 @@ describe('Reward Pool', () => {
     await user.closeUser();
   });
 
-  it('User does some staking after end date', async () => {
+  it("User does some staking after end date", async () => {
     let mintData = await initializeMint();
     stakingKeyPair = mintData.stakingKeyPair;
     stakingMint = mintData.stakingMint;
@@ -196,33 +231,46 @@ describe('Reward Pool', () => {
     admin = new User(2);
     await admin.init(adminKey, 10_000_000_000, stakingMint, 0, rewardMint);
 
-    rewardStartTimestamp = new anchor.BN(Math.floor(Date.now() / 1000))
+    rewardStartTimestamp = new anchor.BN(Math.floor(Date.now() / 1000));
     rewardDuration = new anchor.BN(3);
 
-    pool = await admin.initializePool(stakingMint, rewardMint, rewardStartTimestamp, rewardDuration, fundingAmount);
-
+    pool = await admin.initializePool(
+      stakingMint,
+      rewardMint,
+      rewardStartTimestamp,
+      rewardDuration,
+      fundingAmount
+    );
 
     let userKeyPair = anchor.web3.Keypair.generate();
     let user = new User(5);
-    await user.init(userKeyPair, 10_000_000_000, stakingMint, 100_000, rewardMint);
+    await user.init(
+      userKeyPair,
+      10_000_000_000,
+      stakingMint,
+      100_000,
+      rewardMint
+    );
     await user.createUserStakingAccount(pool);
-    await user.stakeTokens(100_000);
-    // wait util reward ends 
+    await user.depositTokens(100_000);
+    // wait util reward ends
     await utils.sleep(3 * 1000);
     try {
       var pendingRewardBefore = await user.getUserPendingRewardsFunction();
       await utils.sleep(2 * 1000);
       var pendingRewardAfter = await user.getUserPendingRewardsFunction();
       // reward doesn't change after duration end
-      assert.equal(pendingRewardBefore.toString(), pendingRewardAfter.toString());
+      assert.equal(
+        pendingRewardBefore.toString(),
+        pendingRewardAfter.toString()
+      );
     } catch (e) {
-      console.log(e)
+      console.log(e);
     }
-
 
     let claimedAmount = await user.claim();
     console.log("Claim amount ", claimedAmount);
-  })
+  });
 
   it("User do full staking", async () => {
     let userKeyPair = anchor.web3.Keypair.generate();
@@ -241,7 +289,7 @@ describe('Reward Pool', () => {
       );
     assert.strictEqual(beforeBalance.value.amount, String(mintAmount));
     await user.createUserStakingAccount(pool);
-    await user.stakeTokensFull();
+    await user.depositTokensFull();
     let afterBalance =
       await user.program.provider.connection.getTokenAccountBalance(
         user.stakingTokenAccount
@@ -250,18 +298,31 @@ describe('Reward Pool', () => {
   });
 });
 
-
 async function initializeMint() {
   let stakingKeyPair = anchor.web3.Keypair.generate();
-  await utils.createMintFromPriv(stakingKeyPair, provider, provider.wallet.publicKey, null, 9, TOKEN_PROGRAM_ID);
+  await utils.createMintFromPriv(
+    stakingKeyPair,
+    provider,
+    provider.wallet.publicKey,
+    null,
+    9,
+    TOKEN_PROGRAM_ID
+  );
   let stakingMint = stakingKeyPair.publicKey;
   let rewardKeypair = anchor.web3.Keypair.generate();
-  await utils.createMintFromPriv(rewardKeypair, provider, provider.wallet.publicKey, null, 9, TOKEN_PROGRAM_ID);
+  await utils.createMintFromPriv(
+    rewardKeypair,
+    provider,
+    provider.wallet.publicKey,
+    null,
+    9,
+    TOKEN_PROGRAM_ID
+  );
   let rewardMint = rewardKeypair.publicKey;
   return {
     stakingKeyPair: stakingKeyPair,
     stakingMint: stakingMint,
     rewardKeypair: rewardKeypair,
     rewardMint: rewardMint,
-  }
+  };
 }

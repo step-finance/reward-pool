@@ -90,9 +90,19 @@ impl Vault {
 
     /// Stake token into the vault, and return share amount (LP)
     pub fn stake(&mut self, current_time: u64, token_amount: u64, lp_supply: u64) -> Option<u64> {
-        if self.total_amount == 0 {
-            self.total_amount = token_amount;
-            return Some(token_amount);
+        // Scenario 1:
+        // when self.total_amount == 0, guarantee that lp_supply is 0, and self.get_unlocked_amount will returns 0
+        // when the vault is empty (without any locked profit), the program will mint user deposited amount as LP token
+        // so, we can consolidate self.total_amount == 0 condition with lp_supply == 0
+        // Scenario 2:
+        // user withdraw all liquidity, but there are some locked profit
+        // or, admin deposit reward to the pool when there's no liquidity provider
+        // the program will mint user deposited amount + unlocked profit (based on current time) as LP token
+        // when there's 0 lp supply, and some locked profit, when user deposit token_amount == 0
+        // program won't mint free LP to user because there's checking at fn stake
+        if lp_supply == 0 {
+            self.total_amount = self.total_amount.checked_add(token_amount)?;
+            return self.get_unlocked_amount(current_time);
         }
         let total_amount = self.get_unlocked_amount(current_time)?;
         let new_lp_token = (token_amount as u128)
@@ -149,17 +159,18 @@ mod tests {
             locked_reward_tracker: LockedRewardTracker::default(),
         };
 
-        let mut lp_supply = 0;
-        let mut total_mer = 0;
-        let lp_token = vault.stake(0, 0, 1_000_000_000_000).unwrap();
+        let mut lp_supply: u64 = 0;
+        let mut total_mer: u64 = 0;
+        let lp_token = vault.stake(0, 1_000_000_000_000, lp_supply).unwrap();
         lp_supply += lp_token;
         total_mer += 1_000_000_000_000;
 
         // Reward some 1 MER
         total_mer += 1_000_000;
+        vault.update_locked_reward(0, 1_000_000).unwrap();
 
-        // Withdraw 10 ui amount lp tokens
-        let amount = vault.unstake(lp_supply, total_mer, 10_000_000);
+        // After 7 day, withdraw 10 ui amount lp tokens
+        let amount = vault.unstake(86400 * 7, 10_000_000, lp_supply);
         println!("{}", amount.unwrap());
     }
 }

@@ -56,14 +56,14 @@ fn main() -> Result<()> {
         CliCommand::Unpause { staking_mint, base } => {
             unpause(&program, &payer, &staking_mint, &base)?;
         }
-        CliCommand::Stake {
+        CliCommand::Deposit {
             staking_mint,
             base,
             amount,
         } => {
             stake(&program, &payer, &staking_mint, &base, amount)?;
         }
-        CliCommand::Unstake {
+        CliCommand::Withdraw {
             staking_mint,
             base,
             spt_amount,
@@ -238,7 +238,7 @@ pub fn stake(
 
     let builder = program
         .request()
-        .accounts(dual_farming::accounts::Stake {
+        .accounts(dual_farming::accounts::Deposit {
             pool: pool_pda.pubkey,
             staking_vault: pool.staking_vault,
             stake_from_account,
@@ -246,7 +246,7 @@ pub fn stake(
             owner: owner.pubkey(),
             token_program: spl_token::ID,
         })
-        .args(dual_farming::instruction::Stake { amount })
+        .args(dual_farming::instruction::Deposit { amount })
         .signer(owner);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);
@@ -269,7 +269,7 @@ pub fn unstake(
 
     let builder = program
         .request()
-        .accounts(dual_farming::accounts::Stake {
+        .accounts(dual_farming::accounts::Deposit {
             pool: pool_pda.pubkey,
             staking_vault: pool.staking_vault,
             user: user_pubkey,
@@ -277,7 +277,7 @@ pub fn unstake(
             owner: owner.pubkey(),
             token_program: spl_token::ID,
         })
-        .args(dual_farming::instruction::Unstake { spt_amount })
+        .args(dual_farming::instruction::Withdraw { spt_amount })
         .signer(owner);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

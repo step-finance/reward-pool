@@ -11,6 +11,6 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [programs.localnet]
-staking = "FFkqjHsFZS3MaUELNrz4TMNo1pz5nE3sBShjuMiSy1Pz"
+staking = "DNTDdX18wZCfRWzB6auDDi8CqX3TQTLSZGd8LwTpusNL"
 single_farming = "EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd"
 dual_farming = "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"

@@ -31,7 +31,7 @@ function sleep(ms: number) {
   });
 }
 
-describe.only("dual-farming with single reward", () => {
+describe("dual-farming with single reward", () => {
   let stakingMint: anchor.web3.PublicKey = null;
   let rewardMint: anchor.web3.PublicKey = null;
 
@@ -161,7 +161,7 @@ describe.only("dual-farming with single reward", () => {
   });
 
   it("should stake to the pool", async () => {
-    const STAKE_AMOUNT = new anchor.BN(500 * TOKEN_MULTIPLIER);
+    const DEPOSIT_AMOUNT = new anchor.BN(500 * TOKEN_MULTIPLIER);
 
     await stakingToken.mintTo(
       userStakingATA,
@@ -185,7 +185,7 @@ describe.only("dual-farming with single reward", () => {
     const poolAccount = await program.account.pool.fetch(farmingPoolAddress);
 
     await program.methods
-      .stake(STAKE_AMOUNT)
+      .deposit(DEPOSIT_AMOUNT)
       .accounts({
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,

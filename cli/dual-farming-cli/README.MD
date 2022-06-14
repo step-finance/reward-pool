@@ -115,10 +115,10 @@ Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
 Signature 5T8YCrxJkVE238tnDABdhoeVyL5u9kR2EqaAV8KPB6yFefZtAH8nwwEd3BBtiGXYH5NKW2eXju6HByQbj2kvR2ax
 ```
 
-### Stake
+### Deposit
 
 ```bash
-./dual-farming-cli stake --wallet-path ~/.config/solana/user.json  --staking-mint AtssC9B1jGqW4d2PVZmMt6cLLpQ84DycLpAae7EW3XL6 --base 6iG7xBbKbkm14yQfJjBJ6YZR6uHNbdw6eNnrCGQ8RsUF 1000
+./dual-farming-cli deposit --wallet-path ~/.config/solana/user.json  --staking-mint AtssC9B1jGqW4d2PVZmMt6cLLpQ84DycLpAae7EW3XL6 --base 6iG7xBbKbkm14yQfJjBJ6YZR6uHNbdw6eNnrCGQ8RsUF 1000
 
 
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
@@ -127,10 +127,10 @@ Signature 57tnZedp4qZzsYCmss64kyqDWM8BvgexLvc5yEPZyw4gETGqbCbCQG3v3ridyKgwHnWZCN
 
 ```
 
-### Unstake
+### Withdraw
 
 ```bash
-./dual-farming-cli unstake [--wallet-path <WALLET_PATH_JSON>]  --staking-mint <STAKING_MINT_PUBKEY> --base <BASE_PUBKEY> amount
+./dual-farming-cli withdraw [--wallet-path <WALLET_PATH_JSON>]  --staking-mint <STAKING_MINT_PUBKEY> --base <BASE_PUBKEY> amount
 ```
 
 

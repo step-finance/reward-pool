@@ -85,7 +85,7 @@ pub enum CliCommand {
         base: Pubkey,
     },
     /// User stakes
-    Stake {
+    Deposit {
         #[clap(long)]
         staking_mint: Pubkey,
         #[clap(long)]
@@ -93,7 +93,7 @@ pub enum CliCommand {
         amount: u64,
     },
     /// User unstakes
-    Unstake {
+    Withdraw {
         #[clap(long)]
         staking_mint: Pubkey,
         #[clap(long)]

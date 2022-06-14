@@ -119,9 +119,9 @@ class User {
         return await this.program.account.pool.fetch(this.poolPubkey);
     }
     
-    async stakeTokensFull() {
+    async depositTokensFull() {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        await this.program.rpc.stakeFull(
+        await this.program.rpc.depositFull(
             {
                 accounts: {
                     // Stake instance.
@@ -137,9 +137,9 @@ class User {
         );
     }
 
-    async stakeTokens(amount) {
+    async depositTokens(amount) {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        await this.program.rpc.stake(
+        await this.program.rpc.deposit(
             new anchor.BN(amount),
             {
                 accounts: {
@@ -156,9 +156,9 @@ class User {
         );
     }
 
-    async unstakeTokens(amount) {
+    async withdrawTokens(amount) {
         let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-        await this.program.rpc.unstake(
+        await this.program.rpc.withdraw(
             new anchor.BN(amount),
             {
                 accounts: {

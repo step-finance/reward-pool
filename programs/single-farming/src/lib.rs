@@ -147,14 +147,14 @@ pub mod single_farming {
         Ok(())
     }
 
-    /// A user stakes all tokens into the pool.
-    pub fn stake_full(ctx: Context<Stake>) -> Result<()> {
+    /// A user deposit all tokens into the pool.
+    pub fn deposit_full(ctx: Context<Deposit>) -> Result<()> {
         let full_amount = ctx.accounts.stake_from_account.amount;
-        stake(ctx, full_amount)
+        deposit(ctx, full_amount)
     }
 
-    /// A user stakes tokens in the pool.
-    pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
+    /// A user deposit tokens in the pool.
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -183,8 +183,8 @@ pub mod single_farming {
         Ok(())
     }
 
-    /// A user unstakes tokens in the pool.
-    pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
+    /// A user withdraw tokens in the pool.
+    pub fn withdraw(ctx: Context<Deposit>, spt_amount: u64) -> Result<()> {
         if spt_amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -370,9 +370,9 @@ pub struct CreateUser<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// Accounts for [Stake](/single_farming/instruction/struct.Stake.html) instruction and [UnStake](/single_farming/instruction/struct.Unstake.html) instruction
+/// Accounts for [Deposit](/single_farming/instruction/struct.Deposit.html) instruction and [Withdraw](/single_farming/instruction/struct.Withdraw.html) instruction
 #[derive(Accounts)]
-pub struct Stake<'info> {
+pub struct Deposit<'info> {
     /// The farming pool PDA.
     #[account(
         mut,

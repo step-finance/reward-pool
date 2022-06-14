@@ -141,8 +141,8 @@ pub mod dual_farming {
         Ok(())
     }
 
-    /// User stakes tokens in the pool.
-    pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
+    /// User deposit tokens in the pool.
+    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -173,13 +173,13 @@ pub mod dual_farming {
             );
             token::transfer(cpi_ctx, amount)?;
 
-            emit!(EventStake { amount });
+            emit!(EventDeposit { amount });
         }
         Ok(())
     }
 
-    /// User unstakes tokens in the pool.
-    pub fn unstake(ctx: Context<Stake>, spt_amount: u64) -> Result<()> {
+    /// User withdraw tokens in the pool.
+    pub fn withdraw(ctx: Context<Deposit>, spt_amount: u64) -> Result<()> {
         if spt_amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -188,7 +188,7 @@ pub mod dual_farming {
         let total_staked = ctx.accounts.staking_vault.amount;
 
         if ctx.accounts.user.balance_staked < spt_amount {
-            return Err(ErrorCode::InsufficientFundUnstake.into());
+            return Err(ErrorCode::InsufficientFundWithdraw.into());
         }
 
         let user_opt = Some(&mut ctx.accounts.user);
@@ -220,7 +220,7 @@ pub mod dual_farming {
             );
             token::transfer(cpi_ctx, spt_amount)?;
 
-            emit!(EventUnstake { amount: spt_amount });
+            emit!(EventWithdraw { amount: spt_amount });
         }
         Ok(())
     }
@@ -270,7 +270,7 @@ pub mod dual_farming {
         //can't compare using reward_vault because it is PDA. The PDA seed contain different prefix
         //if mint are the same, we just use a
         if amount_b > 0 && ctx.accounts.reward_a_vault.mint == ctx.accounts.reward_b_vault.mint {
-            return Err(ErrorCode::SingleStakeTokenBCannotBeFunded.into());
+            return Err(ErrorCode::SingleDepositTokenBCannotBeFunded.into());
         }
 
         let total_staked = ctx.accounts.staking_vault.amount;
@@ -668,10 +668,10 @@ pub struct Unpause<'info> {
     authority: Signer<'info>,
 }
 
-/// Accounts for [Stake](/dual_farming/instruction/struct.Stake.html) and [Unstake](/dual_farming/instruction/struct.Unstake.html) instructions.
+/// Accounts for [Deposit](/dual_farming/instruction/struct.Deposit.html) and [Withdraw](/dual_farming/instruction/struct.Withdraw.html) instructions.
 #[derive(Accounts)]
-pub struct Stake<'info> {
-    /// Global accounts for the staking instance.
+pub struct Deposit<'info> {
+    /// Global accounts for the deposit/withdraw instance.
     #[account(
         mut,
         has_one = staking_vault,
@@ -925,15 +925,15 @@ pub struct User {
     pub nonce: u8,
 }
 
-/// Stake-event
+/// Deposit event
 #[event]
-pub struct EventStake {
+pub struct EventDeposit {
     amount: u64,
 }
 
-/// Un-stake event
+/// Withdraw event
 #[event]
-pub struct EventUnstake {
+pub struct EventWithdraw {
     amount: u64,
 }
 
@@ -966,15 +966,15 @@ pub struct EventUnauthorizeFunder {
 /// Program error codes
 #[error_code]
 pub enum ErrorCode {
-    /// Insufficient funds to unstake.
-    #[msg("Insufficient funds to unstake.")]
-    InsufficientFundUnstake,
+    /// Insufficient funds to withdraw.
+    #[msg("Insufficient funds to withdraw.")]
+    InsufficientFundWithdraw,
     /// Amount must be greater than zero.
     #[msg("Amount must be greater than zero.")]
     AmountMustBeGreaterThanZero,
-    /// Reward B cannot be funded - pool is single stake.
-    #[msg("Reward B cannot be funded - pool is single stake.")]
-    SingleStakeTokenBCannotBeFunded,
+    /// Reward B cannot be funded - pool is single deposit.
+    #[msg("Reward B cannot be funded - pool is single deposit.")]
+    SingleDepositTokenBCannotBeFunded,
     /// Pool is paused.
     #[msg("Pool is paused.")]
     PoolPaused,

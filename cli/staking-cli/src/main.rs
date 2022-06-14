@@ -304,7 +304,7 @@ fn initialize_vault(
             system_program: system_program::ID,
             token_program: spl_token::ID,
         })
-        .args(staking::instruction::InitializeVault { vault_bump })
+        .args(staking::instruction::InitializeVault {})
         .signer(admin)
         .signer(&base_keypair);
 
