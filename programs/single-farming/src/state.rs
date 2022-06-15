@@ -56,20 +56,16 @@ impl Pool {
                 self.reward_end_timestamp
                     .checked_sub(self.last_update_time)?,
             )?;
-        let time_diff_denumerator = self.reward_duration;
+        let time_diff_denominator = self.reward_duration;
         let emit_rewards: u128 = time_period
             .checked_mul(self.reward_rate.into())?
             .checked_mul(time_diff_numerator.into())?
             .checked_mul(PRECISION)?
             .checked_div(RATE_PRECISION)?
-            .checked_div(time_diff_denumerator.into())?
-            .checked_div(total_staked.into())?
-            .try_into()
-            .ok()?;
+            .checked_div(time_diff_denominator.into())?
+            .checked_div(total_staked.into())?;
 
-        let rewards = self
-            .reward_per_token_stored
-            .checked_add(emit_rewards.try_into().ok()?)?;
+        let rewards = self.reward_per_token_stored.checked_add(emit_rewards)?;
         Some(rewards)
     }
 

@@ -91,7 +91,6 @@ pub mod single_farming {
     /// Initializes a new pool
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
-        pool_nonce: u8,
         reward_duration: u64,
         funding_amount: u64,
     ) -> Result<()> {
@@ -100,7 +99,8 @@ pub mod single_farming {
         }
 
         let pool = &mut ctx.accounts.pool;
-        pool.nonce = pool_nonce;
+        // This is safe as long as the key matched the account in InitializePool context
+        pool.nonce = *ctx.bumps.get("pool").unwrap();
         pool.staking_mint = ctx.accounts.staking_mint.key();
         pool.staking_vault = ctx.accounts.staking_vault.key();
         pool.reward_mint = ctx.accounts.reward_mint.key();
@@ -135,7 +135,6 @@ pub mod single_farming {
     /// Initialize a user staking account
     pub fn create_user<'a, 'b, 'c, 'info>(
         ctx: Context<'a, 'b, 'c, 'info, CreateUser<'info>>,
-        nonce: u8,
     ) -> Result<()> {
         let user = &mut ctx.accounts.user;
         user.pool = *ctx.accounts.pool.to_account_info().key;
@@ -143,7 +142,7 @@ pub mod single_farming {
         user.reward_per_token_complete = 0;
         user.reward_per_token_pending = 0;
         user.balance_staked = 0;
-        user.nonce = nonce;
+        user.nonce = *ctx.bumps.get("user").unwrap();
         Ok(())
     }
 
@@ -284,7 +283,6 @@ pub mod single_farming {
 
 /// Accounts for [InitializePool](/single_farming/instruction/struct.InitializePool.html) instruction
 #[derive(Accounts)]
-#[instruction(pool_nonce: u8)]
 pub struct InitializePool<'info> {
     /// The farming pool PDA.
     #[account(
@@ -347,7 +345,6 @@ pub struct ActivateFarming<'info> {
 
 /// Accounts for [CreateUser](/single_farming/instruction/struct.CreateUser.html) instruction
 #[derive(Accounts)]
-#[instruction(nonce: u8)]
 pub struct CreateUser<'info> {
     /// The farming pool PDA.
     pub pool: Box<Account<'info, Pool>>,

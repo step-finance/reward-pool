@@ -112,7 +112,6 @@ fn initialize_pool(
             rent: solana_program::sysvar::rent::ID,
         })
         .args(single_farming::instruction::InitializePool {
-            pool_nonce: pool_pda.bump,
             reward_duration,
             funding_amount,
         })
@@ -140,7 +139,7 @@ pub fn activate_farming(program: &Program, admin: &Keypair, staking_mint: &Pubke
 pub fn create_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Result<()> {
     let pool_pda = get_pool_pda(&program, &staking_mint)?;
     let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
-    let (user_pubkey, nonce) = user;
+    let (user_pubkey, _nonce) = user;
     let builder = program
         .request()
         .accounts(single_farming::accounts::CreateUser {
@@ -149,7 +148,7 @@ pub fn create_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) ->
             owner: owner.pubkey(),
             system_program: solana_program::system_program::ID,
         })
-        .args(single_farming::instruction::CreateUser { nonce })
+        .args(single_farming::instruction::CreateUser {})
         .signer(owner);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

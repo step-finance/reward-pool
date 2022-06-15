@@ -21,7 +21,6 @@ const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 
 const program = anchor.workspace.DualFarming as Program<DualFarming>;
-
 const BASE_KEYPAIR = anchor.web3.Keypair.generate();
 const ADMIN_KEYPAIR = anchor.web3.Keypair.generate();
 const USER_KEYPAIR = anchor.web3.Keypair.generate();
@@ -33,6 +32,8 @@ const MINT_AMOUNT = new anchor.BN(100_000).mul(TOKEN_MULTIPLIER);
 const FUND_AMOUNT = new anchor.BN(10_000).mul(TOKEN_MULTIPLIER);
 const DEPOSIT_AMOUNT = new anchor.BN(500).mul(TOKEN_MULTIPLIER);
 const UNSTAKE_AMOUNT = new anchor.BN(500).mul(TOKEN_MULTIPLIER);
+
+let totalFundAmount = new anchor.BN(0);
 
 function sleep(ms: number) {
   return new Promise((res) => {
@@ -507,6 +508,8 @@ describe("dual-farming", () => {
       .signers([ADMIN_KEYPAIR])
       .rpc();
 
+    totalFundAmount = totalFundAmount.add(FUND_AMOUNT);
+
     poolState = await program.account.pool.fetch(farmingPoolAddress);
 
     const expectedRewardDurationEnd =
@@ -682,6 +685,120 @@ describe("dual-farming", () => {
     assert.notStrictEqual(funder, undefined);
   });
 
+  it("stake at reward ended pool do not get reward", async () => {
+    // Wait pool reward period end
+    const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
+      program,
+      stakingMint,
+      BASE_KEYPAIR.publicKey
+    );
+
+    let poolState = await program.account.pool.fetch(farmingPoolAddress);
+    let clockState: ParsedClockState | null;
+
+    console.log("Wait for reward end");
+    do {
+      let parsedClock = await program.provider.connection.getParsedAccountInfo(
+        SYSVAR_CLOCK_PUBKEY
+      );
+      clockState = (parsedClock.value!.data as ParsedAccountData)
+        .parsed as ParsedClockState;
+      await sleep(1000);
+    } while (
+      clockState.info.unixTimestamp <= poolState.rewardDurationEnd.toNumber()
+    );
+    console.log("Reward ended");
+    const maliciousUser = new anchor.web3.Keypair();
+    await program.provider.connection
+      .requestAirdrop(maliciousUser.publicKey, 100 * LAMPORTS_PER_SOL)
+      .then((sig) => program.provider.connection.confirmTransaction(sig));
+    const maliciousUserRewardAATA =
+      await rewardAToken.createAssociatedTokenAccount(maliciousUser.publicKey);
+    const maliciousUserRewardBATA =
+      await rewardBToken.createAssociatedTokenAccount(maliciousUser.publicKey);
+    const maliciousUserStakingToken =
+      await stakingToken.createAssociatedTokenAccount(maliciousUser.publicKey);
+    await stakingToken.mintTo(
+      maliciousUserStakingToken,
+      ADMIN_KEYPAIR,
+      [],
+      DEPOSIT_AMOUNT.toNumber()
+    );
+    const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
+      program,
+      farmingPoolAddress,
+      maliciousUser.publicKey
+    );
+    await program.methods
+      .createUser()
+      .accounts({
+        owner: maliciousUser.publicKey,
+        pool: farmingPoolAddress,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        user: userStakingAddress,
+      })
+      .signers([maliciousUser])
+      .rpc();
+    await program.methods
+      .deposit(DEPOSIT_AMOUNT)
+      .accounts({
+        owner: maliciousUser.publicKey,
+        user: userStakingAddress,
+        pool: farmingPoolAddress,
+        stakeFromAccount: maliciousUserStakingToken,
+        stakingVault: poolState.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([maliciousUser])
+      .rpc();
+    // Wait for 1 seconds and claim reward
+    await sleep(1000);
+    await program.methods
+      .claim()
+      .accounts({
+        owner: maliciousUser.publicKey,
+        user: userStakingAddress,
+        pool: farmingPoolAddress,
+        rewardAAccount: maliciousUserRewardAATA,
+        rewardBAccount: maliciousUserRewardBATA,
+        rewardAVault: poolState.rewardAVault,
+        rewardBVault: poolState.rewardBVault,
+        stakingVault: poolState.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([maliciousUser])
+      .rpc();
+    const [rewardABalance, rewardBBalance] = await Promise.all([
+      rewardAToken.getAccountInfo(maliciousUserRewardAATA),
+      rewardBToken.getAccountInfo(maliciousUserRewardBATA),
+    ]);
+    assert.deepStrictEqual(rewardABalance.amount.eq(new anchor.BN(0)), true);
+    assert.deepStrictEqual(rewardBBalance.amount.eq(new anchor.BN(0)), true);
+    // Closing malicious user account
+    await program.methods
+      .closeUser()
+      .accounts({
+        owner: maliciousUser.publicKey,
+        pool: farmingPoolAddress,
+        user: userStakingAddress,
+      })
+      .preInstructions([
+        await program.methods
+          .withdraw(DEPOSIT_AMOUNT)
+          .accounts({
+            owner: maliciousUser.publicKey,
+            user: userStakingAddress,
+            pool: farmingPoolAddress,
+            stakeFromAccount: maliciousUserStakingToken,
+            stakingVault: poolState.stakingVault,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          })
+          .instruction(),
+      ])
+      .signers([maliciousUser])
+      .rpc();
+  });
+
   it("extend pool reward duration", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
@@ -705,6 +822,8 @@ describe("dual-farming", () => {
       })
       .signers([FUNDER_KEYPAIR])
       .rpc();
+
+    totalFundAmount = totalFundAmount.add(FUND_AMOUNT);
 
     let afterPoolState = await program.account.pool.fetch(farmingPoolAddress);
 
@@ -838,6 +957,21 @@ describe("dual-farming", () => {
         program.provider.connection.getTokenAccountBalance(userRewardBATA),
       ]);
 
+    // TODO: fix this, as this will causes user loss part of the reward they should be getting
+    // await stakingToken.mintTo(
+    //   adminStakingATA,
+    //   ADMIN_KEYPAIR,
+    //   [],
+    //   100_000_000_000
+    // );
+    // await stakingToken.transfer(
+    //   adminStakingATA,
+    //   poolState.stakingVault,
+    //   ADMIN_KEYPAIR,
+    //   [],
+    //   1_000_000_000
+    // );
+
     await program.methods
       .claim()
       .accounts({
@@ -869,6 +1003,35 @@ describe("dual-farming", () => {
 
     assert.deepStrictEqual(isUserReceivedRewardA, true);
     assert.deepStrictEqual(isUserReceivedRewardB, true);
+    assert.deepStrictEqual(
+      new anchor.BN(afterUserRewardABalance.value.amount).toString(),
+      totalFundAmount.toString()
+    );
+    assert.deepStrictEqual(
+      new anchor.BN(afterUserRewardBBalance.value.amount).toString(),
+      totalFundAmount.toString()
+    );
+
+    const [rewardAVaultBalance, rewardBVaultBalance] = await Promise.all([
+      program.provider.connection.getTokenAccountBalance(
+        poolState.rewardAVault
+      ),
+      program.provider.connection.getTokenAccountBalance(
+        poolState.rewardBVault
+      ),
+    ]);
+
+    console.log(
+      "User reward A token balance",
+      afterUserRewardABalance.value.amount
+    );
+    console.log(
+      "User reward B token balance",
+      afterUserRewardBBalance.value.amount
+    );
+
+    console.log("Reward A vault", rewardAVaultBalance.value.amount);
+    console.log("Reward B vault", rewardBVaultBalance.value.amount);
   });
 
   it("fail to close user with balance staked", async () => {
