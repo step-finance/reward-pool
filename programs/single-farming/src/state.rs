@@ -33,6 +33,8 @@ pub struct Pool {
     pub reward_per_token_stored: u128,
     /// Admin can active farming
     pub admin: Pubkey,
+    /// Total staked amount
+    pub total_staked: u64,
 }
 
 impl Pool {

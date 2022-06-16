@@ -459,6 +459,7 @@ describe("dual-farming", () => {
 
     assert.deepStrictEqual(userState.balanceStaked.toString(), "0");
     assert.deepStrictEqual(stakingVaultBalance.value.amount, "0");
+    assert.deepStrictEqual(poolState.totalStaked.toString(), "0");
 
     // Deposit back the withdrawn amount for further testing
     await program.methods
@@ -875,6 +876,45 @@ describe("dual-farming", () => {
     await assert.rejects(result);
   });
 
+  it("cannot withdraw mistakenly deposited token if pool reward not ended", async () => {
+    const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
+      program,
+      stakingMint,
+      BASE_KEYPAIR.publicKey
+    );
+
+    const poolState = await program.account.pool.fetch(farmingPoolAddress);
+
+    // Depositing to stakingVault will not affect reward
+    await stakingToken.mintTo(
+      adminStakingATA,
+      ADMIN_KEYPAIR,
+      [],
+      100_000_000_000
+    );
+    await stakingToken.transfer(
+      adminStakingATA,
+      poolState.stakingVault,
+      ADMIN_KEYPAIR,
+      [],
+      1_000_000_000
+    );
+
+    let result = program.methods
+      .withdrawExtraToken()
+      .accounts({
+        authority: ADMIN_KEYPAIR.publicKey,
+        pool: farmingPoolAddress,
+        stakingVault: poolState.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        withdrawToAccount: adminStakingATA,
+      })
+      .signers([ADMIN_KEYPAIR])
+      .rpc();
+
+    await assert.rejects(result);
+  });
+
   it("pause the pool when farming finished", async () => {
     // Wait pool reward period end
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
@@ -957,21 +997,6 @@ describe("dual-farming", () => {
         program.provider.connection.getTokenAccountBalance(userRewardBATA),
       ]);
 
-    // TODO: fix this, as this will causes user loss part of the reward they should be getting
-    // await stakingToken.mintTo(
-    //   adminStakingATA,
-    //   ADMIN_KEYPAIR,
-    //   [],
-    //   100_000_000_000
-    // );
-    // await stakingToken.transfer(
-    //   adminStakingATA,
-    //   poolState.stakingVault,
-    //   ADMIN_KEYPAIR,
-    //   [],
-    //   1_000_000_000
-    // );
-
     await program.methods
       .claim()
       .accounts({
@@ -1003,6 +1028,7 @@ describe("dual-farming", () => {
 
     assert.deepStrictEqual(isUserReceivedRewardA, true);
     assert.deepStrictEqual(isUserReceivedRewardB, true);
+    // user getting full reward
     assert.deepStrictEqual(
       new anchor.BN(afterUserRewardABalance.value.amount).toString(),
       totalFundAmount.toString()
@@ -1011,27 +1037,6 @@ describe("dual-farming", () => {
       new anchor.BN(afterUserRewardBBalance.value.amount).toString(),
       totalFundAmount.toString()
     );
-
-    const [rewardAVaultBalance, rewardBVaultBalance] = await Promise.all([
-      program.provider.connection.getTokenAccountBalance(
-        poolState.rewardAVault
-      ),
-      program.provider.connection.getTokenAccountBalance(
-        poolState.rewardBVault
-      ),
-    ]);
-
-    console.log(
-      "User reward A token balance",
-      afterUserRewardABalance.value.amount
-    );
-    console.log(
-      "User reward B token balance",
-      afterUserRewardBBalance.value.amount
-    );
-
-    console.log("Reward A vault", rewardAVaultBalance.value.amount);
-    console.log("Reward B vault", rewardBVaultBalance.value.amount);
   });
 
   it("fail to close user with balance staked", async () => {
@@ -1073,7 +1078,7 @@ describe("dual-farming", () => {
       USER_KEYPAIR.publicKey
     );
 
-    const [poolState, beforeUserState, beforeUserStakingBalance] =
+    const [beforePoolState, beforeUserState, beforeUserStakingBalance] =
       await Promise.all([
         program.account.pool.fetch(farmingPoolAddress),
         program.account.user.fetch(userStakingAddress),
@@ -1086,17 +1091,19 @@ describe("dual-farming", () => {
         owner: USER_KEYPAIR.publicKey,
         pool: farmingPoolAddress,
         stakeFromAccount: userStakingATA,
-        stakingVault: poolState.stakingVault,
+        stakingVault: beforePoolState.stakingVault,
         tokenProgram: TOKEN_PROGRAM_ID,
         user: userStakingAddress,
       })
       .signers([USER_KEYPAIR])
       .rpc();
 
-    const [afterUserState, afterUserStakingBalance] = await Promise.all([
-      program.account.user.fetch(userStakingAddress),
-      program.provider.connection.getTokenAccountBalance(userStakingATA),
-    ]);
+    const [afterUserState, afterUserStakingBalance, afterPoolState] =
+      await Promise.all([
+        program.account.user.fetch(userStakingAddress),
+        program.provider.connection.getTokenAccountBalance(userStakingATA),
+        program.account.pool.fetch(farmingPoolAddress),
+      ]);
 
     assert.deepStrictEqual(
       afterUserState.balanceStaked.eq(new anchor.BN(0)),
@@ -1108,6 +1115,7 @@ describe("dual-farming", () => {
       ),
       true
     );
+    assert.deepStrictEqual(afterPoolState.totalStaked.toString(), "0");
   });
 
   it("fail to extend reward duration on paused pool", async () => {
@@ -1189,7 +1197,7 @@ describe("dual-farming", () => {
     assert.deepStrictEqual(closedUserAccount, null);
   });
 
-  it("close pool", async () => {
+  it("cannot close pool if there's remaining tokens in stakingVault", async () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
@@ -1208,6 +1216,35 @@ describe("dual-farming", () => {
 
     const poolAccount = await program.account.pool.fetch(farmingPoolAddress);
 
+    let result = program.methods
+      .closePool()
+      .accounts({
+        authority: ADMIN_KEYPAIR.publicKey,
+        pool: farmingPoolAddress,
+        refundee: ADMIN_KEYPAIR.publicKey,
+        rewardARefundee: adminRewardAATA,
+        rewardBRefundee: adminRewardBATA,
+        rewardAVault: poolAccount.rewardAVault,
+        rewardBVault: poolAccount.rewardBVault,
+        stakingRefundee: adminStakingATA,
+        stakingVault: poolAccount.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .signers([ADMIN_KEYPAIR])
+      .rpc();
+
+    await assert.rejects(result);
+  });
+
+  it("close pool", async () => {
+    const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
+      program,
+      stakingMint,
+      BASE_KEYPAIR.publicKey
+    );
+
+    const poolAccount = await program.account.pool.fetch(farmingPoolAddress);
+
     await program.methods
       .closePool()
       .accounts({
@@ -1222,6 +1259,18 @@ describe("dual-farming", () => {
         stakingVault: poolAccount.stakingVault,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
+      .preInstructions([
+        await program.methods
+          .withdrawExtraToken() // Withdraw mistakenly deposited tokens firstly
+          .accounts({
+            authority: ADMIN_KEYPAIR.publicKey,
+            pool: farmingPoolAddress,
+            stakingVault: poolAccount.stakingVault,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            withdrawToAccount: adminStakingATA,
+          })
+          .instruction(),
+      ])
       .signers([ADMIN_KEYPAIR])
       .rpc();
 

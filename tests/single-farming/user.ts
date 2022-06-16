@@ -95,6 +95,18 @@ export class User {
     );
   }
 
+  async mintStakingTokenTo(tokenAccount: PublicKey, amount: number) {
+    let envProvider = anchor.AnchorProvider.env();
+    await this.stakingMintObject.mintTo(
+      tokenAccount,
+      // weird that it's not defined in the type definition, yet it exists
+      // @ts-ignore
+      envProvider.wallet.payer,
+      [],
+      amount
+    );
+  }
+
   async initializePool(
     stakingMint: PublicKey,
     rewardMint: PublicKey,
@@ -109,8 +121,9 @@ export class User {
     const [rewardVault, _rewardVaultNonce] =
       await utils.computeRewardVaultAccount(pool);
 
-    await this.program.rpc.initializePool(rewardDuration, fundingAmount, {
-      accounts: {
+    await this.program.methods
+      .initializePool(rewardDuration, fundingAmount)
+      .accounts({
         pool: pool,
         stakingVault: stakingVault,
         stakingMint: stakingMint,
@@ -120,20 +133,21 @@ export class User {
         tokenProgram: TOKEN_PROGRAM_ID,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         systemProgram: anchor.web3.SystemProgram.programId,
-      },
-      signers: [this.keypair],
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
     return pool;
   }
 
   async activateFarming(poolPubkey: PublicKey) {
-    await this.program.rpc.activateFarming({
-      accounts: {
+    await this.program.methods
+      .activateFarming()
+      .accounts({
         pool: poolPubkey,
         admin: this.provider.wallet.publicKey,
-      },
-      signers: [this.keypair],
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 
   async createUserStakingAccount(poolPubkey: PublicKey) {
@@ -146,14 +160,16 @@ export class User {
     this.userPubkey = _userPubkey;
     this.userNonce = _userNonce;
 
-    await this.program.rpc.createUser({
-      accounts: {
+    await this.program.methods
+      .createUser()
+      .accounts({
         pool: poolPubkey,
         user: this.userPubkey,
         owner: this.provider.wallet.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
-      },
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 
   async getUserStakingInfo() {
@@ -165,8 +181,9 @@ export class User {
 
   async depositTokensFull() {
     let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-    await this.program.rpc.depositFull({
-      accounts: {
+    await this.program.methods
+      .depositFull()
+      .accounts({
         // Stake instance.
         pool: this.poolPubkey,
         stakingVault: poolObject.stakingVault,
@@ -175,14 +192,16 @@ export class User {
         owner: this.provider.wallet.publicKey,
         stakeFromAccount: this.stakingTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-      },
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 
   async depositTokens(amount: number) {
     let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-    await this.program.rpc.deposit(new anchor.BN(amount), {
-      accounts: {
+    await this.program.methods
+      .deposit(new anchor.BN(amount))
+      .accounts({
         // Stake instance.
         pool: this.poolPubkey,
         stakingVault: poolObject.stakingVault,
@@ -191,14 +210,16 @@ export class User {
         owner: this.provider.wallet.publicKey,
         stakeFromAccount: this.stakingTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-      },
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 
   async withdrawTokens(amount: number) {
     let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
-    await this.program.rpc.withdraw(new anchor.BN(amount), {
-      accounts: {
+    await this.program.methods
+      .withdraw(new anchor.BN(amount))
+      .accounts({
         // Stake instance.
         pool: this.poolPubkey,
         stakingVault: poolObject.stakingVault,
@@ -207,11 +228,12 @@ export class User {
         owner: this.provider.wallet.publicKey,
         stakeFromAccount: this.stakingTokenAccount,
         tokenProgram: TOKEN_PROGRAM_ID,
-      },
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 
-  async getUserPendingRewardsFunction(): Promise<anchor.BN> {
+  async getUserPendingRewards(): Promise<anchor.BN> {
     let poolObject = await this.program.account.pool.fetch(this.poolPubkey);
 
     const result = await this.program.methods
@@ -272,13 +294,15 @@ export class User {
   }
 
   async closeUser() {
-    await this.program.rpc.closeUser({
-      accounts: {
+    await this.program.methods
+      .closeUser()
+      .accounts({
         // Stake instance.
         pool: this.poolPubkey,
         user: this.userPubkey,
         owner: this.provider.wallet.publicKey,
-      },
-    });
+      })
+      .signers([this.keypair])
+      .rpc();
   }
 }

@@ -195,7 +195,7 @@ describe("Reward Pool", () => {
     assert.deepStrictEqual(userState.rewardPerTokenComplete.toNumber(), 0);
 
     // user claim 0 reward if farming is not started
-    let claimableReward = await user.getUserPendingRewardsFunction();
+    let claimableReward = await user.getUserPendingRewards();
     assert.deepStrictEqual(claimableReward.toNumber(), 0);
 
     // user is freely to withdraw anytime
@@ -260,7 +260,7 @@ describe("Reward Pool", () => {
 
     try {
       // No time elapsed, no rewards
-      pendingReward = await user.getUserPendingRewardsFunction();
+      pendingReward = await user.getUserPendingRewards();
       assert.deepStrictEqual(pendingReward.toNumber(), 0);
     } catch (e) {
       console.log(e);
@@ -270,7 +270,7 @@ describe("Reward Pool", () => {
 
     try {
       // 2 seconds elapsed
-      pendingReward = await user.getUserPendingRewardsFunction();
+      pendingReward = await user.getUserPendingRewards();
       assert.deepStrictEqual(pendingReward.gt(new anchor.BN(0)), true);
       console.log("Pending Reward after 2 seconds", pendingReward.toString());
     } catch (e) {
@@ -302,7 +302,7 @@ describe("Reward Pool", () => {
     assert.deepStrictEqual(userState.balanceStaked.toNumber(), 50_000);
 
     try {
-      pendingReward = await user.getUserPendingRewardsFunction();
+      pendingReward = await user.getUserPendingRewards();
       console.log("Pending Reward ", pendingReward.toString());
     } catch (e) {
       console.log(e);
@@ -365,7 +365,7 @@ describe("Reward Pool", () => {
 
     await utils.sleep(1 * 1000);
 
-    let beforePendingReward = await user.getUserPendingRewardsFunction();
+    let beforePendingReward = await user.getUserPendingRewards();
     let beforeRewardPerSecond = beforePendingReward.toNumber();
 
     let elapsed = 1;
@@ -376,7 +376,7 @@ describe("Reward Pool", () => {
 
     while (elapsed++ <= rewardDuration.toNumber()) {
       await utils.sleep(1 * 1000);
-      let pendingReward = await user.getUserPendingRewardsFunction();
+      let pendingReward = await user.getUserPendingRewards();
       let rewardPerSeconds =
         pendingReward.toNumber() - beforePendingReward.toNumber();
       console.log(
@@ -424,9 +424,9 @@ describe("Reward Pool", () => {
     // wait util reward ends
     await utils.sleep(3 * 1000);
     try {
-      var pendingRewardBefore = await user.getUserPendingRewardsFunction();
+      var pendingRewardBefore = await user.getUserPendingRewards();
       await utils.sleep(2 * 1000);
-      var pendingRewardAfter = await user.getUserPendingRewardsFunction();
+      var pendingRewardAfter = await user.getUserPendingRewards();
       // reward doesn't change after duration end
       assert.deepStrictEqual(
         pendingRewardBefore.toNumber(),
@@ -480,6 +480,91 @@ describe("Reward Pool", () => {
       userState.balanceStaked.eq(new anchor.BN(mintAmount)),
       true
     );
+  });
+
+  it("Shall not affect reward if somebody deposit directly to staking vault", async () => {
+    let mintData = await initializeMint();
+    stakingKeyPair = mintData.stakingKeyPair;
+    stakingMint = mintData.stakingMint;
+    rewardKeypair = mintData.rewardKeypair;
+    rewardMint = mintData.rewardMint;
+
+    adminKey = anchor.web3.Keypair.generate();
+    admin = new User(2);
+    await admin.init(adminKey, 10_000_000_000, stakingMint, 0, rewardMint);
+
+    rewardDuration = new anchor.BN(3);
+
+    pool = await admin.initializePool(
+      stakingMint,
+      rewardMint,
+      rewardDuration,
+      fundingAmount
+    );
+
+    let userKeyPair = anchor.web3.Keypair.generate();
+    let user = new User(8);
+    await user.init(
+      userKeyPair,
+      10_000_000_000,
+      stakingMint,
+      100_000,
+      rewardMint
+    );
+    await user.createUserStakingAccount(pool);
+    await user.depositTokens(100_000);
+    await admin.activateFarming(pool);
+
+    // Somebody directly deposit to pool stakingVault, manipulating reward_per_token_stored
+    const poolState = await program.account.pool.fetch(pool);
+    await user.mintStakingTokenTo(poolState.stakingVault, 100_000_000);
+
+    // Unable to claim mistakenly deposited token when the reward is not ended
+    let result = program.methods
+      .withdrawExtraToken()
+      .accounts({
+        admin: adminKey.publicKey,
+        pool,
+        stakingVault: poolState.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        withdrawToAccount: admin.stakingTokenAccount,
+      })
+      .signers([adminKey])
+      .rpc();
+
+    await assert.rejects(result);
+
+    console.log("Waiting for reward duration end");
+    await utils.sleep((rewardDuration.toNumber() + 1) * 1000);
+    console.log("Reward ended");
+
+    // Able to withdraw mistakenly deposited token
+    await program.methods
+      .withdrawExtraToken()
+      .accounts({
+        admin: adminKey.publicKey,
+        pool,
+        stakingVault: poolState.stakingVault,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        withdrawToAccount: admin.stakingTokenAccount,
+      })
+      .signers([adminKey])
+      .rpc()
+      .catch(console.error);
+
+    const adminStakingTokenBalance =
+      await program.provider.connection.getTokenAccountBalance(
+        admin.stakingTokenAccount
+      );
+    assert.deepStrictEqual(
+      Number(adminStakingTokenBalance.value.amount),
+      100_000_000
+    );
+
+    const claimable = await user.getUserPendingRewards();
+    console.log("Claimable reward", claimable.toNumber());
+    // User still eligible to full reward
+    assert.deepStrictEqual(claimable.toNumber(), fundingAmount.toNumber() - 1);
   });
 });
 

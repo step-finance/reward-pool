@@ -96,6 +96,7 @@ pub mod dual_farming {
         pool.reward_b_mint = ctx.accounts.reward_b_mint.key();
         pool.reward_b_vault = ctx.accounts.reward_b_vault.key();
         pool.reward_duration = reward_duration;
+        pool.total_staked = 0;
         pool.reward_duration_end = 0;
         pool.last_update_time = 0;
         pool.reward_a_rate = 0;
@@ -150,9 +151,8 @@ pub mod dual_farming {
         if pool.paused {
             return Err(ErrorCode::PoolPaused.into());
         }
-        let total_staked = ctx.accounts.staking_vault.amount;
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, pool.total_staked).unwrap();
 
         ctx.accounts.user.balance_staked = ctx
             .accounts
@@ -172,7 +172,10 @@ pub mod dual_farming {
                 },
             );
             token::transfer(cpi_ctx, amount)?;
-
+            pool.total_staked = pool
+                .total_staked
+                .checked_add(amount)
+                .ok_or(ErrorCode::MathOverflow)?;
             emit!(EventDeposit { amount });
         }
         Ok(())
@@ -185,14 +188,13 @@ pub mod dual_farming {
         }
 
         let pool = &mut ctx.accounts.pool;
-        let total_staked = ctx.accounts.staking_vault.amount;
 
         if ctx.accounts.user.balance_staked < spt_amount {
             return Err(ErrorCode::InsufficientFundWithdraw.into());
         }
 
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, pool.total_staked).unwrap();
         ctx.accounts.user.balance_staked = ctx
             .accounts
             .user
@@ -203,9 +205,9 @@ pub mod dual_farming {
         // Transfer tokens from the pool vault to user vault.
         {
             let seeds = &[
-                ctx.accounts.pool.base_key.as_ref(),
-                ctx.accounts.pool.staking_mint.as_ref(),
-                &[ctx.accounts.pool.pool_bump],
+                pool.base_key.as_ref(),
+                pool.staking_mint.as_ref(),
+                &[pool.pool_bump],
             ];
             let pool_signer = &[&seeds[..]];
 
@@ -214,12 +216,16 @@ pub mod dual_farming {
                 token::Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
-                    authority: ctx.accounts.pool.to_account_info(),
+                    authority: pool.to_account_info(),
                 },
                 pool_signer,
             );
             token::transfer(cpi_ctx, spt_amount)?;
 
+            pool.total_staked = pool
+                .total_staked
+                .checked_sub(spt_amount)
+                .ok_or(ErrorCode::MathOverflow)?;
             emit!(EventWithdraw { amount: spt_amount });
         }
         Ok(())
@@ -273,8 +279,7 @@ pub mod dual_farming {
             return Err(ErrorCode::SingleDepositTokenBCannotBeFunded.into());
         }
 
-        let total_staked = ctx.accounts.staking_vault.amount;
-        update_rewards(pool, None, total_staked).unwrap();
+        update_rewards(pool, None, pool.total_staked).unwrap();
 
         let (reward_a_rate, reward_b_rate) = rate_after_funding(pool, amount_a, amount_b)?;
         pool.reward_a_rate = reward_a_rate;
@@ -322,11 +327,10 @@ pub mod dual_farming {
 
     /// User claim rewards
     pub fn claim(ctx: Context<ClaimReward>) -> Result<()> {
-        let total_staked = ctx.accounts.staking_vault.amount;
-
         let pool = &mut ctx.accounts.pool;
+
         let user_opt = Some(&mut ctx.accounts.user);
-        update_rewards(pool, user_opt, total_staked).unwrap();
+        update_rewards(pool, user_opt, pool.total_staked).unwrap();
 
         let seeds = &[
             ctx.accounts.pool.base_key.as_ref(),
@@ -390,6 +394,38 @@ pub mod dual_farming {
             amount_a: claimed_reward_a,
             amount_b: claimed_reward_b
         });
+        Ok(())
+    }
+
+    /// Withdraw token that mistakenly deposited to staking_vault
+    pub fn withdraw_extra_token(ctx: Context<WithdrawExtraToken>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        let total_amount = ctx.accounts.staking_vault.amount;
+        let total_staked = pool.total_staked;
+        let withdrawable_amount = total_amount
+            .checked_sub(total_staked)
+            .ok_or(ErrorCode::MathOverflow)?;
+
+        if withdrawable_amount > 0 {
+            let seeds = &[
+                pool.base_key.as_ref(),
+                pool.staking_mint.as_ref(),
+                &[pool.pool_bump],
+            ];
+            let pool_signer = &[&seeds[..]];
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                token::Transfer {
+                    from: ctx.accounts.staking_vault.to_account_info(),
+                    to: ctx.accounts.withdraw_to_account.to_account_info(),
+                    authority: pool.to_account_info(),
+                },
+                pool_signer,
+            );
+
+            token::transfer(cpi_ctx, withdrawable_amount)?;
+        }
+
         Ok(())
     }
 
@@ -702,8 +738,8 @@ pub struct Deposit<'info> {
     token_program: Program<'info, Token>,
 }
 
-/// Accounts for
-/// and  instructions.
+/// Accounts for [AuthorizeFunder](/dual_farming/instruction/struct.AuthorizeFunder.html)
+/// and [DeauthorizeFunder](/dual_farming/instruction/struct.DeauthorizeFunder.html) instructions.
 #[derive(Accounts)]
 pub struct FunderChange<'info> {
     /// Global accounts for the staking instance.
@@ -749,6 +785,28 @@ pub struct Fund<'info> {
     /// Funder reward B ATA
     #[account(mut)]
     from_b: Box<Account<'info, TokenAccount>>,
+    /// Misc.
+    token_program: Program<'info, Token>,
+}
+
+/// Accounts for [WithdrawExtraToken](/dual_farming/instruction/struct.WithdrawExtraToken.html) instruction
+#[derive(Accounts)]
+pub struct WithdrawExtraToken<'info> {
+    /// Global accounts for the staking instance.
+    #[account(
+        has_one = staking_vault,
+        has_one = authority,
+        constraint = pool.reward_duration_end < sysvar::clock::Clock::get().unwrap().unix_timestamp.try_into().unwrap(),
+    )]
+    pool: Box<Account<'info, Pool>>,
+    /// Staking vault PDA
+    #[account(mut)]
+    staking_vault: Box<Account<'info, TokenAccount>>,
+    /// Token account to receive mistakenly deposited token
+    #[account(mut)]
+    withdraw_to_account: Box<Account<'info, TokenAccount>>,
+    /// Authority of the staking instance
+    authority: Signer<'info>,
     /// Misc.
     token_program: Program<'info, Token>,
 }
@@ -848,7 +906,7 @@ pub struct ClosePool<'info> {
     pool: Account<'info, Pool>,
     authority: Signer<'info>,
     #[account(mut,
-        constraint = staking_vault.amount == 0,
+        constraint = staking_vault.amount == 0, // Admin need to withdraw out mistakenly deposited token firstly
     )]
     staking_vault: Box<Account<'info, TokenAccount>>,
     #[account(mut)]
@@ -861,7 +919,7 @@ pub struct ClosePool<'info> {
 /// Pool account wrapper
 #[account]
 pub struct Pool {
-    /// Priviledged account.
+    /// Privileged account.
     pub authority: Pubkey, // 32
     /// Paused state of the program
     pub paused: bool, // 1
@@ -901,6 +959,8 @@ pub struct Pool {
     pub funders: [Pubkey; 4], // 32 * 4 = 128
     /// Pool bump
     pub pool_bump: u8, // 1
+    /// Total staked amount
+    pub total_staked: u64,
 }
 
 /// Farming user account
@@ -993,6 +1053,9 @@ pub enum ErrorCode {
     /// Authority not found for deauthorization.
     #[msg("Authority not found for deauthorization.")]
     CannotDeauthorizeMissingAuthority,
+    /// Math opeartion overflow
+    #[msg("Math operation overflow")]
+    MathOverflow,
 }
 
 impl Debug for Pool {
