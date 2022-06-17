@@ -42,7 +42,7 @@ pub struct PoolPDA {
 }
 
 pub fn get_pool_pda(program: &Program, staking_mint: &Pubkey, base: &Pubkey) -> Result<PoolPDA> {
-    let seeds = [base.as_ref(), staking_mint.as_ref()];
+    let seeds = [staking_mint.as_ref(), base.as_ref()];
     let (pool_pubkey, pool_bump) = Pubkey::find_program_address(&seeds, &program.id());
     Ok(PoolPDA {
         pubkey: pool_pubkey,

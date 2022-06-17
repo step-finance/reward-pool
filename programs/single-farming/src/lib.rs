@@ -21,17 +21,11 @@ declare_id!("EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd");
 #[cfg(not(feature = "dev"))]
 mod constants {
     use super::*;
+    use std::str::FromStr;
     pub const MIN_DURATION: u64 = 86400;
     // 1 day
     pub fn validate_admin_address(pubkey: Pubkey) -> bool {
         if pubkey == Pubkey::from_str("DHLXnJdACTY83yKwnUkeoDjqi4QBbsYGa1v8tJL76ViX").unwrap() {
-            return true;
-        }
-        false
-    }
-
-    pub fn validate_staking_mint(pubkey: Pubkey) -> bool {
-        if pubkey == Pubkey::from_str("MERt85fc5boKw3BW1eYdxonEuJNvXbiMbs6hvheau5K").unwrap() {
             return true;
         }
         false
@@ -43,10 +37,6 @@ mod constants {
     use super::*;
     pub const MIN_DURATION: u64 = 1;
     pub fn validate_admin_address(pubkey: Pubkey) -> bool {
-        return true;
-    }
-
-    pub fn validate_staking_mint(pubkey: Pubkey) -> bool {
         return true;
     }
 }
@@ -338,7 +328,6 @@ pub struct InitializePool<'info> {
     )]
     pub staking_vault: Box<Account<'info, TokenAccount>>,
     /// The staking Mint.
-    #[account(mut, constraint = validate_staking_mint(staking_mint.key()) @ ErrorCode::WrongStakingMint)]
     pub staking_mint: Box<Account<'info, Mint>>,
     /// The reward Mint.
     pub reward_mint: Box<Account<'info, Mint>>,

@@ -205,8 +205,8 @@ pub mod dual_farming {
         // Transfer tokens from the pool vault to user vault.
         {
             let seeds = &[
-                pool.base_key.as_ref(),
                 pool.staking_mint.as_ref(),
+                pool.base_key.as_ref(),
                 &[pool.pool_bump],
             ];
             let pool_signer = &[&seeds[..]];
@@ -333,8 +333,8 @@ pub mod dual_farming {
         update_rewards(pool, user_opt, pool.total_staked).unwrap();
 
         let seeds = &[
-            ctx.accounts.pool.base_key.as_ref(),
             ctx.accounts.pool.staking_mint.as_ref(),
+            ctx.accounts.pool.base_key.as_ref(),
             &[ctx.accounts.pool.pool_bump],
         ];
         let pool_signer = &[&seeds[..]];
@@ -408,8 +408,8 @@ pub mod dual_farming {
 
         if withdrawable_amount > 0 {
             let seeds = &[
-                pool.base_key.as_ref(),
                 pool.staking_mint.as_ref(),
+                pool.base_key.as_ref(),
                 &[pool.pool_bump],
             ];
             let pool_signer = &[&seeds[..]];
@@ -441,8 +441,8 @@ pub mod dual_farming {
         let pool = &ctx.accounts.pool;
 
         let signer_seeds = &[
-            ctx.accounts.pool.base_key.as_ref(),
             ctx.accounts.pool.staking_mint.as_ref(),
+            ctx.accounts.pool.base_key.as_ref(),
             &[ctx.accounts.pool.pool_bump],
         ];
 
@@ -573,8 +573,8 @@ pub struct InitializePool<'info> {
     #[account(
         init,
         seeds = [
+            staking_mint.key().as_ref(),
             base.key().as_ref(),
-            staking_mint.key().as_ref()
         ],
         payer = authority,
         bump,

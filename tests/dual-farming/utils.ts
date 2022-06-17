@@ -6,7 +6,7 @@ import { DualFarming } from "../../target/types/dual_farming";
 
 export async function getPoolPda(program: anchor.Program<DualFarming>, stakingMint: anchor.web3.PublicKey, base: anchor.web3.PublicKey) {
     return anchor.web3.PublicKey.findProgramAddress(
-        [base.toBuffer(), stakingMint.toBuffer()],
+        [stakingMint.toBuffer(), base.toBuffer()],
         program.programId
     );
 }
