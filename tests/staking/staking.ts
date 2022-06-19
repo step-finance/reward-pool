@@ -7,6 +7,8 @@ import { Staking } from "../../target/types/staking";
 import { sleep } from "@project-serum/common";
 
 type Pubkey = anchor.web3.PublicKey;
+const BN = anchor.BN;
+type BN = anchor.BN;
 
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
@@ -27,7 +29,9 @@ let lpMint: Pubkey | null; // xMER
 let lpMintNonce: number = 0;
 let vaultLpToken: Token | null;
 let userToken: Pubkey | null;
+let user2Token: Pubkey | null;
 let userLp: Pubkey | null;
+let user2Lp: Pubkey | null;
 let adminToken: Pubkey | null;
 let funderToken: Pubkey | null;
 let newAdminToken: Pubkey | null;
