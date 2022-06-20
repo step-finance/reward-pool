@@ -53,7 +53,7 @@ reward_mint: Gu7Ze57kKQF9r4u4oo4tAsk8riP8idw4gBN6hgUGQdTd
 $ ./single-farming-cli init --staking-mint 5SJETH3dj4zfZ1prQbGXFP1roBir2sU71tNZsLpZL8Je --reward-mint 3posQXX36o8C6qbSvNh7JUubhigVqRmJ9SB9YeD6SV66 --reward-start-timestamp 1656547200 --reward-duration 2592000 --funding-amount 10
 
 Wallet 3ekBoR8LmkuMmUm8M3iURoafbwEVQJzTsPbWEtxXk1d5
-Program ID: "EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd"
+Program ID: "9D9cdG8WV336qsjWe6PeMkqcsBmAWTZhddQgTfQrsHqc"
 Signature 5swLHFTrptwstp2qZ6255XKJMv7FRd22tzgH27Pwmr9X8moBToqsJuTcd5A7bGPubiLRCrWQuMA2EPkDisbwQtRr
 
 ```
@@ -63,7 +63,7 @@ Signature 5swLHFTrptwstp2qZ6255XKJMv7FRd22tzgH27Pwmr9X8moBToqsJuTcd5A7bGPubiLRCr
 $ ./single-farming-cli create-user --wallet-path ~/.config/solana/user.json --staking-mint 5SJETH3dj4zfZ1prQbGXFP1roBir2sU71tNZsLpZL8Je
  
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
-Program ID: "EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd"
+Program ID: "9D9cdG8WV336qsjWe6PeMkqcsBmAWTZhddQgTfQrsHqc"
 Signature 2H1ZWjWBVLWKMKkDXH7HzJd31kLihjxnGDMGsbRADjcK36wG9KcVi17CTddLtSXXRu3A44cAW1hNHZQX251AMYix
 
 ```
@@ -75,7 +75,7 @@ Signature 2H1ZWjWBVLWKMKkDXH7HzJd31kLihjxnGDMGsbRADjcK36wG9KcVi17CTddLtSXXRu3A44
 
 
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
-Program ID: "EnkQuN7PGSdvqDmB9Z1dDRKuYnXnCeEMpUwHU37E3kQd"
+Program ID: "9D9cdG8WV336qsjWe6PeMkqcsBmAWTZhddQgTfQrsHqc"
 Signature 57tnZedp4qZzsYCmss64kyqDWM8BvgexLvc5yEPZyw4gETGqbCbCQG3v3ridyKgwHnWZCNHXxJwXWcJ5ePvQDgEo
 
 ```

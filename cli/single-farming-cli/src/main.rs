@@ -259,8 +259,8 @@ pub fn close_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> 
 pub fn show_info(program: &Program, staking_mint: &Pubkey) -> Result<()> {
     let pda = get_pool_pda(&program, &staking_mint)?;
     let pool = get_pool(program, pda.pubkey)?;
-    println!("pool_pubkey {:#?}", pda.pubkey);
-    println!("staking_vault {:#?}", pool.staking_vault);
+
+    println!("{:?}", pool);
 
     Ok(())
 }

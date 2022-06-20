@@ -8,7 +8,7 @@ const RATE_PRECISION: u128 = 1_000_000_000_000;
 const PRECISION: u128 = 1_000_000_000;
 
 #[account]
-#[derive(Default)]
+#[derive(Default, Debug)]
 /// Pool account wrapper
 pub struct Pool {
     /// Nonce to derive the program-derived address owning the vaults.
