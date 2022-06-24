@@ -95,14 +95,13 @@ describe("Reward Pool", () => {
       assert.fail("did not fail to create dupe pool");
     } catch (e) {}
 
-    const [_, poolNonce] = await utils.computePoolAccount(stakingMint);
-    const [stakingVault, _stakingVaultNonce] =
+    const [stakingVault, stakingVaultNonce] =
       await utils.computeStakingVaultAccount(pool);
     const [rewardVault, _rewardVaultNonce] =
       await utils.computeRewardVaultAccount(pool);
 
     const poolState = await program.account.pool.fetch(pool);
-    assert.deepStrictEqual(poolState.nonce, poolNonce);
+    assert.deepStrictEqual(poolState.stakingVaultNonce, stakingVaultNonce);
     assert.deepStrictEqual(
       poolState.stakingMint.toBase58(),
       stakingMint.toBase58()

@@ -6,7 +6,7 @@ This repository contains 3 main programs:
 
 ## Test
 ```
-anchor test -- --features dev
+anchor test -- --features devnet
 ```
 
 ## Branches and Tags

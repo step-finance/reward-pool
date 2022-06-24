@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "3.1.8", features = ["derive"] }
-single_farming = { path = "../../programs/single-farming", features= ["dev"]}
+single_farming = { path = "../../programs/single-farming"}
 shellexpand = "2.1.0"
 anchor-lang = "0.24.2"
 anchor-spl = {version = "0.24.2"}

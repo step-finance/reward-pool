@@ -21,12 +21,12 @@ pub mod pool;
 
 declare_id!("AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH");
 
-#[cfg(not(feature = "dev"))]
+#[cfg(not(feature = "devnet"))]
 mod constants {
     pub const MIN_DURATION: u64 = 86400;
 }
 
-#[cfg(feature = "dev")]
+#[cfg(feature = "devnet")]
 mod constants {
     pub const MIN_DURATION: u64 = 1;
 }

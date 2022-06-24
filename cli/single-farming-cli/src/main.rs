@@ -47,35 +47,35 @@ fn main() -> Result<()> {
                 funding_amount,
             )?;
         }
-        CliCommand::ActivateFarming { staking_mint } => {
-            activate_farming(&program, &payer, &staking_mint)?;
+        CliCommand::ActivateFarming { pool_pubkey } => {
+            activate_farming(&program, &payer, &pool_pubkey)?;
         }
-        CliCommand::CreateUser { staking_mint } => {
-            create_user(&program, &payer, &staking_mint)?;
+        CliCommand::CreateUser { pool_pubkey } => {
+            create_user(&program, &payer, &pool_pubkey)?;
         }
         CliCommand::Stake {
-            staking_mint,
+            pool_pubkey,
             amount,
         } => {
-            stake(&program, &payer, &staking_mint, amount)?;
+            stake(&program, &payer, &pool_pubkey, amount)?;
         }
         CliCommand::Unstake {
-            staking_mint,
+            pool_pubkey,
             spt_amount,
         } => {
-            unstake(&program, &payer, &staking_mint, spt_amount)?;
+            unstake(&program, &payer, &pool_pubkey, spt_amount)?;
         }
-        CliCommand::Claim { staking_mint } => {
-            claim(&program, &payer, &staking_mint)?;
+        CliCommand::Claim { pool_pubkey } => {
+            claim(&program, &payer, &pool_pubkey)?;
         }
-        CliCommand::CloseUser { staking_mint } => {
-            close_user(&program, &payer, &staking_mint)?;
+        CliCommand::CloseUser { pool_pubkey } => {
+            close_user(&program, &payer, &pool_pubkey)?;
         }
-        CliCommand::ShowInfo { staking_mint } => {
-            show_info(&program, &staking_mint)?;
+        CliCommand::ShowInfo { pool_pubkey } => {
+            show_info(&program, &pool_pubkey)?;
         }
-        CliCommand::StakeInfo { staking_mint } => {
-            stake_info(&program, &staking_mint, &payer.pubkey())?;
+        CliCommand::StakeInfo { pool_pubkey } => {
+            stake_info(&program, &pool_pubkey, &payer.pubkey())?;
         }
     }
     Ok(())
@@ -89,19 +89,21 @@ fn initialize_pool(
     reward_duration: u64,
     funding_amount: u64,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
+    let pool_keypair = Keypair::new();
+    let pool_pubkey = pool_keypair.pubkey();
+    print!("pool_pubkey {}", pool_pubkey);
 
     let VaultPDAs {
         staking_vault,
         reward_vault,
-    } = get_vault_pdas(&program.id(), &pool_pda.pubkey);
+    } = get_vault_pdas(&program.id(), &pool_pubkey);
     let (staking_vault_pubkey, _) = staking_vault;
     let (reward_vault_pubkey, _) = reward_vault;
 
     let builder = program
         .request()
         .accounts(single_farming::accounts::InitializePool {
-            pool: pool_pda.pubkey,
+            pool: pool_pubkey,
             staking_mint: *staking_mint,
             staking_vault: staking_vault_pubkey,
             reward_mint: *reward_mint,
@@ -115,18 +117,18 @@ fn initialize_pool(
             reward_duration,
             funding_amount,
         })
-        .signer(admin);
+        .signer(admin)
+        .signer(&pool_keypair);
     let signature = builder.send()?;
     println!("Signature {:?}", signature);
     Ok(())
 }
 
-pub fn activate_farming(program: &Program, admin: &Keypair, staking_mint: &Pubkey) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
+pub fn activate_farming(program: &Program, admin: &Keypair, pool_pubkey: &Pubkey) -> Result<()> {
     let builder = program
         .request()
         .accounts(single_farming::accounts::ActivateFarming {
-            pool: pool_pda.pubkey,
+            pool: *pool_pubkey,
             admin: admin.pubkey(),
         })
         .args(single_farming::instruction::ActivateFarming {})
@@ -136,14 +138,13 @@ pub fn activate_farming(program: &Program, admin: &Keypair, staking_mint: &Pubke
     Ok(())
 }
 
-pub fn create_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn create_user(program: &Program, owner: &Keypair, pool_pubkey: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool_pubkey, &owner.pubkey(), &program.id());
     let (user_pubkey, _nonce) = user;
     let builder = program
         .request()
         .accounts(single_farming::accounts::CreateUser {
-            pool: pool_pda.pubkey,
+            pool: *pool_pubkey,
             user: user_pubkey,
             owner: owner.pubkey(),
             system_program: solana_program::system_program::ID,
@@ -155,18 +156,17 @@ pub fn create_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) ->
     Ok(())
 }
 
-pub fn stake(program: &Program, owner: &Keypair, staking_mint: &Pubkey, amount: u64) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn stake(program: &Program, owner: &Keypair, pool_pubkey: &Pubkey, amount: u64) -> Result<()> {
+    let pool = get_pool(program, *pool_pubkey)?;
+    let UserPDA { user } = get_user_pda(pool_pubkey, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let stake_from_account = get_or_create_ata(&program, &owner.pubkey(), &pool.staking_mint)?;
 
     let builder = program
         .request()
-        .accounts(single_farming::accounts::Deposit {
-            pool: pool_pda.pubkey,
+        .accounts(single_farming::accounts::DepositOrWithdraw {
+            pool: *pool_pubkey,
             staking_vault: pool.staking_vault,
             stake_from_account,
             user: user_pubkey,
@@ -184,19 +184,18 @@ pub fn stake(program: &Program, owner: &Keypair, staking_mint: &Pubkey, amount: 
 pub fn unstake(
     program: &Program,
     owner: &Keypair,
-    staking_mint: &Pubkey,
+    pool_pubkey: &Pubkey,
     spt_amount: u64,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+    let pool = get_pool(program, *pool_pubkey)?;
+    let UserPDA { user } = get_user_pda(pool_pubkey, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
     let stake_from_account = get_or_create_ata(&program, &owner.pubkey(), &pool.staking_mint)?;
 
     let builder = program
         .request()
-        .accounts(single_farming::accounts::Deposit {
-            pool: pool_pda.pubkey,
+        .accounts(single_farming::accounts::DepositOrWithdraw {
+            pool: *pool_pubkey,
             staking_vault: pool.staking_vault,
             user: user_pubkey,
             stake_from_account,
@@ -211,10 +210,9 @@ pub fn unstake(
     Ok(())
 }
 
-pub fn claim(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn claim(program: &Program, owner: &Keypair, pool_pubkey: &Pubkey) -> Result<()> {
+    let pool = get_pool(program, *pool_pubkey)?;
+    let UserPDA { user } = get_user_pda(pool_pubkey, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let reward_account = get_or_create_ata(&program, &owner.pubkey(), &pool.reward_mint)?;
@@ -222,7 +220,7 @@ pub fn claim(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Resul
     let builder = program
         .request()
         .accounts(single_farming::accounts::ClaimReward {
-            pool: pool_pda.pubkey,
+            pool: *pool_pubkey,
             staking_vault: pool.staking_vault,
             reward_vault: pool.reward_vault,
             user: user_pubkey,
@@ -237,15 +235,14 @@ pub fn claim(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Resul
     Ok(())
 }
 
-pub fn close_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn close_user(program: &Program, owner: &Keypair, pool_pubkey: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool_pubkey, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let builder = program
         .request()
         .accounts(single_farming::accounts::CloseUser {
-            pool: pool_pda.pubkey,
+            pool: *pool_pubkey,
             user: user_pubkey,
             owner: owner.pubkey(),
         })
@@ -256,18 +253,16 @@ pub fn close_user(program: &Program, owner: &Keypair, staking_mint: &Pubkey) -> 
     Ok(())
 }
 
-pub fn show_info(program: &Program, staking_mint: &Pubkey) -> Result<()> {
-    let pda = get_pool_pda(&program, &staking_mint)?;
-    let pool = get_pool(program, pda.pubkey)?;
+pub fn show_info(program: &Program, pool_pubkey: &Pubkey) -> Result<()> {
+    let pool = get_pool(program, *pool_pubkey)?;
 
     println!("{:?}", pool);
 
     Ok(())
 }
 
-pub fn stake_info(program: &Program, staking_mint: &Pubkey, user: &Pubkey) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &user, &program.id());
+pub fn stake_info(program: &Program, pool_pubkey: &Pubkey, user: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool_pubkey, &user, &program.id());
     let (user_pubkey, _) = user;
     let user = get_user(&program, user_pubkey)?;
     println!("balance_staked {:#?}", user.balance_staked);

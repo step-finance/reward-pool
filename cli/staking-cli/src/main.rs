@@ -11,11 +11,10 @@ use anchor_client::{Client, Program};
 use anyhow::Result;
 use core::str::FromStr;
 use solana_program::system_program;
+use staking::vault::Vault;
 use std::rc::Rc;
 
 use clap::*;
-
-const BASE_KEY: &str = "HWzXGcGHy4tcpYfaRDCyLNzXqBTv3E6BttpCH2vJxArv";
 
 fn main() -> Result<()> {
     let opts = Opts::parse();
@@ -34,42 +33,45 @@ fn main() -> Result<()> {
     );
     let program = client.program(program_id);
     match opts.command {
-        CliCommand::Init {
-            token_mint,
-            base_key_location,
-        } => {
-            initialize_vault(&program, &payer, &token_mint, base_key_location)?;
+        CliCommand::Init { token_mint } => {
+            initialize_vault(&program, &payer, &token_mint)?;
         }
         CliCommand::TransferAdmin {
-            token_mint,
+            vault_pubkey,
             new_admin_path,
         } => {
             let new_admin =
                 read_keypair_file(new_admin_path).expect("Wallet keypair file not found");
-            transfer_admin(&program, &token_mint, &payer, &new_admin)?;
+            transfer_admin(&program, &vault_pubkey, &payer, &new_admin)?;
         }
-        CliCommand::ShowInfo { token_mint } => {
-            show_vault_info(&program, &token_mint)?;
+        CliCommand::ShowInfo { vault_pubkey } => {
+            show_vault_info(&program, &vault_pubkey)?;
         }
-        CliCommand::Stake { token_mint, amount } => {
-            stake(&program, &token_mint, &payer, amount)?;
+        CliCommand::Stake {
+            vault_pubkey,
+            amount,
+        } => {
+            stake(&program, &vault_pubkey, &payer, amount)?;
         }
-        CliCommand::Reward { token_mint, amount } => {
-            reward(&program, &token_mint, &payer, amount)?;
+        CliCommand::Reward {
+            vault_pubkey,
+            amount,
+        } => {
+            reward(&program, &vault_pubkey, &payer, amount)?;
         }
         CliCommand::Unstake {
-            token_mint,
+            vault_pubkey,
             unmint_amount,
         } => {
-            unstake(&program, &token_mint, &payer, unmint_amount)?;
+            unstake(&program, &vault_pubkey, &payer, unmint_amount)?;
         }
         CliCommand::UpdateLockedRewardDegradation {
-            token_mint,
+            vault_pubkey,
             locked_reward_degradation,
         } => {
             update_locked_reward_degradation(
                 &program,
-                &token_mint,
+                &vault_pubkey,
                 &payer,
                 locked_reward_degradation,
             )?;
@@ -80,24 +82,21 @@ fn main() -> Result<()> {
 
 fn update_locked_reward_degradation(
     program: &Program,
-    token_mint: &Pubkey,
+    vault_pubkey: &Pubkey,
     admin: &Keypair,
     locked_reward_degradation: u64,
 ) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
-
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
     let VaultPdas {
-        vault,
         token_vault: _,
         lp_mint: _,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
-
-    let (vault_pubkey, _) = vault;
+    } = get_vault_pdas(&vault_pubkey, &token_mint, &program.id());
 
     let builder = program
         .request()
         .accounts(staking::accounts::UpdateLockedRewardDegradation {
-            vault: vault_pubkey,
+            vault: *vault_pubkey,
             admin: admin.pubkey(),
         })
         .args(staking::instruction::UpdateLockedRewardDegradation {
@@ -113,19 +112,18 @@ fn update_locked_reward_degradation(
 
 fn unstake(
     program: &Program,
-    token_mint: &Pubkey,
+    vault_pubkey: &Pubkey,
     payer: &Keypair,
     unmint_amount: u64,
 ) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
 
     let VaultPdas {
-        vault,
         token_vault,
         lp_mint,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
+    } = get_vault_pdas(&vault_pubkey, &token_mint, &program.id());
 
-    let (vault_pubkey, _) = vault;
     let (token_vault_pubkey, _) = token_vault;
     let (lp_mint_pubkey, _) = lp_mint;
 
@@ -137,7 +135,7 @@ fn unstake(
         .accounts(staking::accounts::Stake {
             lp_mint: lp_mint_pubkey,
             token_program: spl_token::ID,
-            vault: vault_pubkey,
+            vault: *vault_pubkey,
             user_transfer_authority: payer.pubkey(),
             token_vault: token_vault_pubkey,
             user_lp,
@@ -152,16 +150,15 @@ fn unstake(
     Ok(())
 }
 
-fn reward(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
+fn reward(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
 
     let VaultPdas {
-        vault,
         token_vault,
         lp_mint: _,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
+    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
 
-    let (vault_pubkey, _) = vault;
     let (token_vault_pubkey, _) = token_vault;
 
     let user_token = get_or_create_ata(&program, &payer.pubkey(), &token_mint)?;
@@ -170,7 +167,7 @@ fn reward(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) 
         .request()
         .accounts(staking::accounts::Reward {
             token_program: spl_token::ID,
-            vault: vault_pubkey,
+            vault: *vault_pubkey,
             user_transfer_authority: payer.pubkey(),
             token_vault: token_vault_pubkey,
             user_token,
@@ -184,16 +181,15 @@ fn reward(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) 
     Ok(())
 }
 
-fn stake(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
+fn stake(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
 
     let VaultPdas {
-        vault,
         token_vault,
         lp_mint,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
+    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
 
-    let (vault_pubkey, _) = vault;
     let (token_vault_pubkey, _) = token_vault;
     let (lp_mint_pubkey, _) = lp_mint;
 
@@ -205,7 +201,7 @@ fn stake(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) -
         .accounts(staking::accounts::Stake {
             lp_mint: lp_mint_pubkey,
             token_program: spl_token::ID,
-            vault: vault_pubkey,
+            vault: *vault_pubkey,
             user_transfer_authority: payer.pubkey(),
             token_vault: token_vault_pubkey,
             user_lp,
@@ -220,17 +216,14 @@ fn stake(program: &Program, token_mint: &Pubkey, payer: &Keypair, amount: u64) -
     Ok(())
 }
 
-fn show_vault_info(program: &Program, token_mint: &Pubkey) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
+fn show_vault_info(program: &Program, vault_pubkey: &Pubkey) -> Result<()> {
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
 
     let VaultPdas {
-        vault,
         token_vault: _,
         lp_mint: _,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
-
-    let (vault_pubkey, _) = vault;
-    let vault: staking::vault::Vault = program.account(vault_pubkey)?;
+    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
 
     println!("{:#?}", vault);
 
@@ -239,25 +232,23 @@ fn show_vault_info(program: &Program, token_mint: &Pubkey) -> Result<()> {
 
 fn transfer_admin(
     program: &Program,
-    token_mint: &Pubkey,
+    vault_pubkey: &Pubkey,
     admin: &Keypair,
     new_admin: &Keypair,
 ) -> Result<()> {
-    let base_pubkey = Pubkey::from_str(BASE_KEY)?;
+    let vault: Vault = program.account(*vault_pubkey)?;
+    let token_mint = vault.token_mint;
     let VaultPdas {
-        vault,
         token_vault: _,
         lp_mint: _,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
-
-    let (vault_pubkey, _) = vault;
+    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
 
     let builder = program
         .request()
         .accounts(staking::accounts::TransferAdmin {
             admin: admin.pubkey(),
             new_admin: new_admin.pubkey(),
-            vault: vault_pubkey,
+            vault: *vault_pubkey,
         })
         .args(staking::instruction::TransferAdmin {})
         .signer(admin)
@@ -269,25 +260,16 @@ fn transfer_admin(
     Ok(())
 }
 
-fn initialize_vault(
-    program: &Program,
-    admin: &Keypair,
-    token_mint: &Pubkey,
-    base_key_location: String,
-) -> Result<()> {
-    let base_keypair = read_keypair_file(&*shellexpand::tilde(&base_key_location))
-        .expect("Cannot read a keypair file");
-
-    let base_pubkey = base_keypair.pubkey();
-    println!("base pubkey {}", base_pubkey);
+fn initialize_vault(program: &Program, admin: &Keypair, token_mint: &Pubkey) -> Result<()> {
+    let vault_keypair = Keypair::new();
+    let vault_pubkey = vault_keypair.pubkey();
+    println!("vault_pubkey {}", vault_pubkey);
 
     let VaultPdas {
-        vault,
         token_vault,
         lp_mint,
-    } = get_vault_pdas(&base_pubkey, &token_mint, &program.id());
+    } = get_vault_pdas(&vault_pubkey, &token_mint, &program.id());
 
-    let (vault_pubkey, vault_bump) = vault;
     let (token_vault_pubkey, _) = token_vault;
     let (lp_mint_pubkey, _) = lp_mint;
 
@@ -295,7 +277,6 @@ fn initialize_vault(
         .request()
         .accounts(staking::accounts::InitializeVault {
             admin: admin.pubkey(),
-            base: base_pubkey,
             lp_mint: lp_mint_pubkey,
             token_mint: *token_mint,
             vault: vault_pubkey,
@@ -306,7 +287,7 @@ fn initialize_vault(
         })
         .args(staking::instruction::InitializeVault {})
         .signer(admin)
-        .signer(&base_keypair);
+        .signer(&vault_keypair);
 
     let signature = builder.send()?;
     println!("Signature {:?}", signature);

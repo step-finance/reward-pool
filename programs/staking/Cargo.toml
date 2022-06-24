@@ -11,10 +11,9 @@ name = "staking"
 [features]
 no-entrypoint = []
 no-idl = []
-devnet = []
 cpi = ["no-entrypoint"]
 default = []
-dev = []
+devnet = []
 
 [dependencies]
 anchor-lang = { version = "0.24.2" }

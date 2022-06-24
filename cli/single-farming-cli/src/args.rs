@@ -46,44 +46,44 @@ pub enum CliCommand {
     },
     ActivateFarming {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
     /// User enables staking
     CreateUser {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
     /// User stakes
     Stake {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
         amount: u64,
     },
     /// User unstakes
     Unstake {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
         spt_amount: u64,
     },
     /// User claims pending rewards
     Claim {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
     /// Admin closes a user stake account
     CloseUser {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
     /// Show pool info
     ShowInfo {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
     /// User stake info
     StakeInfo {
         #[clap(long)]
-        staking_mint: Pubkey,
+        pool_pubkey: Pubkey,
     },
 }
 

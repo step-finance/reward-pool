@@ -113,7 +113,8 @@ export class User {
     rewardDuration: anchor.BN,
     fundingAmount: anchor.BN
   ) {
-    const [pool, _poolNonce] = await utils.computePoolAccount(stakingMint);
+    const poolKeypair = anchor.web3.Keypair.generate();
+    const pool = poolKeypair.publicKey;    
 
     const [stakingVault, _stakingVaultNonce] =
       await utils.computeStakingVaultAccount(pool);
@@ -134,7 +135,7 @@ export class User {
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .signers([this.keypair])
+      .signers([this.keypair, poolKeypair])
       .rpc();
     return pool;
   }

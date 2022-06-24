@@ -5,7 +5,6 @@
 #![warn(clippy::integer_arithmetic)]
 #![warn(missing_docs)]
 
-use crate::constants::*;
 use crate::state::*;
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{clock, sysvar};
@@ -17,29 +16,6 @@ use std::convert::TryInto;
 pub mod state;
 
 declare_id!("9D9cdG8WV336qsjWe6PeMkqcsBmAWTZhddQgTfQrsHqc");
-
-#[cfg(not(feature = "dev"))]
-mod constants {
-    use super::*;
-    use std::str::FromStr;
-    pub const MIN_DURATION: u64 = 86400;
-    // 1 day
-    pub fn validate_admin_address(pubkey: Pubkey) -> bool {
-        if pubkey == Pubkey::from_str("DHLXnJdACTY83yKwnUkeoDjqi4QBbsYGa1v8tJL76ViX").unwrap() {
-            return true;
-        }
-        false
-    }
-}
-
-#[cfg(feature = "dev")]
-mod constants {
-    use super::*;
-    pub const MIN_DURATION: u64 = 1;
-    pub fn validate_admin_address(pubkey: Pubkey) -> bool {
-        return true;
-    }
-}
 
 /// Updates the pool with the total reward per token that is due stakers
 /// Using the calculator specific to that pool version which uses the reward
@@ -83,13 +59,13 @@ pub mod single_farming {
         reward_duration: u64,
         funding_amount: u64,
     ) -> Result<()> {
-        if reward_duration < MIN_DURATION {
-            return Err(ErrorCode::DurationTooShort.into());
+        if reward_duration == 0 {
+            return Err(ErrorCode::DurationCannotBeZero.into());
         }
 
         let pool = &mut ctx.accounts.pool;
         // This is safe as long as the key matched the account in InitializePool context
-        pool.nonce = *ctx.bumps.get("pool").unwrap();
+        pool.staking_vault_nonce = *ctx.bumps.get("staking_vault").unwrap();
         pool.staking_mint = ctx.accounts.staking_mint.key();
         pool.staking_vault = ctx.accounts.staking_vault.key();
         pool.reward_mint = ctx.accounts.reward_mint.key();
@@ -137,13 +113,13 @@ pub mod single_farming {
     }
 
     /// A user deposit all tokens into the pool.
-    pub fn deposit_full(ctx: Context<Deposit>) -> Result<()> {
+    pub fn deposit_full(ctx: Context<DepositOrWithdraw>) -> Result<()> {
         let full_amount = ctx.accounts.stake_from_account.amount;
         deposit(ctx, full_amount)
     }
 
     /// A user deposit tokens in the pool.
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
+    pub fn deposit(ctx: Context<DepositOrWithdraw>, amount: u64) -> Result<()> {
         if amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -177,7 +153,7 @@ pub mod single_farming {
     }
 
     /// A user withdraw tokens in the pool.
-    pub fn withdraw(ctx: Context<Deposit>, spt_amount: u64) -> Result<()> {
+    pub fn withdraw(ctx: Context<DepositOrWithdraw>, spt_amount: u64) -> Result<()> {
         if spt_amount == 0 {
             return Err(ErrorCode::AmountMustBeGreaterThanZero.into());
         }
@@ -199,8 +175,13 @@ pub mod single_farming {
 
         // Transfer tokens from the pool vault to user vault.
         {
-            let staking_mint = pool.staking_mint;
-            let seeds = &[b"pool".as_ref(), staking_mint.as_ref(), &[pool.nonce]];
+            let pool_key = pool.key();
+
+            let seeds = &[
+                b"staking_vault".as_ref(),
+                pool_key.as_ref(),
+                &[pool.staking_vault_nonce],
+            ];
             let pool_signer = &[&seeds[..]];
 
             let cpi_ctx = CpiContext::new_with_signer(
@@ -208,7 +189,7 @@ pub mod single_farming {
                 token::Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.stake_from_account.to_account_info(),
-                    authority: pool.to_account_info(),
+                    authority: ctx.accounts.staking_vault.to_account_info(),
                 },
                 pool_signer,
             );
@@ -232,14 +213,19 @@ pub mod single_farming {
             .ok_or(ErrorCode::MathOverFlow)?;
 
         if withdrawable_amount > 0 {
-            let seeds = &[b"pool".as_ref(), pool.staking_mint.as_ref(), &[pool.nonce]];
+            let pool_pubkey = pool.key();
+            let seeds = &[
+                b"staking_vault".as_ref(),
+                pool_pubkey.as_ref(),
+                &[pool.staking_vault_nonce],
+            ];
             let pool_signer = &[&seeds[..]];
             let cpi_ctx = CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
                 token::Transfer {
                     from: ctx.accounts.staking_vault.to_account_info(),
                     to: ctx.accounts.withdraw_to_account.to_account_info(),
-                    authority: pool.to_account_info(),
+                    authority: ctx.accounts.staking_vault.to_account_info(),
                 },
                 pool_signer,
             );
@@ -256,8 +242,12 @@ pub mod single_farming {
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(pool, user_opt, pool.total_staked)?;
 
-        let staking_mint = pool.staking_mint;
-        let seeds = &[b"pool".as_ref(), staking_mint.as_ref(), &[pool.nonce]];
+        let pool_key = pool.key();
+        let seeds = &[
+            b"staking_vault".as_ref(),
+            pool_key.as_ref(),
+            &[pool.staking_vault_nonce],
+        ];
         let pool_signer = &[&seeds[..]];
 
         // emit pending reward
@@ -283,7 +273,7 @@ pub mod single_farming {
                     token::Transfer {
                         from: ctx.accounts.reward_vault.to_account_info(),
                         to: ctx.accounts.reward_account.to_account_info(),
-                        authority: ctx.accounts.pool.to_account_info(),
+                        authority: ctx.accounts.staking_vault.to_account_info(),
                     },
                     pool_signer,
                 );
@@ -310,8 +300,6 @@ pub struct InitializePool<'info> {
     /// The farming pool PDA.
     #[account(
         init,
-        seeds = [b"pool".as_ref(), staking_mint.key().as_ref()], 
-        bump,
         payer = admin,
         space = 250 // 1 + 177 + buffer
     )]
@@ -324,7 +312,7 @@ pub struct InitializePool<'info> {
         bump,
         payer = admin,
         token::mint = staking_mint,
-        token::authority = pool,
+        token::authority = staking_vault,
     )]
     pub staking_vault: Box<Account<'info, TokenAccount>>,
     /// The staking Mint.
@@ -338,12 +326,12 @@ pub struct InitializePool<'info> {
         bump,
         payer = admin,
         token::mint = reward_mint,
-        token::authority = pool,
+        token::authority = staking_vault,
     )]
     pub reward_vault: Box<Account<'info, TokenAccount>>,
 
-    /// The authority of the pool
-    #[account(mut, constraint = validate_admin_address(admin.key()) @ ErrorCode::InvalidAdminWhenCreatingPool)]
+    /// The authority of the pool   
+    #[account(mut)]
     pub admin: Signer<'info>,
 
     /// Token Program
@@ -378,7 +366,7 @@ pub struct CreateUser<'info> {
         payer = owner,
         seeds = [
             owner.key.as_ref(),
-            pool.to_account_info().key.as_ref()
+            pool.key().as_ref()
         ],
         bump,
         space = 120 // 1 + 97 + buffer
@@ -393,7 +381,7 @@ pub struct CreateUser<'info> {
 
 /// Accounts for [Deposit](/single_farming/instruction/struct.Deposit.html) instruction and [Withdraw](/single_farming/instruction/struct.Withdraw.html) instruction
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct DepositOrWithdraw<'info> {
     /// The farming pool PDA.
     #[account(
         mut,
@@ -489,6 +477,7 @@ pub struct WithdrawExtraToken<'info> {
     /// Token account to receive mistakenly deposited token
     #[account(mut)]
     withdraw_to_account: Box<Account<'info, TokenAccount>>,
+
     /// Admin of the staking instance
     admin: Signer<'info>,
     /// Misc.
@@ -517,8 +506,8 @@ pub enum ErrorCode {
     #[msg("Amount must be greater than zero.")]
     AmountMustBeGreaterThanZero,
     /// Duration cannot be shorter than one day.
-    #[msg("Duration cannot be shorter than one day.")]
-    DurationTooShort,
+    #[msg("Duration cannot be zero")]
+    DurationCannotBeZero,
     /// MathOverFlow
     #[msg("MathOverFlow")]
     MathOverFlow,

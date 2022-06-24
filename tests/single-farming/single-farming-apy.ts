@@ -31,9 +31,9 @@ const merUsdRate = 0.3;
 const jupUsdRate = 1;
 
 const admin = new anchor.web3.Keypair();
-const base = new anchor.web3.Keypair();
 const user = new anchor.web3.Keypair();
 const user2 = new anchor.web3.Keypair();
+const merVaultKeypair = new anchor.web3.Keypair();
 
 let merTokenVault: Pubkey | null;
 let merMint: Token | null;
@@ -85,14 +85,7 @@ describe("SingleFarming APY", () => {
       TOKEN_PROGRAM_ID
     );
 
-    [merVault] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("vault")),
-        merMint.publicKey.toBuffer(),
-        base.publicKey.toBuffer(),
-      ],
-      stakeProgram.programId
-    );
+    merVault = merVaultKeypair.publicKey;
 
     [merTokenVault] = await anchor.web3.PublicKey.findProgramAddress(
       [
@@ -114,7 +107,6 @@ describe("SingleFarming APY", () => {
       .initializeVault()
       .accounts({
         vault: merVault,
-        base: base.publicKey,
         tokenVault: merTokenVault,
         tokenMint: merMint.publicKey,
         lpMint: xMerMintPubkey,
@@ -123,7 +115,7 @@ describe("SingleFarming APY", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([base, admin])
+      .signers([merVaultKeypair, admin])
       .rpc();
 
     xMerMint = new Token(
@@ -201,13 +193,8 @@ describe("SingleFarming APY", () => {
       TOKEN_PROGRAM_ID
     );
 
-    [jupFarm] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("pool")),
-        xMerMintPubkey.toBuffer(),
-      ],
-      farmProgram.programId
-    );
+    const jupFarmingKeypair = anchor.web3.Keypair.generate();
+    jupFarm = jupFarmingKeypair.publicKey;       
 
     [jupFarmStakingVault] = await anchor.web3.PublicKey.findProgramAddress(
       [
@@ -248,7 +235,7 @@ describe("SingleFarming APY", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
         tokenProgram: TOKEN_PROGRAM_ID,
       })
-      .signers([admin])
+      .signers([admin, jupFarmingKeypair])
       .rpc();
 
     userJupToken = await jupMint.createAssociatedTokenAccount(user.publicKey);

@@ -136,12 +136,6 @@ export async function getOrCreateAssociatedTokenAccount(
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function computePoolAccount(stakingMint) {
-  return anchor.web3.PublicKey.findProgramAddress(
-    [Buffer.from("pool"), stakingMint.toBuffer()],
-    program.programId
-  );
-}
 
 export function computeStakingVaultAccount(pool) {
   return anchor.web3.PublicKey.findProgramAddress(

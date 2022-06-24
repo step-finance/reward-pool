@@ -35,4 +35,4 @@ jobs:
       - name: Cargo test
         run: cargo test
       - name: Anchor tests
-        run: anchor test -- --features dev
+        run: anchor test -- --features devnet

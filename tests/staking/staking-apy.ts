@@ -19,6 +19,7 @@ anchor.setProvider(provider);
 
 const program = anchor.workspace.Staking as Program<Staking>;
 const admin = new anchor.web3.Keypair();
+const vaultKeypair = new anchor.web3.Keypair();
 const base = new anchor.web3.Keypair();
 const user = new anchor.web3.Keypair();
 const user2 = new anchor.web3.Keypair();
@@ -63,14 +64,7 @@ describe("staking apy", () => {
       TOKEN_PROGRAM_ID
     );
 
-    [vault] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("vault")),
-        tokenMint.publicKey.toBuffer(),
-        base.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
+    vault = vaultKeypair.publicKey;
 
     [tokenVault] = await anchor.web3.PublicKey.findProgramAddress(
       [
@@ -92,7 +86,6 @@ describe("staking apy", () => {
       .initializeVault()
       .accounts({
         vault,
-        base: base.publicKey,
         tokenVault,
         tokenMint: tokenMint.publicKey,
         lpMint,
@@ -101,7 +94,7 @@ describe("staking apy", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([base, admin])
+      .signers([vaultKeypair, admin])
       .rpc();
 
     vaultLpToken = new Token(

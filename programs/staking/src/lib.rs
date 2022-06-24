@@ -21,11 +21,10 @@ mod staking {
     /// Initialize a new vault.
     pub fn initialize_vault(ctx: Context<InitializeVault>) -> Result<()> {
         let vault = &mut ctx.accounts.vault;
-        vault.vault_bump = *ctx.bumps.get("vault").unwrap();
+        vault.token_vault_bump = *ctx.bumps.get("token_vault").unwrap();
         vault.token_mint = ctx.accounts.token_mint.key();
         vault.token_vault = ctx.accounts.token_vault.key();
         vault.lp_mint = ctx.accounts.lp_mint.key();
-        vault.base = *ctx.accounts.base.key;
         vault.admin = *ctx.accounts.admin.key;
         vault.locked_reward_tracker = LockedRewardTracker::default();
         Ok(())
@@ -83,11 +82,11 @@ mod staking {
         )?;
 
         // Mint corresponding amount of LP to user.
+        let vault_pubkey = ctx.accounts.vault.key();
         let seeds = &[
-            b"vault".as_ref(),
-            ctx.accounts.vault.token_mint.as_ref(),
-            ctx.accounts.vault.base.as_ref(),
-            &[ctx.accounts.vault.vault_bump],
+            b"token_vault".as_ref(),
+            vault_pubkey.as_ref(),
+            &[ctx.accounts.vault.token_vault_bump],
         ];
 
         let signer = &[&seeds[..]];
@@ -97,7 +96,7 @@ mod staking {
                 MintTo {
                     mint: ctx.accounts.lp_mint.to_account_info(),
                     to: ctx.accounts.user_lp.to_account_info(),
-                    authority: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.token_vault.to_account_info(),
                 },
                 signer,
             ),
@@ -164,11 +163,11 @@ mod staking {
             .unstake(current_time, unmint_amount, ctx.accounts.lp_mint.supply)
             .ok_or(VaultError::MathOverflow)?;
 
+        let vault_pubkey = ctx.accounts.vault.key();
         let seeds = &[
-            b"vault".as_ref(),
-            ctx.accounts.vault.token_mint.as_ref(),
-            ctx.accounts.vault.base.as_ref(),
-            &[ctx.accounts.vault.vault_bump],
+            b"token_vault".as_ref(),
+            vault_pubkey.as_ref(),
+            &[ctx.accounts.vault.token_vault_bump],
         ];
         let signer = &[&seeds[..]];
 
@@ -179,7 +178,7 @@ mod staking {
                 Transfer {
                     from: ctx.accounts.token_vault.to_account_info(),
                     to: ctx.accounts.user_token.to_account_info(),
-                    authority: ctx.accounts.vault.to_account_info(),
+                    authority: ctx.accounts.token_vault.to_account_info(),
                 },
                 signer,
             ),
@@ -220,19 +219,13 @@ mod staking {
 /// Accounts for [InitializeVault](/staking/instruction/struct.InitializeVault.html) instruction
 #[derive(Accounts)]
 pub struct InitializeVault<'info> {
+    /// Vault account. A PDA.
     #[account(
         init,
-        seeds = [b"vault".as_ref(), token_mint.key().as_ref(), base.key().as_ref()],
-        bump,
         payer = admin,
         space = 500, // exceed space for buffer
     )]
-    /// Vault account. A PDA.
     pub vault: Account<'info, Vault>,
-
-    #[account(mut)]
-    /// Base account for the vault. Disposable.
-    pub base: Signer<'info>,
 
     /// Mint account of the vault.
     pub token_mint: Account<'info, Mint>,
@@ -243,7 +236,7 @@ pub struct InitializeVault<'info> {
         bump,
         payer = admin,
         token::mint = token_mint,
-        token::authority = vault,
+        token::authority = token_vault,
     )]
     /// Token account of the vault. A PDA.
     pub token_vault: Account<'info, TokenAccount>,
@@ -254,7 +247,7 @@ pub struct InitializeVault<'info> {
         bump,
         payer = admin,
         mint::decimals = token_mint.decimals,
-        mint::authority = vault,
+        mint::authority = token_vault,
     )]
     /// LP mint account of the vault. A PDA.
     pub lp_mint: Account<'info, Mint>,

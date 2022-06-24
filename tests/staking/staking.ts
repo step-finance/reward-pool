@@ -15,8 +15,8 @@ anchor.setProvider(provider);
 
 const program = anchor.workspace.Staking as Program<Staking>;
 const admin = new anchor.web3.Keypair();
-const base = new anchor.web3.Keypair();
 const user = new anchor.web3.Keypair();
+const vaultKeypair = new anchor.web3.Keypair();
 const funder = new anchor.web3.Keypair();
 const newAdmin = new anchor.web3.Keypair();
 
@@ -60,14 +60,7 @@ describe("staking", () => {
       TOKEN_PROGRAM_ID
     );
 
-    [vault, vaultBump] = await anchor.web3.PublicKey.findProgramAddress(
-      [
-        Buffer.from(anchor.utils.bytes.utf8.encode("vault")),
-        tokenMint.publicKey.toBuffer(),
-        base.publicKey.toBuffer(),
-      ],
-      program.programId
-    );
+    vault = vaultKeypair.publicKey;
 
     [tokenVault, tokenVaultNonce] =
       await anchor.web3.PublicKey.findProgramAddress(
@@ -90,7 +83,6 @@ describe("staking", () => {
       .initializeVault()
       .accounts({
         vault,
-        base: base.publicKey,
         tokenVault,
         tokenMint: tokenMint.publicKey,
         lpMint,
@@ -99,17 +91,13 @@ describe("staking", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([base, admin])
+      .signers([vaultKeypair, admin])
       .rpc();
 
     let vaultAccount = await program.account.vault.fetch(vault);
     assert.deepStrictEqual(
       vaultAccount.admin.toBase58(),
       admin.publicKey.toBase58()
-    );
-    assert.deepStrictEqual(
-      vaultAccount.base.toBase58(),
-      base.publicKey.toBase58()
     );
     assert.deepStrictEqual(
       vaultAccount.funder.toBase58(),
@@ -125,7 +113,7 @@ describe("staking", () => {
       vaultAccount.tokenVault.toBase58(),
       tokenVault.toBase58()
     );
-    assert.deepStrictEqual(vaultAccount.vaultBump, vaultBump);
+    assert.deepStrictEqual(vaultAccount.tokenVaultBump, tokenVaultNonce);
   });
 
   it("unable to initialize vault with same token mint", async () => {
@@ -133,7 +121,6 @@ describe("staking", () => {
       .initializeVault()
       .accounts({
         vault,
-        base: base.publicKey,
         tokenVault,
         tokenMint: tokenMint.publicKey,
         lpMint,
@@ -142,7 +129,7 @@ describe("staking", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
         rent: anchor.web3.SYSVAR_RENT_PUBKEY,
       })
-      .signers([base, admin])
+      .signers([vaultKeypair, admin])
       .rpc();
 
     await assert.rejects(result);

@@ -14,7 +14,7 @@ cpi = ["no-entrypoint"]
 #add to default for local testing
 #default = ["dev"]
 #note, can also use `anchor test -- --features dev` now
-dev = []
+devnet = []
 verbose = []
 
 [dependencies]

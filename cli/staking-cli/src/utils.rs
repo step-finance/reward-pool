@@ -6,15 +6,15 @@ use spl_associated_token_account::{create_associated_token_account, get_associat
 
 #[derive(Clone, Copy, Debug)]
 pub struct VaultPdas {
-    pub vault: (Pubkey, u8),
     pub token_vault: (Pubkey, u8),
     pub lp_mint: (Pubkey, u8),
 }
 
-pub fn get_vault_pdas(base: &Pubkey, token_mint: &Pubkey, program_id: &Pubkey) -> VaultPdas {
-    let seeds = [b"vault".as_ref(), token_mint.as_ref(), base.as_ref()];
-    let (vault_pubkey, vault_bump) = Pubkey::find_program_address(&seeds, &program_id);
-
+pub fn get_vault_pdas(
+    vault_pubkey: &Pubkey,
+    token_mint: &Pubkey,
+    program_id: &Pubkey,
+) -> VaultPdas {
     let seeds = [b"token_vault".as_ref(), vault_pubkey.as_ref()];
     let (token_vault_pubkey, token_vault_bump) = Pubkey::find_program_address(&seeds, &program_id);
 
@@ -23,7 +23,6 @@ pub fn get_vault_pdas(base: &Pubkey, token_mint: &Pubkey, program_id: &Pubkey) -
 
     VaultPdas {
         token_vault: (token_vault_pubkey, token_vault_bump),
-        vault: (vault_pubkey, vault_bump),
         lp_mint: (lp_mint_pubkey, lp_mint_bump),
     }
 }

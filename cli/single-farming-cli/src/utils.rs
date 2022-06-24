@@ -1,5 +1,4 @@
 use anchor_client::{solana_sdk::pubkey::Pubkey, Program};
-
 use anyhow::Result;
 use spl_associated_token_account::{create_associated_token_account, get_associated_token_address};
 
@@ -27,15 +26,6 @@ pub fn get_user_pda(pool: &Pubkey, owner: &Pubkey, program_id: &Pubkey) -> UserP
 
 pub fn get_user(program: &Program, user_pubkey: Pubkey) -> Result<single_farming::state::User> {
     Ok(program.account(user_pubkey)?)
-}
-
-pub fn get_pool_pda(program: &Program, staking_mint: &Pubkey) -> Result<PoolPDA> {
-    let seeds = [b"pool", staking_mint.as_ref()];
-    let (pool_pubkey, pool_bump) = Pubkey::find_program_address(&seeds, &program.id());
-    Ok(PoolPDA {
-        pubkey: pool_pubkey,
-        bump: pool_bump,
-    })
 }
 
 pub fn get_pool(program: &Program, pool_pubkey: Pubkey) -> Result<single_farming::state::Pool> {

@@ -15,12 +15,10 @@ pub struct Vault {
     pub token_vault: Pubkey,
     /// LP mint account
     pub lp_mint: Pubkey,
-    /// Base account. Used as seed for Vault PDA. Disposable
-    pub base: Pubkey,
     /// Admin account
     pub admin: Pubkey,
-    /// Vault bump. Used to create signer seeds
-    pub vault_bump: u8,
+    /// Token vault bump. Used to create signer seeds
+    pub token_vault_bump: u8,
     /// Total amount in the vault
     pub total_amount: u64,
     /// Used to keep track, and calculate locked profit
@@ -151,10 +149,9 @@ mod tests {
             token_mint: Pubkey::new_unique(),
             token_vault: Pubkey::new_unique(),
             lp_mint: Pubkey::new_unique(),
-            base: Pubkey::new_unique(),
             admin: Pubkey::new_unique(),
             funder: Pubkey::new_unique(),
-            vault_bump: 0,
+            token_vault_bump: 0,
             total_amount: 0,
             locked_reward_tracker: LockedRewardTracker::default(),
         };

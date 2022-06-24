@@ -11,8 +11,8 @@ const PRECISION: u128 = 1_000_000_000;
 #[derive(Default, Debug)]
 /// Pool account wrapper
 pub struct Pool {
-    /// Nonce to derive the program-derived address owning the vaults.
-    pub nonce: u8,
+    /// staking_vault_nonce.
+    pub staking_vault_nonce: u8,
     /// Mint of the token that can be staked.
     pub staking_mint: Pubkey,
     /// Vault to store staked tokens.
