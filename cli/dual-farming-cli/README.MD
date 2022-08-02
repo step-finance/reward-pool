@@ -30,7 +30,7 @@ OPTIONS:
             Print help information
 
     -p, --program-id <PROGRAM_ID>
-            [default: AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH]
+            [default: DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw]
 
     -V, --version
             Print version information
@@ -90,7 +90,7 @@ reward_b_mint: D6a1BML94qorutv8j67fdpmYiQGou3iBArGiw467Qwzj
 $ ./dual-farming-cli init --staking-mint AtssC9B1jGqW4d2PVZmMt6cLLpQ84DycLpAae7EW3XL6 --reward-a-mint Gu7Ze57kKQF9r4u4oo4tAsk8riP8idw4gBN6hgUGQdTd --reward-b-mint D6a1BML94qorutv8j67fdpmYiQGou3iBArGiw467Qwzj 2592000`
 
 Wallet 3ekBoR8LmkuMmUm8M3iURoafbwEVQJzTsPbWEtxXk1d5
-Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
+Program ID: "DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw"
 base pubkey 6iG7xBbKbkm14yQfJjBJ6YZR6uHNbdw6eNnrCGQ8RsUF
 Signature dNG7A3meEuxHtRUFdhL13fwUpFiWe3WXpvx8eoV94HwtJmVj6crqiYqFpnfQMy7mz8w9Nts2jPkjf87FrVoW5nP
 ```
@@ -111,7 +111,7 @@ $ ./dual-farming-cli create-user --wallet-path ~/.config/solana/user.json  --sta
  --base 9C4KtWUFkqw9k4fyPmLoeh88KXRubZUbcLWRwbrZeycT
  
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
-Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
+Program ID: "DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw"
 Signature 5T8YCrxJkVE238tnDABdhoeVyL5u9kR2EqaAV8KPB6yFefZtAH8nwwEd3BBtiGXYH5NKW2eXju6HByQbj2kvR2ax
 ```
 
@@ -122,7 +122,7 @@ Signature 5T8YCrxJkVE238tnDABdhoeVyL5u9kR2EqaAV8KPB6yFefZtAH8nwwEd3BBtiGXYH5NKW2
 
 
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
-Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
+Program ID: "DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw"
 Signature 57tnZedp4qZzsYCmss64kyqDWM8BvgexLvc5yEPZyw4gETGqbCbCQG3v3ridyKgwHnWZCNHXxJwXWcJ5ePvQDgEo
 
 ```
@@ -148,7 +148,7 @@ Signature 57tnZedp4qZzsYCmss64kyqDWM8BvgexLvc5yEPZyw4gETGqbCbCQG3v3ridyKgwHnWZCN
 ./dual-farming-cli fund fund --staking-mint AtssC9B1jGqW4d2PVZmMt6cLLpQ84DycLpAae7EW3XL6 --base 6iG7xBbKbkm14yQfJjBJ6YZR6uHNbdw6eNnrCGQ8RsUF --amount-a 100000 --amount-b 100000
 
 Wallet 3ekBoR8LmkuMmUm8M3iURoafbwEVQJzTsPbWEtxXk1d5
-Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
+Program ID: "DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw"
 Signature 52qNmzg8knVzEPSuCmMfcGPkm7JQtUoFAXMG9xaDTwKwcemE7ijcSCQkkBmP3ZKpjCX2JScopksed6LKMGijfAHv
 ```
 
@@ -181,7 +181,7 @@ Signature 52qNmzg8knVzEPSuCmMfcGPkm7JQtUoFAXMG9xaDTwKwcemE7ijcSCQkkBmP3ZKpjCX2JS
 ./dual-farming-cli stake-info --wallet-path ~/.config/solana/user.json  --staking-mint AtssC9B1jGqW4d2PVZmMt6cLLpQ84DycLpAae7EW3XL6 --base 6iG7xBbKbkm14yQfJjBJ6YZR6uHNbdw6eNnrCGQ8RsUF 
 
 Wallet EdRCHLTZR6Pcx1YDa4TgvVoxJDkCuwwvDGYSh9LNy5KK
-Program ID: "AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH"
+Program ID: "DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw"
 balance_staked 1000
 reward_a_per_token_complete 0
 reward_a_per_token_pending 0

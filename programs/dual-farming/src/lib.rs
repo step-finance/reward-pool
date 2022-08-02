@@ -13,24 +13,14 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{clock, sysvar};
 use anchor_spl::token::{self, Mint, Token, TokenAccount};
 
-use crate::constants::*;
 use crate::pool::*;
 
 /// Export for pool implementation
 pub mod pool;
 
-declare_id!("AXFHikQNKk2zgiss9USaUVccLt4TSqmXBLEkZZ6GhojH");
+declare_id!("DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw");
 
-#[cfg(not(feature = "devnet"))]
-mod constants {
-    pub const MIN_DURATION: u64 = 86400;
-}
-
-#[cfg(feature = "devnet")]
-mod constants {
-    pub const MIN_DURATION: u64 = 1;
-}
-
+pub const MIN_DURATION: u64 = 1;
 const PRECISION: u128 = u64::MAX as u128;
 
 /// Updates the pool with the total reward per token that is due stakers
