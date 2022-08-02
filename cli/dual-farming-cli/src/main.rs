@@ -30,6 +30,7 @@ fn main() -> Result<()> {
         Rc::new(Keypair::from_bytes(&payer.to_bytes())?),
         CommitmentConfig::finalized(),
     );
+
     let program = client.program(program_id);
     match opts.command {
         CliCommand::Init {
@@ -38,8 +39,10 @@ fn main() -> Result<()> {
             reward_b_mint,
             reward_duration,
         } => {
+            let base = opts.config_override.base;
             initialize_pool(
                 &program,
+                base,
                 &payer,
                 &staking_mint,
                 &reward_a_mint,
@@ -97,15 +100,16 @@ fn main() -> Result<()> {
 
 fn initialize_pool(
     program: &Program,
+    base_location: String,
     authority: &Keypair,
     staking_mint: &Pubkey,
     reward_a_mint: &Pubkey,
     reward_b_mint: &Pubkey,
     reward_duration: u64,
 ) -> Result<()> {
-    let base_keypair = Keypair::new();
+    let base_keypair = read_keypair_file(base_location).expect("base keypair file not found");
     let base_pubkey = base_keypair.pubkey();
-    println!("base pubkey {}", base_pubkey);
+
     let pool_pda = get_pool_pda(
         &program,
         reward_duration,
@@ -114,6 +118,8 @@ fn initialize_pool(
         reward_b_mint,
         &base_pubkey,
     )?;
+
+    println!("pool address {}", pool_pda.pubkey);
 
     let VaultPDAs {
         staking_vault,
@@ -394,6 +400,7 @@ pub fn close_pool(program: &Program, authority: &Keypair, pool_pda: &Pubkey) -> 
 
 pub fn show_info(program: &Program, pool_pda: &Pubkey) -> Result<()> {
     let pool = get_pool(program, *pool_pda)?;
+    println!("pool data {:#?}", pool);
     println!("pool_pubkey {:#?}", pool_pda);
     println!("user_stake_count {:#?}", pool.user_stake_count);
     println!("staking_vault {:#?}", pool.staking_vault);

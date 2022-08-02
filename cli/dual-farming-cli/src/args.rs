@@ -15,12 +15,18 @@ pub struct ConfigOverride {
     /// Example: /path/to/wallet/keypair.json
     /// Default: ~/.config/solana/id.json
     #[clap(
-    global = true,
-    short,
-    long,
-    default_value_t = String::from(shellexpand::tilde("~/.config/solana/id.json"))
+        global = true,
+        short,
+        long,
+        default_value_t = String::from(shellexpand::tilde("~/.config/solana/id.json"))
     )]
     pub wallet_path: String,
+
+    /// Base keypair file required to initialize the vault
+    ///
+    /// /path/to/base/keypair.json
+    #[clap(global = true, short, long, default_value_t = String::from(""))]
+    pub base: String,
 
     #[clap(
     global = true,
