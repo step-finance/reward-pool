@@ -47,65 +47,48 @@ fn main() -> Result<()> {
                 reward_duration,
             )?;
         }
-        CliCommand::CreateUser { staking_mint, base } => {
-            create_user(&program, &payer, &staking_mint, &base)?;
+        CliCommand::CreateUser { pool } => {
+            create_user(&program, &payer, &pool)?;
         }
-        CliCommand::Pause { staking_mint, base } => {
-            pause(&program, &payer, &staking_mint, &base)?;
+        CliCommand::Pause { pool } => {
+            pause(&program, &payer, &pool)?;
         }
-        CliCommand::Unpause { staking_mint, base } => {
-            unpause(&program, &payer, &staking_mint, &base)?;
+        CliCommand::Unpause { pool } => {
+            unpause(&program, &payer, &pool)?;
         }
-        CliCommand::Deposit {
-            staking_mint,
-            base,
-            amount,
-        } => {
-            stake(&program, &payer, &staking_mint, &base, amount)?;
+        CliCommand::Deposit { pool, amount } => {
+            stake(&program, &payer, &pool, amount)?;
         }
-        CliCommand::Withdraw {
-            staking_mint,
-            base,
-            spt_amount,
-        } => {
-            unstake(&program, &payer, &staking_mint, &base, spt_amount)?;
+        CliCommand::Withdraw { pool, spt_amount } => {
+            unstake(&program, &payer, &pool, spt_amount)?;
         }
-        CliCommand::Authorize {
-            staking_mint,
-            base,
-            funder,
-        } => {
-            authorize_funder(&program, &payer, &staking_mint, &base, &funder)?;
+        CliCommand::Authorize { pool, funder } => {
+            authorize_funder(&program, &payer, &pool, &funder)?;
         }
-        CliCommand::Deauthorize {
-            staking_mint,
-            base,
-            funder,
-        } => {
-            deauthorize_funder(&program, &payer, &staking_mint, &base, &funder)?;
+        CliCommand::Deauthorize { pool, funder } => {
+            deauthorize_funder(&program, &payer, &pool, &funder)?;
         }
         CliCommand::Fund {
-            staking_mint,
-            base,
+            pool,
             amount_a,
             amount_b,
         } => {
-            fund(&program, &payer, &staking_mint, &base, amount_a, amount_b)?;
+            fund(&program, &payer, &pool, amount_a, amount_b)?;
         }
-        CliCommand::Claim { staking_mint, base } => {
-            claim(&program, &payer, &staking_mint, &base)?;
+        CliCommand::Claim { pool } => {
+            claim(&program, &payer, &pool)?;
         }
-        CliCommand::CloseUser { staking_mint, base } => {
-            close_user(&program, &payer, &staking_mint, &base)?;
+        CliCommand::CloseUser { pool } => {
+            close_user(&program, &payer, &pool)?;
         }
-        CliCommand::ClosePool { staking_mint, base } => {
-            close_pool(&program, &payer, &staking_mint, &base)?;
+        CliCommand::ClosePool { pool } => {
+            close_pool(&program, &payer, &pool)?;
         }
-        CliCommand::ShowInfo { staking_mint, base } => {
-            show_info(&program, &staking_mint, &base)?;
+        CliCommand::ShowInfo { pool } => {
+            show_info(&program, &pool)?;
         }
-        CliCommand::StakeInfo { staking_mint, base } => {
-            stake_info(&program, &staking_mint, &base, &payer.pubkey())?;
+        CliCommand::StakeInfo { pool } => {
+            stake_info(&program, &pool, &payer.pubkey())?;
         }
     }
 
@@ -123,7 +106,14 @@ fn initialize_pool(
     let base_keypair = Keypair::new();
     let base_pubkey = base_keypair.pubkey();
     println!("base pubkey {}", base_pubkey);
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base_pubkey)?;
+    let pool_pda = get_pool_pda(
+        &program,
+        reward_duration,
+        &staking_mint,
+        reward_a_mint,
+        reward_b_mint,
+        &base_pubkey,
+    )?;
 
     let VaultPDAs {
         staking_vault,
@@ -158,19 +148,13 @@ fn initialize_pool(
     Ok(())
 }
 
-pub fn create_user(
-    program: &Program,
-    owner: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn create_user(program: &Program, owner: &Keypair, pool: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
     let builder = program
         .request()
         .accounts(dual_farming::accounts::CreateUser {
-            pool: pool_pda.pubkey,
+            pool: *pool,
             user: user_pubkey,
             owner: owner.pubkey(),
             system_program: solana_program::system_program::ID,
@@ -182,17 +166,11 @@ pub fn create_user(
     Ok(())
 }
 
-pub fn pause(
-    program: &Program,
-    authority: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
+pub fn pause(program: &Program, authority: &Keypair, pool: &Pubkey) -> Result<()> {
     let builder = program
         .request()
         .accounts(dual_farming::accounts::Pause {
-            pool: pool_pda.pubkey,
+            pool: *pool,
             authority: authority.pubkey(),
         })
         .args(dual_farming::instruction::Pause {})
@@ -202,17 +180,11 @@ pub fn pause(
     Ok(())
 }
 
-pub fn unpause(
-    program: &Program,
-    authority: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
+pub fn unpause(program: &Program, authority: &Keypair, pool: &Pubkey) -> Result<()> {
     let builder = program
         .request()
         .accounts(dual_farming::accounts::Unpause {
-            pool: pool_pda.pubkey,
+            pool: *pool,
             authority: authority.pubkey(),
         })
         .args(dual_farming::instruction::Unpause {})
@@ -222,16 +194,9 @@ pub fn unpause(
     Ok(())
 }
 
-pub fn stake(
-    program: &Program,
-    owner: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-    amount: u64,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn stake(program: &Program, owner: &Keypair, pool_pda: &Pubkey, amount: u64) -> Result<()> {
+    let pool = get_pool(program, *pool_pda)?;
+    let UserPDA { user } = get_user_pda(pool_pda, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let stake_from_account = get_or_create_ata(&program, &owner.pubkey(), &pool.staking_mint)?;
@@ -239,7 +204,7 @@ pub fn stake(
     let builder = program
         .request()
         .accounts(dual_farming::accounts::Deposit {
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             staking_vault: pool.staking_vault,
             stake_from_account,
             user: user_pubkey,
@@ -257,20 +222,18 @@ pub fn stake(
 pub fn unstake(
     program: &Program,
     owner: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
+    pool_pda: &Pubkey,
     spt_amount: u64,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+    let pool = get_pool(program, *pool_pda)?;
+    let UserPDA { user } = get_user_pda(pool_pda, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
     let stake_from_account = get_or_create_ata(&program, &owner.pubkey(), &pool.staking_mint)?;
 
     let builder = program
         .request()
         .accounts(dual_farming::accounts::Deposit {
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             staking_vault: pool.staking_vault,
             user: user_pubkey,
             stake_from_account,
@@ -288,15 +251,13 @@ pub fn unstake(
 pub fn authorize_funder(
     program: &Program,
     authority: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
+    pool: &Pubkey,
     funder_to_add: &Pubkey,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
     let builder = program
         .request()
         .accounts(dual_farming::accounts::FunderChange {
-            pool: pool_pda.pubkey,
+            pool: *pool,
             authority: authority.pubkey(),
         })
         .args(dual_farming::instruction::AuthorizeFunder {
@@ -311,15 +272,13 @@ pub fn authorize_funder(
 pub fn deauthorize_funder(
     program: &Program,
     authority: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
+    pool: &Pubkey,
     funder_to_remove: &Pubkey,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
     let builder = program
         .request()
         .accounts(dual_farming::accounts::FunderChange {
-            pool: pool_pda.pubkey,
+            pool: *pool,
             authority: authority.pubkey(),
         })
         .args(dual_farming::instruction::DeauthorizeFunder {
@@ -334,19 +293,17 @@ pub fn deauthorize_funder(
 pub fn fund(
     program: &Program,
     funder: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
+    pool_pda: &Pubkey,
     amount_a: u64,
     amount_b: u64,
 ) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
+    let pool = get_pool(program, *pool_pda)?;
     let from_a = get_or_create_ata(&program, &funder.pubkey(), &pool.reward_a_mint)?;
     let from_b = get_or_create_ata(&program, &funder.pubkey(), &pool.reward_b_mint)?;
     let builder = program
         .request()
         .accounts(dual_farming::accounts::Fund {
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             staking_vault: pool.staking_vault,
             reward_a_vault: pool.reward_a_vault,
             reward_b_vault: pool.reward_b_vault,
@@ -362,15 +319,9 @@ pub fn fund(
     Ok(())
 }
 
-pub fn claim(
-    program: &Program,
-    owner: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn claim(program: &Program, owner: &Keypair, pool_pda: &Pubkey) -> Result<()> {
+    let pool = get_pool(program, *pool_pda)?;
+    let UserPDA { user } = get_user_pda(pool_pda, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let reward_a_account = get_or_create_ata(&program, &owner.pubkey(), &pool.reward_a_mint)?;
@@ -379,7 +330,7 @@ pub fn claim(
     let builder = program
         .request()
         .accounts(dual_farming::accounts::ClaimReward {
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             staking_vault: pool.staking_vault,
             reward_a_vault: pool.reward_a_vault,
             reward_b_vault: pool.reward_b_vault,
@@ -396,20 +347,14 @@ pub fn claim(
     Ok(())
 }
 
-pub fn close_user(
-    program: &Program,
-    owner: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &owner.pubkey(), &program.id());
+pub fn close_user(program: &Program, owner: &Keypair, pool_pda: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool_pda, &owner.pubkey(), &program.id());
     let (user_pubkey, _) = user;
 
     let builder = program
         .request()
         .accounts(dual_farming::accounts::CloseUser {
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             user: user_pubkey,
             owner: owner.pubkey(),
         })
@@ -420,14 +365,8 @@ pub fn close_user(
     Ok(())
 }
 
-pub fn close_pool(
-    program: &Program,
-    authority: &Keypair,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let pool = get_pool(program, pool_pda.pubkey)?;
+pub fn close_pool(program: &Program, authority: &Keypair, pool_pda: &Pubkey) -> Result<()> {
+    let pool = get_pool(program, *pool_pda)?;
     let staking_refundee = get_or_create_ata(&program, &authority.pubkey(), &pool.staking_mint)?;
     let reward_a_refundee = get_or_create_ata(&program, &authority.pubkey(), &pool.reward_a_mint)?;
     let reward_b_refundee = get_or_create_ata(&program, &authority.pubkey(), &pool.reward_b_mint)?;
@@ -439,7 +378,7 @@ pub fn close_pool(
             staking_refundee,
             reward_a_refundee,
             reward_b_refundee,
-            pool: pool_pda.pubkey,
+            pool: *pool_pda,
             authority: authority.pubkey(),
             staking_vault: pool.staking_vault,
             reward_a_vault: pool.reward_a_vault,
@@ -453,24 +392,17 @@ pub fn close_pool(
     Ok(())
 }
 
-pub fn show_info(program: &Program, staking_mint: &Pubkey, base: &Pubkey) -> Result<()> {
-    let pda = get_pool_pda(&program, &staking_mint, base)?;
-    let pool = get_pool(program, pda.pubkey)?;
-    println!("pool_pubkey {:#?}", pda.pubkey);
+pub fn show_info(program: &Program, pool_pda: &Pubkey) -> Result<()> {
+    let pool = get_pool(program, *pool_pda)?;
+    println!("pool_pubkey {:#?}", pool_pda);
     println!("user_stake_count {:#?}", pool.user_stake_count);
     println!("staking_vault {:#?}", pool.staking_vault);
 
     Ok(())
 }
 
-pub fn stake_info(
-    program: &Program,
-    staking_mint: &Pubkey,
-    base: &Pubkey,
-    user: &Pubkey,
-) -> Result<()> {
-    let pool_pda = get_pool_pda(&program, &staking_mint, &base)?;
-    let UserPDA { user } = get_user_pda(&pool_pda.pubkey, &user, &program.id());
+pub fn stake_info(program: &Program, pool_pda: &Pubkey, user: &Pubkey) -> Result<()> {
+    let UserPDA { user } = get_user_pda(pool_pda, &user, &program.id());
     let (user_pubkey, _) = user;
     let user = get_user(&program, user_pubkey)?;
     println!("balance_staked {:#?}", user.balance_staked);

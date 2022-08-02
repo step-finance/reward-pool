@@ -41,8 +41,22 @@ pub struct PoolPDA {
     pub bump: u8,
 }
 
-pub fn get_pool_pda(program: &Program, staking_mint: &Pubkey, base: &Pubkey) -> Result<PoolPDA> {
-    let seeds = [staking_mint.as_ref(), base.as_ref()];
+pub fn get_pool_pda(
+    program: &Program,
+    reward_duration: u64,
+    staking_mint: &Pubkey,
+    reward_a_mint: &Pubkey,
+    reward_b_mint: &Pubkey,
+    base: &Pubkey,
+) -> Result<PoolPDA> {
+    let reward_duration = reward_duration.to_be_bytes();
+    let seeds = [
+        reward_duration.as_ref(),
+        staking_mint.as_ref(),
+        reward_a_mint.as_ref(),
+        reward_b_mint.as_ref(),
+        base.as_ref(),
+    ];
     let (pool_pubkey, pool_bump) = Pubkey::find_program_address(&seeds, &program.id());
     Ok(PoolPDA {
         pubkey: pool_pubkey,

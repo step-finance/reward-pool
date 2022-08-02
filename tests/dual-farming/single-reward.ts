@@ -10,6 +10,7 @@ import {
   getRewardBVaultPda,
   getStakingVaultPda,
   getUserPda,
+  REWARD_DURATION,
 } from "./utils";
 
 const provider = anchor.AnchorProvider.env();
@@ -21,7 +22,6 @@ const BASE_KEYPAIR = anchor.web3.Keypair.generate();
 const ADMIN_KEYPAIR = anchor.web3.Keypair.generate();
 const USER_KEYPAIR = anchor.web3.Keypair.generate();
 const FUNDER_KEYPAIR = anchor.web3.Keypair.generate();
-const REWARD_DURATION = new anchor.BN(5);
 const TOKEN_DECIMAL = 6;
 const TOKEN_MULTIPLIER = 10 ** TOKEN_DECIMAL;
 
@@ -99,21 +99,29 @@ describe("dual-farming with single reward", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
     const [stakingVaultAddress, _stakingVaultBump] = await getStakingVaultPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardAVaultAddress, _rewardAVaultBump] = await getRewardAVaultPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardBVaultAddress, _rewardBVaultBump] = await getRewardBVaultPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
     await program.methods
@@ -140,6 +148,8 @@ describe("dual-farming with single reward", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
@@ -173,6 +183,8 @@ describe("dual-farming with single reward", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -204,6 +216,8 @@ describe("dual-farming with single reward", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -242,6 +256,8 @@ describe("dual-farming with single reward", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardMint,
+      rewardMint,
       BASE_KEYPAIR.publicKey
     );
 

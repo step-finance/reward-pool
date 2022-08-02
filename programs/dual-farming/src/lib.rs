@@ -204,8 +204,12 @@ pub mod dual_farming {
 
         // Transfer tokens from the pool vault to user vault.
         {
+            let reward_duration = pool.reward_duration.to_be_bytes();
             let seeds = &[
+                reward_duration.as_ref(),
                 pool.staking_mint.as_ref(),
+                pool.reward_a_mint.as_ref(),
+                pool.reward_b_mint.as_ref(),
                 pool.base_key.as_ref(),
                 &[pool.pool_bump],
             ];
@@ -332,8 +336,12 @@ pub mod dual_farming {
         let user_opt = Some(&mut ctx.accounts.user);
         update_rewards(pool, user_opt, pool.total_staked).unwrap();
 
+        let reward_duration = ctx.accounts.pool.reward_duration.to_be_bytes();
         let seeds = &[
+            reward_duration.as_ref(),
             ctx.accounts.pool.staking_mint.as_ref(),
+            ctx.accounts.pool.reward_a_mint.as_ref(),
+            ctx.accounts.pool.reward_b_mint.as_ref(),
             ctx.accounts.pool.base_key.as_ref(),
             &[ctx.accounts.pool.pool_bump],
         ];
@@ -407,8 +415,12 @@ pub mod dual_farming {
             .ok_or(ErrorCode::MathOverflow)?;
 
         if withdrawable_amount > 0 {
+            let reward_duration = pool.reward_duration.to_be_bytes();
             let seeds = &[
+                reward_duration.as_ref(),
                 pool.staking_mint.as_ref(),
+                pool.reward_a_mint.as_ref(),
+                pool.reward_b_mint.as_ref(),
                 pool.base_key.as_ref(),
                 &[pool.pool_bump],
             ];
@@ -439,9 +451,12 @@ pub mod dual_farming {
     /// Closes a pool account. Only able to be done when there are no users staked.
     pub fn close_pool(ctx: Context<ClosePool>) -> Result<()> {
         let pool = &ctx.accounts.pool;
-
+        let reward_duration = ctx.accounts.pool.reward_duration.to_be_bytes();
         let signer_seeds = &[
+            reward_duration.as_ref(),
             ctx.accounts.pool.staking_mint.as_ref(),
+            ctx.accounts.pool.reward_a_mint.as_ref(),
+            ctx.accounts.pool.reward_b_mint.as_ref(),
             ctx.accounts.pool.base_key.as_ref(),
             &[ctx.accounts.pool.pool_bump],
         ];
@@ -568,12 +583,16 @@ pub mod dual_farming {
 
 /// Accounts for [InitializePool](/dual_farming/instruction/struct.InitializePool.html) instruction
 #[derive(Accounts)]
+#[instruction(reward_duration: u64)]
 pub struct InitializePool<'info> {
     /// Global accounts for the staking instance.
     #[account(
         init,
         seeds = [
+            reward_duration.to_be_bytes().as_ref(),
             staking_mint.key().as_ref(),
+            reward_a_mint.key().as_ref(),
+            reward_b_mint.key().as_ref(),
             base.key().as_ref(),
         ],
         payer = authority,
@@ -1088,5 +1107,27 @@ impl Debug for User {
         } else {
             write!(f, "balance_staked: {:?}", self.balance_staked,)
         }
+    }
+}
+
+#[cfg(test)]
+mod pool_test {
+    use super::*;
+    use std::str::FromStr;
+    #[test]
+    fn test_get_pool_address() {
+        let reward_duration = 10u64;
+        let staking_mint =
+            Pubkey::from_str("HAUzPWNrRn612RchFiCQc4hgWVSDC56TBj4Eoih79os6").unwrap();
+        let base = Pubkey::from_str("BwVU5zF3R5jWP6WNfFpass34dLtnLAkzWJotgLtMenXN").unwrap();
+        let (pool_pda, _nonce) = Pubkey::find_program_address(
+            &[
+                reward_duration.to_be_bytes().as_ref(),
+                staking_mint.as_ref(),
+                base.as_ref(),
+            ],
+            &id(),
+        );
+        println!("pool_pda {}", pool_pda);
     }
 }

@@ -66,64 +66,48 @@ pub enum CliCommand {
     /// User enables staking
     CreateUser {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// Admin pauses the pool
     Pause {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// Admin resumes the paused pool
     Unpause {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// User stakes
     Deposit {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
         amount: u64,
     },
     /// User unstakes
     Withdraw {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
         spt_amount: u64,
     },
     /// Admin adds a wallet as funder
     Authorize {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
         #[clap(long)]
         funder: Pubkey,
     },
     /// Admin removes a wallet as funder
     Deauthorize {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
         #[clap(long)]
         funder: Pubkey,
     },
     /// Admin or funder funds rewards to pool
     Fund {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
         #[clap(long)]
         amount_a: u64,
         #[clap(long)]
@@ -132,37 +116,27 @@ pub enum CliCommand {
     /// User claims pending rewards
     Claim {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// Admin closes a user stake account
     CloseUser {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// Admin closes the pool
     ClosePool {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// Show pool info
     ShowInfo {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
     /// User stake info
     StakeInfo {
         #[clap(long)]
-        staking_mint: Pubkey,
-        #[clap(long)]
-        base: Pubkey,
+        pool: Pubkey,
     },
 }
 

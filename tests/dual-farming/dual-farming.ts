@@ -13,6 +13,7 @@ import {
   getRewardBVaultPda,
   getStakingVaultPda,
   getUserPda,
+  REWARD_DURATION,
 } from "./utils";
 import assert from "assert";
 import { ParsedClockState } from "../clock_state";
@@ -25,7 +26,7 @@ const BASE_KEYPAIR = anchor.web3.Keypair.generate();
 const ADMIN_KEYPAIR = anchor.web3.Keypair.generate();
 const USER_KEYPAIR = anchor.web3.Keypair.generate();
 const FUNDER_KEYPAIR = anchor.web3.Keypair.generate();
-const REWARD_DURATION = new anchor.BN(10);
+
 const TOKEN_DECIMAL = 3;
 const TOKEN_MULTIPLIER = new anchor.BN(10 ** TOKEN_DECIMAL);
 const MINT_AMOUNT = new anchor.BN(100_000).mul(TOKEN_MULTIPLIER);
@@ -173,21 +174,29 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [stakingVaultAddress, _stakingVaultBump] = await getStakingVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardAVaultAddress, _rewardAVaultBump] = await getRewardAVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardBVaultAddress, _rewardBVaultBump] = await getRewardBVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     await program.methods
@@ -265,21 +274,29 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [stakingVaultAddress, _stakingVaultBump] = await getStakingVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardAVaultAddress, _rewardAVaultBump] = await getRewardAVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [rewardBVaultAddress, _rewardBVaultBump] = await getRewardBVaultPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     let result = program.methods
@@ -307,6 +324,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [userStakingAddress, userStakingAddressBump] = await getUserPda(
@@ -355,6 +374,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -374,6 +395,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -424,6 +447,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -480,6 +505,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -545,6 +572,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -565,6 +594,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
@@ -617,6 +648,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -667,6 +700,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -691,6 +726,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -804,6 +841,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -839,6 +878,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -880,6 +921,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -920,6 +963,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -956,6 +1001,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -982,6 +1029,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
     const [userStakingAddress, _userStakingAddressBump] = await getUserPda(
@@ -1043,6 +1092,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1069,6 +1120,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1122,6 +1175,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1149,6 +1204,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1169,6 +1226,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1201,6 +1260,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
@@ -1240,6 +1301,8 @@ describe("dual-farming", () => {
     const [farmingPoolAddress, _farmingPoolBump] = await getPoolPda(
       program,
       stakingMint,
+      rewardAMint,
+      rewardBMint,
       BASE_KEYPAIR.publicKey
     );
 
