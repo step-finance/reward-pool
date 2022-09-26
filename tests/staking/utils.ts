@@ -1,71 +1,158 @@
 import * as anchor from "@project-serum/anchor";
-import { ParsedAccountData, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { Staking } from "../../target/types/staking";
-import { ParsedClockState } from "../clock_state";
-import { LockedRewardTracker, Vault } from "./vault_state";
 
-type BN = anchor.BN;
-const BN = anchor.BN;
-type Pubkey = anchor.web3.PublicKey;
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  MintLayout,
+  Token,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 
-export function getUnlockedAmount(vaultState: Vault, currentTime: number): BN {
-  return vaultState.totalAmount.sub(
-    calculateLockedProfit(vaultState, currentTime)
+const program = anchor.workspace.Staking;
+
+type PublicKey = anchor.web3.PublicKey;
+type Keypair = anchor.web3.Keypair;
+
+export async function createMint(provider, decimals) {
+  const mint = await Token.createMint(
+    provider.connection,
+    provider.wallet.payer,
+    provider.wallet.publicKey,
+    null,
+    decimals,
+    TOKEN_PROGRAM_ID
   );
+  return mint;
 }
 
-export function calculateLockedProfit(
-  vaultState: Vault,
-  currentTime: number
-): BN {
-  let currentTimeBN = new BN(currentTime);
-  const duration = currentTimeBN.sub(vaultState.lockedRewardTracker.lastReport);
-  const lockedProfitDegradation =
-    vaultState.lockedRewardTracker.lockedRewardDegradation;
-  const lockedFundRatio = duration.mul(lockedProfitDegradation);
-  if (
-    lockedFundRatio.gt(
-      LockedRewardTracker.LOCKED_REWARD_DEGRADATION_DENOMINATOR
-    )
-  ) {
-    return new BN(0);
-  }
-  const lockedProfit = vaultState.lockedRewardTracker.lastUpdatedLockedReward;
-  return lockedProfit
-    .mul(
-      LockedRewardTracker.LOCKED_REWARD_DEGRADATION_DENOMINATOR.sub(
-        lockedFundRatio
-      )
-    )
-    .div(LockedRewardTracker.LOCKED_REWARD_DEGRADATION_DENOMINATOR);
-}
-
-export async function calculateApy(
-  vaultAddress: Pubkey,
-  program: anchor.Program<Staking>
+export async function createMintFromPriv(
+  mintAccount,
+  provider,
+  mintAuthority,
+  freezeAuthority,
+  decimals,
+  programId
 ) {
-  const secondsInYear: number = 3600 * 24 * 365;
-  const [clock, vaultState] = await Promise.all([
-    program.provider.connection.getParsedAccountInfo(SYSVAR_CLOCK_PUBKEY),
-    program.account.vault.fetch(vaultAddress),
-  ]);
-  const clockState = (clock.value.data as ParsedAccountData)
-    .parsed as ParsedClockState;
-  const currentTime = clockState.info.unixTimestamp;
-  const secondsInFullDrip =
-    LockedRewardTracker.LOCKED_REWARD_DEGRADATION_DENOMINATOR.div(
-      vaultState.lockedRewardTracker.lockedRewardDegradation
-    ).toNumber();
-  const frequency = secondsInYear / secondsInFullDrip;
-  let lockedProfit = calculateLockedProfit(
-    vaultState as unknown as Vault,
-    currentTime
+  const token = new Token(
+    provider.connection,
+    mintAccount.publicKey,
+    programId,
+    provider.wallet.payer
   );
-  let unlockedAmount = getUnlockedAmount(
-    vaultState as unknown as Vault,
-    currentTime
+
+  // Allocate memory for the account
+  const balanceNeeded = await Token.getMinBalanceRentForExemptMint(
+    provider.connection
   );
-  let rewardPerToken = lockedProfit.toNumber() / unlockedAmount.toNumber();
-  let apy = (1 + rewardPerToken) ** frequency - 1;
-  return apy * 100;
+
+  const transaction = new anchor.web3.Transaction();
+  transaction.add(
+    anchor.web3.SystemProgram.createAccount({
+      fromPubkey: provider.wallet.payer.publicKey,
+      newAccountPubkey: mintAccount.publicKey,
+      lamports: balanceNeeded,
+      space: MintLayout.span,
+      programId,
+    })
+  );
+
+  transaction.add(
+    Token.createInitMintInstruction(
+      programId,
+      mintAccount.publicKey,
+      decimals,
+      mintAuthority,
+      freezeAuthority
+    )
+  );
+
+  await provider.sendAndConfirm(transaction, [mintAccount]);
+  return token;
+}
+
+export async function mintToAccount(provider, mint, destination, amount) {
+  const tx = new anchor.web3.Transaction();
+  tx.add(
+    Token.createMintToInstruction(
+      TOKEN_PROGRAM_ID,
+      mint,
+      destination,
+      provider.wallet.publicKey,
+      [],
+      amount
+    )
+  );
+  await provider.sendAndConfirm(tx);
+}
+
+export async function sendLamports(provider, destination, amount) {
+  const tx = new anchor.web3.Transaction();
+  tx.add(
+    anchor.web3.SystemProgram.transfer({
+      fromPubkey: provider.wallet.publicKey,
+      lamports: amount,
+      toPubkey: destination,
+    })
+  );
+  await provider.sendAndConfirm(tx);
+}
+
+export async function getOrCreateAssociatedTokenAccount(
+  tokenMint: PublicKey,
+  owner: PublicKey,
+  payer: Keypair,
+  provider: anchor.Provider
+) {
+  const toAccount = await Token.getAssociatedTokenAddress(
+    ASSOCIATED_TOKEN_PROGRAM_ID,
+    TOKEN_PROGRAM_ID,
+    tokenMint,
+    owner
+  );
+  const account = await provider.connection.getAccountInfo(toAccount);
+  if (!account) {
+    const tx = new anchor.web3.Transaction().add(
+      Token.createAssociatedTokenAccountInstruction(
+        ASSOCIATED_TOKEN_PROGRAM_ID,
+        TOKEN_PROGRAM_ID,
+        tokenMint,
+        toAccount,
+        owner,
+        payer.publicKey
+      )
+    );
+
+    const signature = await provider.sendAndConfirm(tx, [payer]);
+    await provider.connection.confirmTransaction(signature);
+
+    return Token.getAssociatedTokenAddress(
+      ASSOCIATED_TOKEN_PROGRAM_ID,
+      TOKEN_PROGRAM_ID,
+      tokenMint,
+      owner
+    );
+  }
+  return toAccount;
+}
+
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function computeStakingVaultAccount(pool) {
+  return anchor.web3.PublicKey.findProgramAddress(
+    [Buffer.from("staking_vault"), pool.toBuffer()],
+    program.programId
+  );
+}
+
+export function computeRewardVaultAccount(pool) {
+  return anchor.web3.PublicKey.findProgramAddress(
+    [Buffer.from("reward_vault"), pool.toBuffer()],
+    program.programId
+  );
+}
+
+export function computeUserAccount(wallet, pool) {
+  return anchor.web3.PublicKey.findProgramAddress(
+    [wallet.toBuffer(), pool.toBuffer()],
+    program.programId
+  );
 }

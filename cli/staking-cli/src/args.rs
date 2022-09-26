@@ -6,8 +6,8 @@ use clap::*;
 pub struct ConfigOverride {
     /// Cluster override
     ///
-    /// Values = mainnet, testnet, devnet, localnet.
-    /// Default: devnet
+    /// Values = Mainnet, Testnet, Devnet, Localnet.
+    /// Default: Devnet
     #[clap(global = true, short, long, default_value_t = Cluster::Devnet)]
     pub cluster: Cluster,
     /// Wallet override
@@ -15,67 +15,75 @@ pub struct ConfigOverride {
     /// Example: /path/to/wallet/keypair.json
     /// Default: ~/.config/solana/id.json
     #[clap(
-        global = true,
-        short,
-        long,
-        default_value_t = String::from(shellexpand::tilde("~/.config/solana/id.json"))
+    global = true,
+    short,
+    long,
+    default_value_t = String::from(shellexpand::tilde("~/.config/solana/id.json"))
     )]
     pub wallet_path: String,
 
     #[clap(
-        global = true,
-        short,
-        long,
-        default_value_t = staking::id().to_string()
+    global = true,
+    short,
+    long,
+    default_value_t = staking::id().to_string()
     )]
     pub program_id: String,
 }
 
 #[derive(Parser, Debug)]
 pub enum CliCommand {
-    /// Initialize vault
+    /// Initialize pool
     Init {
         #[clap(long)]
-        token_mint: Pubkey,
-    },
-    /// Transfer admin
-    TransferAdmin {
+        staking_mint: Pubkey,
         #[clap(long)]
-        new_admin_path: String, // path that stores new_admin keypair
+        reward_mint: Pubkey,
         #[clap(long)]
-        vault_pubkey: Pubkey,
-    },
-    /// Show vault info
-    ShowInfo {
+        reward_duration: u64,
         #[clap(long)]
-        vault_pubkey: Pubkey,
+        funding_amount: u64,
     },
-    /// Stake
+    ActivateFarming {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+    },
+    /// User enables staking
+    CreateUser {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+    },
+    /// User stakes
     Stake {
         #[clap(long)]
-        vault_pubkey: Pubkey,
-        /// Amount to stake
+        pool_pubkey: Pubkey,
         amount: u64,
     },
-    /// Add reward to the vault
-    Reward {
-        #[clap(long)]
-        vault_pubkey: Pubkey,
-        /// Amount to stake
-        amount: u64,
-    },
-    /// Unstake
+    /// User unstakes
     Unstake {
         #[clap(long)]
-        vault_pubkey: Pubkey,
-        /// Amount to stake
-        unmint_amount: u64,
+        pool_pubkey: Pubkey,
+        spt_amount: u64,
     },
-    /// Update locked reward degradation
-    UpdateLockedRewardDegradation {
+    /// User claims pending rewards
+    Claim {
         #[clap(long)]
-        vault_pubkey: Pubkey,
-        locked_reward_degradation: u64,
+        pool_pubkey: Pubkey,
+    },
+    /// Admin closes a user stake account
+    CloseUser {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+    },
+    /// Show pool info
+    ShowInfo {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+    },
+    /// User stake info
+    StakeInfo {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
     },
 }
 

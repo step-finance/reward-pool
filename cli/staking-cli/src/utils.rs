@@ -1,29 +1,47 @@
-use anchor_client::solana_client::rpc_response::RpcSimulateTransactionResult;
-use anchor_client::RequestBuilder;
 use anchor_client::{solana_sdk::pubkey::Pubkey, Program};
 use anyhow::Result;
 use spl_associated_token_account::{create_associated_token_account, get_associated_token_address};
 
-#[derive(Clone, Copy, Debug)]
-pub struct VaultPdas {
-    pub token_vault: (Pubkey, u8),
-    pub lp_mint: (Pubkey, u8),
+pub struct UserPDA {
+    pub user: (Pubkey, u8),
 }
 
-pub fn get_vault_pdas(
-    vault_pubkey: &Pubkey,
-    token_mint: &Pubkey,
-    program_id: &Pubkey,
-) -> VaultPdas {
-    let seeds = [b"token_vault".as_ref(), vault_pubkey.as_ref()];
-    let (token_vault_pubkey, token_vault_bump) = Pubkey::find_program_address(&seeds, &program_id);
+pub struct PoolPDA {
+    pub pubkey: Pubkey,
+    pub bump: u8,
+}
 
-    let seeds = [b"lp_mint", vault_pubkey.as_ref()];
-    let (lp_mint_pubkey, lp_mint_bump) = Pubkey::find_program_address(&seeds, &program_id);
+pub struct VaultPDAs {
+    pub staking_vault: (Pubkey, u8),
+    pub reward_vault: (Pubkey, u8),
+}
 
-    VaultPdas {
-        token_vault: (token_vault_pubkey, token_vault_bump),
-        lp_mint: (lp_mint_pubkey, lp_mint_bump),
+pub fn get_user_pda(pool: &Pubkey, owner: &Pubkey, program_id: &Pubkey) -> UserPDA {
+    let seeds = [owner.as_ref(), pool.as_ref()];
+    let (user_pubkey, user_bump) = Pubkey::find_program_address(&seeds, &program_id);
+    UserPDA {
+        user: (user_pubkey, user_bump),
+    }
+}
+
+pub fn get_user(program: &Program, user_pubkey: Pubkey) -> Result<staking::state::User> {
+    Ok(program.account(user_pubkey)?)
+}
+
+pub fn get_pool(program: &Program, pool_pubkey: Pubkey) -> Result<staking::state::Pool> {
+    Ok(program.account(pool_pubkey)?)
+}
+
+pub fn get_vault_pdas(program_id: &Pubkey, pool_pubkey: &Pubkey) -> VaultPDAs {
+    let seeds = [b"staking_vault", pool_pubkey.as_ref()];
+    let (staking_vault_pubkey, staking_vault_bump) =
+        Pubkey::find_program_address(&seeds, &program_id);
+    let seeds = [b"reward_vault", pool_pubkey.as_ref()];
+    let (reward_vault_pubkey, reward_vault_bump) =
+        Pubkey::find_program_address(&seeds, &program_id);
+    VaultPDAs {
+        staking_vault: (staking_vault_pubkey, staking_vault_bump),
+        reward_vault: (reward_vault_pubkey, reward_vault_bump),
     }
 }
 

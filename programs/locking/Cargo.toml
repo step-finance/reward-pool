@@ -1,0 +1,22 @@
+[package]
+name = "locking"
+version = "0.1.0"
+description = "Locking program"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "locking"
+
+[features]
+no-entrypoint = []
+no-idl = []
+cpi = ["no-entrypoint"]
+default = []
+devnet = []
+
+[dependencies]
+anchor-lang = { version = "0.24.2" }
+anchor-spl = { version = "0.24.2"}
+spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
+num-traits = "0.2"

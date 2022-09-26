@@ -1,4 +1,0 @@
-extends = ["../Test.base.toml"]
-
-[scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/dual-farming/**/*.ts"

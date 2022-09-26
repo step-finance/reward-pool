@@ -1,19 +1,16 @@
 [package]
-name = "staking"
+name = "farming"
 version = "0.2.0"
 description = "Created with Anchor"
 edition = "2018"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "staking"
+name = "farming"
 
 [features]
 no-entrypoint = []
 cpi = ["no-entrypoint"]
-#add to default for local testing
-#default = ["dev"]
-#note, can also use `anchor test -- --features dev` now
 devnet = []
 verbose = []
 
