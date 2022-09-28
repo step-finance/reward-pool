@@ -38,44 +38,31 @@ pub enum CliCommand {
         #[clap(long)]
         token_mint: Pubkey,
     },
-    /// Transfer admin
-    TransferAdmin {
-        #[clap(long)]
-        new_admin_path: String, // path that stores new_admin keypair
-        #[clap(long)]
-        vault_pubkey: Pubkey,
-    },
     /// Show vault info
     ShowInfo {
         #[clap(long)]
         vault_pubkey: Pubkey,
     },
-    /// Stake
-    Stake {
+    /// Lock
+    Lock {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Amount to stake
+        /// Amount to lock
         amount: u64,
     },
-    /// Add reward to the vault
-    Reward {
+    /// Unlock
+    Unlock {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Amount to stake
-        amount: u64,
+        /// Amount to unlock
+        unlock_amount: u64,
     },
-    /// Unstake
-    Unstake {
+    /// Set release date
+    SetReleaseDate {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Amount to stake
-        unmint_amount: u64,
-    },
-    /// Update locked reward degradation
-    UpdateLockedRewardDegradation {
-        #[clap(long)]
-        vault_pubkey: Pubkey,
-        locked_reward_degradation: u64,
+        /// Release date since unix timestamp
+        release_date: u64,
     },
 }
 

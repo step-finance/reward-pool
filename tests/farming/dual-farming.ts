@@ -16,7 +16,7 @@ import {
   REWARD_DURATION,
 } from "./utils";
 import assert from "assert";
-import { ParsedClockState } from "../clock_state";
+import { ParsedClockState } from "../clock";
 
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);

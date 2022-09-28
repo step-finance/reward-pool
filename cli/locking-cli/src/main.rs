@@ -36,85 +36,58 @@ fn main() -> Result<()> {
         CliCommand::Init { token_mint } => {
             initialize_vault(&program, &payer, &token_mint)?;
         }
-        CliCommand::TransferAdmin {
-            vault_pubkey,
-            new_admin_path,
-        } => {
-            let new_admin =
-                read_keypair_file(new_admin_path).expect("Wallet keypair file not found");
-            transfer_admin(&program, &vault_pubkey, &payer, &new_admin)?;
-        }
         CliCommand::ShowInfo { vault_pubkey } => {
             show_vault_info(&program, &vault_pubkey)?;
         }
-        CliCommand::Stake {
+        CliCommand::Lock {
             vault_pubkey,
             amount,
         } => {
-            stake(&program, &vault_pubkey, &payer, amount)?;
+            lock(&program, &vault_pubkey, &payer, amount)?;
         }
-        CliCommand::Reward {
+        CliCommand::Unlock {
             vault_pubkey,
-            amount,
+            unlock_amount,
         } => {
-            reward(&program, &vault_pubkey, &payer, amount)?;
+            unlock(&program, &vault_pubkey, &payer, unlock_amount)?;
         }
-        CliCommand::Unstake {
+        CliCommand::SetReleaseDate {
             vault_pubkey,
-            unmint_amount,
+            release_date,
         } => {
-            unstake(&program, &vault_pubkey, &payer, unmint_amount)?;
-        }
-        CliCommand::UpdateLockedRewardDegradation {
-            vault_pubkey,
-            locked_reward_degradation,
-        } => {
-            update_locked_reward_degradation(
-                &program,
-                &vault_pubkey,
-                &payer,
-                locked_reward_degradation,
-            )?;
+            set_release_date(&program, &vault_pubkey, &payer, release_date)?;
         }
     }
     Ok(())
 }
 
-fn update_locked_reward_degradation(
-    program: &Program,
-    vault_pubkey: &Pubkey,
-    admin: &Keypair,
-    locked_reward_degradation: u64,
-) -> Result<()> {
-    let vault: Vault = program.account(*vault_pubkey)?;
-    let token_mint = vault.token_mint;
-    let VaultPdas {
-        token_vault: _,
-        lp_mint: _,
-    } = get_vault_pdas(&vault_pubkey, &token_mint, &program.id());
-
-    let builder = program
-        .request()
-        .accounts(locking::accounts::UpdateLockedRewardDegradation {
-            vault: *vault_pubkey,
-            admin: admin.pubkey(),
-        })
-        .args(locking::instruction::UpdateLockedRewardDegradation {
-            locked_reward_degradation,
-        })
-        .signer(admin);
-
-    let signature = builder.send()?;
-    println!("Signature {:?}", signature);
-
-    Ok(())
-}
-
-fn unstake(
+fn set_release_date(
     program: &Program,
     vault_pubkey: &Pubkey,
     payer: &Keypair,
-    unmint_amount: u64,
+    release_date: u64,
+) -> Result<()> {
+    let vault: Vault = program.account(*vault_pubkey)?;
+
+    let builder = program
+        .request()
+        .accounts(locking::accounts::SetReleaseDate {
+            admin: vault.admin,
+            vault: *vault_pubkey,
+        })
+        .args(locking::instruction::SetReleaseDate { release_date })
+        .signer(payer);
+
+    let signature = builder.send()?;
+    println!("Signature {:?}", signature);
+    Ok(())
+}
+
+fn unlock(
+    program: &Program,
+    vault_pubkey: &Pubkey,
+    payer: &Keypair,
+    unlock_amount: u64,
 ) -> Result<()> {
     let vault: Vault = program.account(*vault_pubkey)?;
     let token_mint = vault.token_mint;
@@ -132,7 +105,7 @@ fn unstake(
 
     let builder = program
         .request()
-        .accounts(locking::accounts::Stake {
+        .accounts(locking::accounts::Lock {
             lp_mint: lp_mint_pubkey,
             token_program: spl_token::ID,
             vault: *vault_pubkey,
@@ -141,7 +114,7 @@ fn unstake(
             user_lp,
             user_token,
         })
-        .args(locking::instruction::Unstake { unmint_amount })
+        .args(locking::instruction::Unlock { unlock_amount })
         .signer(payer);
 
     let signature = builder.send()?;
@@ -150,38 +123,7 @@ fn unstake(
     Ok(())
 }
 
-fn reward(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
-    let vault: Vault = program.account(*vault_pubkey)?;
-    let token_mint = vault.token_mint;
-
-    let VaultPdas {
-        token_vault,
-        lp_mint: _,
-    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
-
-    let (token_vault_pubkey, _) = token_vault;
-
-    let user_token = get_or_create_ata(&program, &payer.pubkey(), &token_mint)?;
-
-    let builder = program
-        .request()
-        .accounts(locking::accounts::Reward {
-            token_program: spl_token::ID,
-            vault: *vault_pubkey,
-            user_transfer_authority: payer.pubkey(),
-            token_vault: token_vault_pubkey,
-            user_token,
-        })
-        .args(locking::instruction::Reward { amount })
-        .signer(payer);
-
-    let signature = builder.send()?;
-    println!("Signature {:?}", signature);
-
-    Ok(())
-}
-
-fn stake(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
+fn lock(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64) -> Result<()> {
     let vault: Vault = program.account(*vault_pubkey)?;
     let token_mint = vault.token_mint;
 
@@ -198,7 +140,7 @@ fn stake(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64)
 
     let builder = program
         .request()
-        .accounts(locking::accounts::Stake {
+        .accounts(locking::accounts::Lock {
             lp_mint: lp_mint_pubkey,
             token_program: spl_token::ID,
             vault: *vault_pubkey,
@@ -207,7 +149,7 @@ fn stake(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64)
             user_lp,
             user_token,
         })
-        .args(locking::instruction::Stake { amount })
+        .args(locking::instruction::Lock { amount })
         .signer(payer);
 
     let signature = builder.send()?;
@@ -218,44 +160,7 @@ fn stake(program: &Program, vault_pubkey: &Pubkey, payer: &Keypair, amount: u64)
 
 fn show_vault_info(program: &Program, vault_pubkey: &Pubkey) -> Result<()> {
     let vault: Vault = program.account(*vault_pubkey)?;
-    let token_mint = vault.token_mint;
-
-    let VaultPdas {
-        token_vault: _,
-        lp_mint: _,
-    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
-
     println!("{:#?}", vault);
-
-    Ok(())
-}
-
-fn transfer_admin(
-    program: &Program,
-    vault_pubkey: &Pubkey,
-    admin: &Keypair,
-    new_admin: &Keypair,
-) -> Result<()> {
-    let vault: Vault = program.account(*vault_pubkey)?;
-    let token_mint = vault.token_mint;
-    let VaultPdas {
-        token_vault: _,
-        lp_mint: _,
-    } = get_vault_pdas(vault_pubkey, &token_mint, &program.id());
-
-    let builder = program
-        .request()
-        .accounts(locking::accounts::TransferAdmin {
-            admin: admin.pubkey(),
-            new_admin: new_admin.pubkey(),
-            vault: *vault_pubkey,
-        })
-        .args(locking::instruction::TransferAdmin {})
-        .signer(admin)
-        .signer(new_admin);
-
-    let signature = builder.send()?;
-    println!("Signature {:?}", signature);
 
     Ok(())
 }
