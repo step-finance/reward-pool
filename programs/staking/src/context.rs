@@ -153,7 +153,7 @@ pub struct FundJup<'info> {
     /// Global accounts for the staking instance.
     #[account(
         mut,
-        has_one = jup_reward_vault,        
+        has_one = jup_reward_vault,
         constraint = pool.is_jup_info_enable != 0
     )]
     pub pool: Box<Account<'info, Pool>>,
@@ -267,7 +267,7 @@ pub struct ClaimJupReward<'info> {
     #[account(
         mut,
         has_one = staking_vault,
-        has_one = jup_reward_vault,        
+        has_one = jup_reward_vault,
         constraint = pool.is_jup_info_enable != 0
     )]
     pub pool: Box<Account<'info, Pool>>,
@@ -317,9 +317,9 @@ pub struct CloseUser<'info> {
 
 /// Accounts for [GetUserInfo](/staking/instruction/struct.GetUserInfo.html) instruction
 #[derive(Accounts)]
-pub struct GetUserInfo<'info> { 
+pub struct GetUserInfo<'info> {
     /// The farming pool.
-    #[account(mut,)]
+    #[account(mut)]
     pub pool: Box<Account<'info, Pool>>,
 
     /// User staking PDA.
