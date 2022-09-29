@@ -24,7 +24,7 @@ pub mod state;
 /// Export for utils implementation
 pub mod utils;
 
-declare_id!("9D9cdG8WV336qsjWe6PeMkqcsBmAWTZhddQgTfQrsHqc");
+declare_id!("StakhsBRrXhafhcBUpMmQuippk1JrQuAk6GXuknBCxW");
 
 /// Single farming program
 #[program]

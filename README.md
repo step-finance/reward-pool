@@ -1,12 +1,21 @@
 ## Programs
 This repository contains 3 main programs:
-- Staking: Stake MER earn xMER
-- Single farming: Stake xMER farm other token
-- Dual farming: Deposit LP tokens to get single or dual rewards
+- Locking: Lock MER get xMER (ratio is 1:1)
+- Staking: Stake xMER farm xMER + JUP
+- Farming: Deposit LP tokens to get xMER and other tokens
 
 ## Test
 ```
 anchor test -- --features devnet
+```
+
+## Build
+```
+[Devnet]
+anchor build -- --features devnet
+
+[Mainnet]
+anchor build
 ```
 
 ## Branches and Tags

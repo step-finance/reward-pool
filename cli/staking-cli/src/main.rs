@@ -118,7 +118,7 @@ fn initialize_pool(
 ) -> Result<()> {
     let pool_keypair = Keypair::new();
     let pool_pubkey = pool_keypair.pubkey();
-    print!("pool_pubkey {}", pool_pubkey);
+    print!("pool_pubkey {} \n", pool_pubkey);
 
     let VaultPDAs {
         staking_vault,

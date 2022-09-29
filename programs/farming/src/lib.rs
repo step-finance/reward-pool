@@ -18,9 +18,8 @@ use crate::pool::*;
 /// Export for pool implementation
 pub mod pool;
 
-declare_id!("DUALszVmfxqFLXDQpkrf8S6qHNxjqeBdDnqne74Bwhvw");
+declare_id!("FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1");
 
-pub const MIN_DURATION: u64 = 1;
 const PRECISION: u128 = u64::MAX as u128;
 
 /// Updates the pool with the total reward per token that is due stakers
@@ -70,7 +69,7 @@ fn last_time_reward_applicable(reward_duration_end: u64) -> u64 {
 #[program]
 pub mod farming {
     use super::*;
-
+    pub const MIN_DURATION: u64 = 1;
     /// Initializes a new pool. Able to create pool with single reward by passing the same Mint account for reward_a_mint and reward_a_mint
     pub fn initialize_pool(ctx: Context<InitializePool>, reward_duration: u64) -> Result<()> {
         if reward_duration < MIN_DURATION {

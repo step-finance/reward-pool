@@ -47,21 +47,21 @@ pub enum CliCommand {
     Lock {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Amount to lock
+        #[clap(long)]
         amount: u64,
     },
     /// Unlock
     Unlock {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Amount to unlock
+        #[clap(long)]
         unlock_amount: u64,
     },
     /// Set release date
     SetReleaseDate {
         #[clap(long)]
         vault_pubkey: Pubkey,
-        /// Release date since unix timestamp
+        #[clap(long)]
         release_date: u64,
     },
 }

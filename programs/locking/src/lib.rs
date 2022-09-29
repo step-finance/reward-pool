@@ -11,7 +11,7 @@ use crate::vault::Vault;
 
 pub mod vault;
 
-declare_id!("DNTDdX18wZCfRWzB6auDDi8CqX3TQTLSZGd8LwTpusNL");
+declare_id!("LockrzAg7Zg5LhrJP5sszKYCrx5fGrhLdMvU3zhftHp");
 
 const ELEVEN_MONTHS: i64 = 86400 * 30 * 11;
 const THIRTEEN_MONTHS: i64 = 86400 * 30 * 13;
