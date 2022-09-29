@@ -8,7 +8,7 @@ pub struct ConfigOverride {
     ///
     /// Values = Mainnet, Testnet, Devnet, Localnet.
     /// Default: Devnet
-    #[clap(global = true, short, long, default_value_t = Cluster::Devnet)]
+    #[clap(global = true, short, long, default_value_t = Cluster::Mainnet)]
     pub cluster: Cluster,
     /// Wallet override
     ///
@@ -88,12 +88,14 @@ pub enum CliCommand {
     Deposit {
         #[clap(long)]
         pool: Pubkey,
+        #[clap(long)]
         amount: u64,
     },
     /// User unstakes
     Withdraw {
         #[clap(long)]
         pool: Pubkey,
+        #[clap(long)]
         spt_amount: u64,
     },
     /// Admin adds a wallet as funder

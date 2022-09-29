@@ -38,35 +38,83 @@ pub enum CliCommand {
         #[clap(long)]
         staking_mint: Pubkey,
         #[clap(long)]
-        reward_mint: Pubkey,
+        xmer_reward_mint: Pubkey,
         #[clap(long)]
-        reward_duration: u64,
+        jup_reward_duration: u64,
         #[clap(long)]
-        funding_amount: u64,
+        jup_funding_amount: u64,
+        #[clap(long)]
+        xmer_reward_duration: u64,
     },
     ActivateFarming {
         #[clap(long)]
         pool_pubkey: Pubkey,
+    },
+    SetJupInformation {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+        #[clap(long)]
+        jup_mint: Pubkey,
+    },
+    /// Admin adds a wallet as funder
+    Authorize {
+        #[clap(long)]
+        pool: Pubkey,
+        #[clap(long)]
+        funder: Pubkey,
+    },
+    /// Admin removes a wallet as funder
+    Deauthorize {
+        #[clap(long)]
+        pool: Pubkey,
+        #[clap(long)]
+        funder: Pubkey,
+    },
+    /// Admin or funder funds rewards to pool
+    FundXmer {
+        #[clap(long)]
+        pool: Pubkey,
+        #[clap(long)]
+        amount: u64,
+    },
+    /// Admin or funder funds rewards to pool
+    FundJup {
+        #[clap(long)]
+        pool: Pubkey,
+        #[clap(long)]
+        amount: u64,
     },
     /// User enables staking
     CreateUser {
         #[clap(long)]
         pool_pubkey: Pubkey,
     },
-    /// User stakes
-    Stake {
+    /// User deposits full
+    DepositFull {
         #[clap(long)]
         pool_pubkey: Pubkey,
+    },
+    /// User deposits
+    Deposit {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+        #[clap(long)]
         amount: u64,
     },
-    /// User unstakes
-    Unstake {
+    /// User withdraw
+    Withdraw {
         #[clap(long)]
         pool_pubkey: Pubkey,
+        #[clap(long)]
         spt_amount: u64,
     },
     /// User claims pending rewards
-    Claim {
+    ClaimXmer {
+        #[clap(long)]
+        pool_pubkey: Pubkey,
+    },
+    /// User claims pending rewards
+    ClaimJup {
         #[clap(long)]
         pool_pubkey: Pubkey,
     },
