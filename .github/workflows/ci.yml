@@ -33,6 +33,7 @@ jobs:
           files: |
             cli
             programs
+            tests
 
   reward_pool_test:
     runs-on: ubuntu-latest
