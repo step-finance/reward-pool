@@ -15,6 +15,8 @@ const program = anchor.workspace.Staking as anchor.Program<Staking>;
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 
+const PRECISION = new BN(1_000_000_000);
+const SECONDS_PER_DAY = new BN(86_400);
 const adminKeypair = new Keypair();
 const userKeypair = new Keypair();
 
@@ -40,8 +42,11 @@ async function computeApy(program: anchor.Program<Staking>, pool: PublicKey) {
   if (poolState.xmerRewardEndTimestamp.toNumber() < clock.info.unixTimestamp) {
     return 0;
   }
-  const rewardPerDay = poolState.xmerRewardRate.div(new BN(365));
-  const rewardPerTokenPerDay = rewardPerDay.toNumber() / lockedToken;
+  const rewardPerDay = poolState.xmerRewardRate
+    .mul(SECONDS_PER_DAY)
+    .div(PRECISION)
+    .toNumber();
+  const rewardPerTokenPerDay = rewardPerDay / lockedToken;
   return ((1 + rewardPerTokenPerDay) ** 365 - 1) * 100;
 }
 

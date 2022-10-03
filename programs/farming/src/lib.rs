@@ -20,7 +20,7 @@ pub mod pool;
 
 declare_id!("FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1");
 
-const PRECISION: u128 = u64::MAX as u128;
+const PRECISION: u128 = 1_000_000_000;
 
 /// Updates the pool with the total reward per token that is due stakers
 /// Using the calculator specific to that pool version which uses the reward

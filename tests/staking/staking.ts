@@ -22,12 +22,12 @@ const program = anchor.workspace.Staking as anchor.Program<Staking>;
 const provider = anchor.AnchorProvider.env();
 anchor.setProvider(provider);
 
+const PRECISION = new BN(1_000_000_000);
 const adminKeypair = new Keypair();
 const userKeypair = new Keypair();
 
 function computeRewardRate(rewardAmount: BN, rewardDuration: BN) {
-  const annualMultiplier = new BN(86400 * 365).div(rewardDuration);
-  return annualMultiplier.mul(rewardAmount);
+  return rewardAmount.mul(PRECISION).div(rewardDuration);
 }
 
 async function assertAnchorError(result: Promise<string>, errorCode: string) {
@@ -234,16 +234,16 @@ describe("staking", () => {
       PublicKey.default.toBase58()
     );
     assert.strictEqual(
-      poolState.jupRewardDuration.toNumber(),
-      jupRewardDuration.toNumber()
+      poolState.jupRewardDuration.toString(),
+      jupRewardDuration.toString()
     );
     assert.strictEqual(poolState.jupLastUpdateTime.toNumber(), 0);
     assert.strictEqual(poolState.jupRewardEndTimestamp.toNumber(), 0);
     assert.strictEqual(poolState.isJupInfoEnable, 0);
     assert.strictEqual(poolState.jupRewardPerTokenStored.toNumber(), 0);
     assert.strictEqual(
-      poolState.jupRewardRate.toNumber(),
-      jupRewardRate.toNumber()
+      poolState.jupRewardRate.toString(),
+      jupRewardRate.toString()
     );
     assert.strictEqual(poolState.totalFundedJup.toNumber(), 0);
   });
