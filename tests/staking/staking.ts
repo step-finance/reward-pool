@@ -547,19 +547,13 @@ describe("staking", () => {
 
   it("start accumulate jup reward", async () => {
     await sleep(1000);
-    // User claim xMer, which will trigger the program to compute the reward from 1 seconds -> 2 seconds time window
+    // User invoke getUserInfo, which will trigger the program to compute the reward from 1 seconds -> 2 seconds time window
     await program.methods
-      .claimXmer()
+      .getUserInfo()
       .accounts({
-        owner: userKeypair.publicKey,
         pool,
-        stakingVault,
-        tokenProgram: TOKEN_PROGRAM_ID,
         user,
-        xmerRewardAccount: userStakingToken,
-        xmerRewardVault: xMerRewardVault,
       })
-      .signers([userKeypair])
       .rpc();
 
     const userState = await program.account.user.fetch(user);
@@ -568,7 +562,6 @@ describe("staking", () => {
     assert.notStrictEqual(userState.totalJupReward.toNumber(), 0);
 
     assert.strictEqual(userState.jupRewardHarvested.toNumber(), 0);
-    assert.strictEqual(userState.xmerRewardPending.toNumber(), 0);
   });
 
   it("unable to set jup info until jup reward accumulation end", async () => {
@@ -646,6 +639,7 @@ describe("staking", () => {
 
     const afterUserXMerBalance =
       await provider.connection.getTokenAccountBalance(userStakingToken);
+
     assert.strictEqual(
       afterUserXMerBalance.value.uiAmount >
         beforeUserXMerBalance.value.uiAmount,
