@@ -9,10 +9,10 @@ edition = "2021"
 clap = { version = "3.1.8", features = ["derive"] }
 staking = { path = "../../programs/staking"}
 shellexpand = "2.1.0"
-anchor-lang = "0.24.2"
-anchor-spl = {version = "0.24.2"}
-anchor-client = "0.24.2"
+anchor-lang = "0.25.0"
+anchor-spl = "0.25.0"
+anchor-client = "0.25.0"
 anyhow = "1.0.57"
-solana-program = "1.9.17"
-spl-token = { version = "3.1.1", features = ["no-entrypoint"] }
+solana-program = "1.10.29"
+spl-token = { version = "~3.3.0", features = ["no-entrypoint"] }
 spl-associated-token-account = { version = "1.0.3", features = ["no-entrypoint"] }
