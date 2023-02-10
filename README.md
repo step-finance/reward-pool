@@ -1,8 +1,5 @@
 ## Programs
-This repository contains 3 main programs:
-- Locking: Lock MER get xMER (ratio is 1:1)
-- Staking: Stake xMER farm xMER + JUP
-- Farming: Deposit LP tokens to get xMER and other tokens
+`FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`
 
 ## Test
 ```
@@ -17,6 +14,9 @@ anchor build -- --features devnet
 [Mainnet]
 anchor build
 ```
+
+## Farming pools
+farming_pools.json
 
 ## Branches and Tags
 - New development happens on `main`.
