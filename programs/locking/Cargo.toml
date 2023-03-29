@@ -16,7 +16,7 @@ default = []
 devnet = []
 
 [dependencies]
-anchor-lang = { version = "0.25.0" }
-anchor-spl = { version = "0.25.0"}
+anchor-lang = { version = "0.26.0" }
+anchor-spl = { version = "0.26.0"}
 spl-math = { version = "0.1.0", features = ["no-entrypoint"] }
 num-traits = "0.2"
