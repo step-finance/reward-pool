@@ -1,3 +1,5 @@
+# Farming Program for Meteora Pools
+
 ## Programs
 `FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1`
 
@@ -16,7 +18,10 @@ anchor build
 ```
 
 ## Farming pools
-farming_pools.json
+
+Visit Meteora API to get all farming pools
+
+https://docs.meteora.ag/dynamic-pools-integration/dynamic-pool-api/pool-info
 
 ## Branches and Tags
 - New development happens on `main`.

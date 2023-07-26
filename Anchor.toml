@@ -1,7 +1,7 @@
 anchor_version = "0.24.2"
 
 [workspace]
-members = ["programs/locking", "programs/staking", "programs/farming"]
+members = ["programs/farming"]
 
 [registry]
 url = "https://anchor.projectserum.com"
@@ -11,6 +11,4 @@ cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [programs.localnet]
-locking = "LockrzAg7Zg5LhrJP5sszKYCrx5fGrhLdMvU3zhftHp"
-staking = "StakhsBRrXhafhcBUpMmQuippk1JrQuAk6GXuknBCxW"
 farming = "FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1"

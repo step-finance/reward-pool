@@ -2130,32 +2130,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "locking"
-version = "0.1.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "num-traits",
- "spl-math",
-]
-
-[[package]]
-name = "locking-cli"
-version = "0.1.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "clap 3.2.23",
- "locking",
- "shellexpand",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
-]
-
-[[package]]
 name = "log"
 version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3396,12 +3370,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 
 [[package]]
-name = "sn_fake_clock"
-version = "0.4.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2407d5b1cfd7dd5f3a9d2fa04484473fb9cfe939e701d18a3aa14e15671cb83"
-
-[[package]]
 name = "socket2"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4255,34 +4223,6 @@ dependencies = [
  "spl-memo",
  "spl-token",
  "thiserror",
-]
-
-[[package]]
-name = "staking"
-version = "0.2.0"
-dependencies = [
- "anchor-lang",
- "anchor-spl",
- "sn_fake_clock",
- "solana-program",
- "spl-math",
- "spl-token",
-]
-
-[[package]]
-name = "staking-cli"
-version = "0.1.0"
-dependencies = [
- "anchor-client",
- "anchor-lang",
- "anchor-spl",
- "anyhow",
- "clap 3.2.23",
- "shellexpand",
- "solana-program",
- "spl-associated-token-account",
- "spl-token",
- "staking",
 ]
 
 [[package]]
