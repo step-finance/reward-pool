@@ -34,32 +34,28 @@ jobs:
           files: |
             ts-client
 
-  ts-test-publish:
+  ts-test:
     needs: changed_files_ts
     if: needs.changed_files_ts.outputs.program == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Setup .npmrc file to publish to npm
+      - name: Set up Node.js
         uses: actions/setup-node@v1
         with:
-          node-version: "16.x"
-          registry-url: "https://registry.npmjs.org"
+          node-version: ${{ matrix.node }}
       - uses: pnpm/action-setup@v2.2.2
         with:
           version: 6.0.2
-      - name: Install modules
+      - name: Install dependencies
         working-directory: ${{ env.working_dir }}
-        run: pnpm i
-      - name: Build
-        working-directory: ${{ env.working_dir }}
-        run: pnpm run build
-      - name: Add git commit tag to env
-        run: echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
-      - name: Publish to npm
+        run: pnpm install
+      - name: create env file
         working-directory: ${{ env.working_dir }}
         run: |
-          npm version --no-git-tag-version prerelease --preid=${SHORT_SHA} --force
-          npm publish --tag next
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          touch .env
+          echo MAINNET_RPC_ENDPOINT=${{ env.MAINNET_PRC_ENDPOINT }} >> .env
+          echo WALLET_PRIVATE_KEY=${{ env.WALLET_PRIVATE_KEY }} >> .env
+      - name: Run tests
+        working-directory: ${{ env.working_dir }}
+        run: pnpm run test
