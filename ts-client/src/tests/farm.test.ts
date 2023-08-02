@@ -80,9 +80,10 @@ describe("Interact with farm", () => {
       DEVNET_POOL,
       "devnet"
     );
-    const [farm1] = await PoolFarmImpl.createMultiple(DEVNET.connection, [
-      farmingPool.farmAddress,
-    ]);
+    const [farm1] = await PoolFarmImpl.createMultiple(
+      DEVNET.connection,
+      farmingPool.map(({ farmAddress }) => farmAddress)
+    );
 
     farm = farm1;
   });
@@ -93,12 +94,7 @@ describe("Interact with farm", () => {
       const stakeResult = await provider.sendAndConfirm(stakeTx);
       expect(typeof stakeResult).toBe("string");
 
-      const stakedBalanceMap = await PoolFarmImpl.getUserBalances(
-        DEVNET.connection,
-        mockWallet.publicKey,
-        [farm.address]
-      );
-      stakedBalance = stakedBalanceMap.get(farm.address.toBase58());
+      stakedBalance = await farm.getUserBalance(mockWallet.publicKey);
 
       expect(stakedBalance.toNumber()).toBeGreaterThan(0);
     } catch (error: any) {

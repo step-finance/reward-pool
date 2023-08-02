@@ -107,17 +107,17 @@ export class PoolFarmImpl {
   ) {
     const apiData = await getFarmInfo(cluster);
 
-    const farm = apiData.find(
+    const farms = apiData.filter(
       (farm) => farm.pool_address === poolAddress.toBase58()
     );
 
-    if (!farm) throw new Error("No pool address found ");
+    if (!farms.length) throw new Error("No pool address found ");
 
-    return {
+    return farms.map((farm) => ({
       farmAddress: new PublicKey(farm.farming_pool),
       APY: farm.farming_apy,
       expired: farm.farm_expire,
-    };
+    }));
   }
 
   public static async getFarmAddressByLp(
@@ -126,15 +126,17 @@ export class PoolFarmImpl {
   ) {
     const apiData = await getFarmInfo(cluster);
 
-    const farm = apiData.find((farm) => farm.lp_mint === lpAddress.toBase58());
+    const farms = apiData.filter(
+      (farm) => farm.lp_mint === lpAddress.toBase58()
+    );
 
-    if (!farm) throw new Error("No pool address found ");
+    if (!farms.length) throw new Error("No pool address found ");
 
-    return {
+    return farms.map((farm) => ({
       farmAddress: new PublicKey(farm.farming_pool),
       APY: farm.farming_apy,
       expired: farm.farm_expire,
-    };
+    }));
   }
 
   public static async getUserBalances(
@@ -211,6 +213,19 @@ export class PoolFarmImpl {
           .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }));
       })
     );
+  }
+
+  async getUserBalance(owner: PublicKey) {
+    const [userStakingAddress] = PublicKey.findProgramAddressSync(
+      [owner.toBuffer(), this.address.toBuffer()],
+      FARM_PROGRAM_ID
+    );
+
+    const userState = await this.program.account.user.fetchNullable(
+      userStakingAddress
+    );
+
+    return userState.balanceStaked;
   }
 
   getUserPda(owner: PublicKey) {
