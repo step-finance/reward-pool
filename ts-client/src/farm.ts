@@ -11,13 +11,13 @@ import {
 
 import { FarmProgram, Opt, PoolState, UserState } from "./types";
 import {
-  FARM_PROGRAM_ID,
-  SIMULATION_USER,
   chunks,
+  getFarmInfo,
   getFarmProgram,
   getOrCreateATAInstruction,
   parseLogs,
 } from "./utils";
+import { FARM_PROGRAM_ID, SIMULATION_USER } from "./constant";
 
 const chunkedFetchMultipleUserAccount = async (
   program: FarmProgram,
@@ -99,6 +99,42 @@ export class PoolFarmImpl {
         cluster,
       });
     });
+  }
+
+  public static async getFarmAddressByPoolAddress(
+    poolAddress: PublicKey,
+    cluster?: Cluster
+  ) {
+    const apiData = await getFarmInfo(cluster);
+
+    const farm = apiData.find(
+      (farm) => farm.pool_address === poolAddress.toBase58()
+    );
+
+    if (!farm) throw new Error("No pool address found ");
+
+    return {
+      farmAddress: new PublicKey(farm.farming_pool),
+      APY: farm.farming_apy,
+      expired: farm.farm_expire,
+    };
+  }
+
+  public static async getFarmAddressByLp(
+    lpAddress: PublicKey,
+    cluster?: Cluster
+  ) {
+    const apiData = await getFarmInfo(cluster);
+
+    const farm = apiData.find((farm) => farm.lp_mint === lpAddress.toBase58());
+
+    if (!farm) throw new Error("No pool address found ");
+
+    return {
+      farmAddress: new PublicKey(farm.farming_pool),
+      APY: farm.farming_apy,
+      expired: farm.farm_expire,
+    };
   }
 
   public static async getUserBalances(
