@@ -80,6 +80,24 @@ export class PoolFarmImpl {
     this.opt = opt;
   }
 
+  public static async create(
+    connection: Connection,
+    farm: PublicKey,
+    opt?: { cluster?: Cluster }
+  ) {
+    const cluster = opt?.cluster ?? "mainnet-beta";
+    const { program } = getFarmProgram(connection);
+    const eventParser = new EventParser(FARM_PROGRAM_ID, program.coder);
+
+    const poolState = await program.account.pool.fetchNullable(farm);
+
+    if (!poolState) throw new Error("No pool state found");
+
+    return new PoolFarmImpl(farm, program, eventParser, poolState, {
+      cluster,
+    });
+  }
+
   public static async createMultiple(
     connection: Connection,
     farmList: Array<PublicKey>,
@@ -101,7 +119,7 @@ export class PoolFarmImpl {
     });
   }
 
-  public static async getFarmAddressByPoolAddress(
+  public static async getFarmAddressesByPoolAddress(
     poolAddress: PublicKey,
     cluster?: Cluster
   ) {
@@ -120,7 +138,7 @@ export class PoolFarmImpl {
     }));
   }
 
-  public static async getFarmAddressByLp(
+  public static async getFarmAddressesByLp(
     lpAddress: PublicKey,
     cluster?: Cluster
   ) {

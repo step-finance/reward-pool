@@ -40,10 +40,12 @@ const provider = new AnchorProvider(mainnetConnection, mockWallet, {
 });
 // Alternatively, to use Solana Wallet Adapter
 
-const farmingPool = await PoolFarmImpl.getFarmAddressByPoolAddress(
+const farmingPools = await PoolFarmImpl.getFarmAddressesByPoolAddress(
   MAINNET_POOL.USDC_USDT // Pool Address can get from https://docs.meteora.ag/dynamic-pools-integration/dynamic-pool-api/pool-info
 );
-const [farm] = await PoolFarmImpl.createMultiple(connection, [farmingPool]);
+// farmingPools is an array (A pool can have multiple farms)
+const farmingPool = farmingPools[0];
+const farm = await PoolFarmImpl.create(connection, farmingPool);
 ```
 
 3. To interact with the PoolFarmImpl

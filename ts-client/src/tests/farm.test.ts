@@ -42,16 +42,15 @@ describe("Interact with farm", () => {
       (token) => token.address === "zVzi5VAf4qMEwzv7NXECVx5v2pQ7xnqVVjCXZwS9XzA"
     );
 
-    const pools = [
+    const pool = await AmmImpl.create(
+      DEVNET.connection,
+      new PublicKey(DEVNET_POOL),
+      USDT!,
+      USDC!,
       {
-        pool: new PublicKey(DEVNET_POOL),
-        tokenInfoA: USDT!,
-        tokenInfoB: USDC!,
-      },
-    ];
-    const [pool] = await AmmImpl.createMultiple(DEVNET.connection, pools, {
-      cluster: DEVNET.cluster as Cluster,
-    });
+        cluster: DEVNET.cluster as Cluster,
+      }
+    );
 
     const inAmountALamport = new BN(0.1 * 10 ** pool.tokenA.decimals);
     const inAmountBLamport = new BN(0.1 * 10 ** pool.tokenB.decimals);
@@ -76,16 +75,14 @@ describe("Interact with farm", () => {
       throw new Error(error.message);
     }
 
-    const farmingPool = await PoolFarmImpl.getFarmAddressByPoolAddress(
+    const farmingPool = await PoolFarmImpl.getFarmAddressesByPoolAddress(
       DEVNET_POOL,
       "devnet"
     );
-    const [farm1] = await PoolFarmImpl.createMultiple(
+    farm = await PoolFarmImpl.create(
       DEVNET.connection,
-      farmingPool.map(({ farmAddress }) => farmAddress)
+      farmingPool[0].farmAddress
     );
-
-    farm = farm1;
   });
 
   test("Stake farm", async () => {
