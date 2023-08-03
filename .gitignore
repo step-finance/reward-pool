@@ -13,3 +13,5 @@ soteria-linux-develop/
 .coderrect/
 testing/
 deployment
+dist
+.env
