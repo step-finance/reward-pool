@@ -15,7 +15,11 @@ import fetch from "node-fetch";
 
 import { Farming, IDL } from "./idl/farming-idl";
 import { Amm as AmmIdl, IDL as AmmIDL } from "./idl/amm-idl";
-import { AMM_PROGRAM_ID, FARM_PROGRAM_ID } from "./constant";
+import {
+  AMM_PROGRAM_ID,
+  FARMING_API_ENDPOINT,
+  FARM_PROGRAM_ID,
+} from "./constant";
 import { PoolInfo } from "./types";
 
 export const getFarmProgram = (connection: Connection) => {
@@ -44,12 +48,10 @@ export const getAmmProgram = (connection: Connection, programId?: string) => {
   return { provider, ammProgram };
 };
 
-export const getFarmInfo = async (cluster?: Cluster) => {
-  const data = await fetch(
-    cluster === "devnet"
-      ? process.env.DEVNET_FARM_API
-      : process.env.MAINNET_FARM_API
-  ).then((res) => res.json());
+export const getFarmInfo = async (cluster: Cluster = "mainnet-beta") => {
+  const data = await fetch(FARMING_API_ENDPOINT[cluster]).then((res) =>
+    res.json()
+  );
 
   return data as PoolInfo[];
 };

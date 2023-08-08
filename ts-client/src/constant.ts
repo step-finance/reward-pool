@@ -1,6 +1,11 @@
 import { ENV, TokenInfo } from "@solana/spl-token-registry";
 import { PublicKey } from "@solana/web3.js";
 
+export const FARMING_API_ENDPOINT = Object.freeze({
+  devnet: "https://dev-mer-amm.raccoons.dev/farms",
+  "mainnet-beta": "https://amm.mercurial.finance/farms",
+});
+
 export const FARM_PROGRAM_ID = new PublicKey(
   "FarmuwXPWXvefWUeqFAa5w6rifLkq5X6E8bimYvrhCB1"
 );

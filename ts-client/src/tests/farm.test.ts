@@ -5,9 +5,13 @@ import { AnchorProvider, BN, Wallet } from "@coral-xyz/anchor";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
 import { airDropSol } from "../utils";
 import { DEVNET_COIN } from "../constant";
+import { TokenListProvider } from "@solana/spl-token-registry";
 
 const DEVNET_POOL = new PublicKey(
   "BAHscmu1NncGS7t4rc5gSBPv1UFEMkvLaon1Ahdd5rHi"
+);
+const MAINNET_POOL = new PublicKey(
+  "6ZLKLjMd2KzH7PPHCXUPgbMAtdTT37VgTtdeXWLoJppr"
 );
 
 const DEVNET = {
@@ -17,13 +21,18 @@ const DEVNET = {
   cluster: "devnet",
 };
 
+const MAINNET = {
+  connection: new Connection(process.env.MAINNET_RPC_ENDPOINT as string),
+  cluster: "mainnet-beta",
+};
+
 const mockWallet = new Wallet(
   process.env.WALLET_PRIVATE_KEY
     ? Keypair.fromSecretKey(bs58.decode(process.env.WALLET_PRIVATE_KEY))
     : new Keypair()
 );
 
-describe("Interact with farm", () => {
+describe("Interact with devnet farm", () => {
   const provider = new AnchorProvider(DEVNET.connection, mockWallet, {
     commitment: "confirmed",
   });
@@ -117,5 +126,28 @@ describe("Interact with farm", () => {
       console.trace(error);
       throw new Error(error.message);
     }
+  });
+});
+
+describe("Interact with mainnet farm", () => {
+  const provider = new AnchorProvider(MAINNET.connection, mockWallet, {
+    commitment: "confirmed",
+  });
+
+  let farm: PoolFarmImpl;
+  beforeAll(async () => {
+    const farmingPool = await PoolFarmImpl.getFarmAddressesByPoolAddress(
+      MAINNET_POOL
+    );
+    farm = await PoolFarmImpl.create(
+      MAINNET.connection,
+      farmingPool[0].farmAddress
+    );
+  });
+
+  test("Get farm info", () => {
+    expect(farm.address.toBase58()).toBe(
+      "9dGX6N3FLAVfKmvtkwHA9MVGsvEqGKnLFDQQFbw5dprr"
+    );
   });
 });
