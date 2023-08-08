@@ -22,15 +22,15 @@ Discord: https://discord.com/channels/841152225564950528/864859354335412224
 1. Install deps
 
 ```
-npm i @mercurial-finance/farming-sdk @project-serum/anchor @solana/web3.js @solana/spl-token @solana/spl-token-registry
+npm i @mercurial-finance/farming-sdk @coral-xyz/anchor @solana/web3.js @solana/spl-token @solana/spl-token-registry
 ```
 
-2. Initialize AmmImpl instance
+2. Initialize PoolFarmImpl instance
 
 ```ts
-import PoolFarmImpl from "@mercurial-finance/farming-sdk";
-import { PublicKey } from "@solana/web3.js";
-import { Wallet, AnchorProvider } from "@project-serum/anchor";
+import { PoolFarmImpl } from "@mercurial-finance/farming-sdk";
+import { Wallet, AnchorProvider } from "@coral-xyz/anchor";
+import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 
 // Connection, Wallet, and AnchorProvider to interact with the network
 const mainnetConnection = new Connection("https://api.mainnet-beta.solana.com");
@@ -40,12 +40,19 @@ const provider = new AnchorProvider(mainnetConnection, mockWallet, {
 });
 // Alternatively, to use Solana Wallet Adapter
 
+const USDC_acUSDC_POOL = new PublicKey(
+  "6ZLKLjMd2KzH7PPHCXUPgbMAtdTT37VgTtdeXWLoJppr"
+); // Pool Address can get from https://docs.meteora.ag/dynamic-pools-integration/dynamic-pool-api/pool-info
+
 const farmingPools = await PoolFarmImpl.getFarmAddressesByPoolAddress(
-  MAINNET_POOL.USDC_USDT // Pool Address can get from https://docs.meteora.ag/dynamic-pools-integration/dynamic-pool-api/pool-info
+  USDC_acUSDC_POOL
 );
 // farmingPools is an array (A pool can have multiple farms)
 const farmingPool = farmingPools[0];
-const farm = await PoolFarmImpl.create(connection, farmingPool);
+const farm = await PoolFarmImpl.create(
+  mainnetConnection,
+  farmingPool.farmAddress
+);
 ```
 
 3. To interact with the PoolFarmImpl
