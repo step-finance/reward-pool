@@ -45,6 +45,7 @@ export const getAmmProgram = (connection: Connection, programId?: string) => {
 };
 
 export const getFarmInfo = async (cluster?: Cluster) => {
+  console.log(process.env.MAINNET_FARM_API);
   const data = await fetch(
     cluster === "devnet"
       ? process.env.DEVNET_FARM_API
