@@ -211,23 +211,24 @@ export class PoolFarmImpl {
       { cluster: opt?.cluster }
     );
 
-    const claimAllIxs = await Promise.all(
+    const claimAllTxs = await Promise.all(
       poolFarmsImpl.map(async (poolFarmImpl) => {
-        return (await poolFarmImpl.claimMethodBuilder(owner)).instruction();
+        const claimMethod = await poolFarmImpl.claimMethodBuilder(owner);
+        return await claimMethod.method.transaction();
       })
     );
 
-    const chunkedClaimAllIx = chunks(claimAllIxs, MAX_CLAIM_ALL_ALLOWED);
+    const chunkedClaimAllTx = chunks(claimAllTxs, MAX_CLAIM_ALL_ALLOWED);
 
     return Promise.all(
-      chunkedClaimAllIx.map(async (claimAllIx) => {
+      chunkedClaimAllTx.map(async (claimAllTx) => {
         return new Transaction({
           feePayer: owner,
           ...(await program.provider.connection.getLatestBlockhash(
             "finalized"
           )),
         })
-          .add(...claimAllIx)
+          .add(...claimAllTx)
           .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }));
       })
     );
@@ -382,24 +383,29 @@ export class PoolFarmImpl {
     userRewardAIx && preInstructions.push(userRewardAIx);
     userRewardBIx && preInstructions.push(userRewardBIx);
 
-    return this.program.methods
-      .claim()
-      .accounts({
-        owner,
-        pool: this.address,
-        rewardAAccount: userRewardAATA,
-        rewardBAccount: isDual ? userRewardBATA : userRewardAATA,
-        rewardAVault: this.poolState.rewardAVault,
-        rewardBVault: this.poolState.rewardBVault,
-        stakingVault: this.poolState.stakingVault,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        user: userPda,
-      })
-      .preInstructions(preInstructions);
+    return {
+      method: this.program.methods
+        .claim()
+        .accounts({
+          owner,
+          pool: this.address,
+          rewardAAccount: userRewardAATA,
+          rewardBAccount: isDual ? userRewardBATA : userRewardAATA,
+          rewardAVault: this.poolState.rewardAVault,
+          rewardBVault: this.poolState.rewardBVault,
+          stakingVault: this.poolState.stakingVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          user: userPda,
+        })
+        .preInstructions(preInstructions),
+      preInstructions,
+    };
   }
 
   public async claim(owner: PublicKey) {
-    const claimTx = await (await this.claimMethodBuilder(owner)).transaction();
+    const claimTx = await (
+      await this.claimMethodBuilder(owner)
+    ).method.transaction();
 
     return new Transaction({
       feePayer: owner,
@@ -414,7 +420,7 @@ export class PoolFarmImpl {
 
     const claimMethodBuilder = await this.claimMethodBuilder(owner);
 
-    const claimTransaction = await claimMethodBuilder.transaction();
+    const claimTransaction = await claimMethodBuilder.method.transaction();
 
     if (!claimTransaction) return;
 
